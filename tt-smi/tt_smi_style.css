@@ -1,0 +1,56 @@
+$green: #1eb57d;
+#app_grid {
+  layout: grid;
+  grid-gutter: 1 1;
+}
+
+#tab_container{
+  overflow: auto auto;
+}
+
+#left_col {
+  width: 40;
+  column-span: 1;
+  dock: left
+}
+
+#right_col {
+  width: 35;
+  column-span: 1;
+  dock: right
+}
+
+TabPane {
+  width: 100%;
+  /* Enable scrolling on tabs */
+  overflow: auto hidden;
+}
+
+#tt_smi {
+  width: 100
+}
+
+#host_info {
+  height: 12;
+}
+
+#helper_menu {
+  height: 12;
+}
+
+DataTable {
+  text-align: center;
+}
+
+DataTable > .datatable--header-hover {
+  background: 0%;
+  color: white 0%;
+}
+
+/* TTMenu Style */
+
+TTHealthMenu, TTTextMenu, TTTestOutput {
+  padding: 1 2;
+  border: solid $green;
+  color: $green;
+}
