@@ -118,7 +118,7 @@ def hex_to_semver(hexsemver: int):
 def hex_to_semver_eth(hexsemver: int):
     """Converts a semantic version string from format 0x061000 to 6.1.0"""
     if hexsemver == 0 or hexsemver == 0xFFFFFF:
-        raise ValueError("hexsemver is invalid!")
+        return "N/A"
 
     major = hexsemver >> 16 & 0xFF
     minor = hexsemver >>  12 & 0xF
@@ -129,7 +129,7 @@ def hex_to_semver_eth(hexsemver: int):
 def hex_to_semver_m3_fw(hexsemver: int):
     """Converts a semantic version string from format 0x0A0F0100 to 10.15.1"""
     if hexsemver == 0 or hexsemver == 0xFFFFFFFF:
-        raise ValueError("hexsemver is invalid!")
+        return "N/A"
     
     major = hexsemver >> 24 & 0xFF
     minor = hexsemver >> 16 & 0xFF
@@ -141,7 +141,7 @@ def hex_to_semver_m3_fw(hexsemver: int):
 def hex_to_date(hexdate: int, include_time=True):
     """Converts a date given in hex from format 0xYMDDHHMM to string YYYY-MM-DD HH:MM"""
     if hexdate == 0 or hexdate == 0xFFFFFFFF:
-        raise ValueError("hexdate is invalid!")
+        return "N/A"
 
     year = (hexdate >> 28 & 0xF) + 2020
     month = hexdate >> 24 & 0xF

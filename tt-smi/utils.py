@@ -19,11 +19,13 @@ import constants as constants
 from collections import OrderedDict
 from tqdm import TqdmExperimentalWarning
 # from version import VERSION_STR, APP_SIGNATURE
+from utils_common import get_host_info, init_logging
 from typing import Dict, List, OrderedDict, Tuple, Union, Optional
 from pyluwen import PciChip
 import jsons
 import utils_common
 import re
+import log
 
 IS_PYINSTALLER_BIN = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
@@ -36,7 +38,19 @@ class TTSMIBackend():
 
     def __init__(self, devices: List[PciChip]):
         self.devices = devices
-        self.log = None
+        self.log: log.TTSMILog = log.TTSMILog(
+            time=datetime.datetime.now(),
+            host_info=get_host_info(),
+            device_info=[
+                log.TTSMIDeviceLog
+                (   board_info=log.BoardInfo(),
+                    telemetry =log.Telemetry(),
+                    firmwares =log.Firmwares(),
+                    limits = log.Limits(),
+                    smbus_telem = log.SmbusTelem()
+                )
+                for device in self.devices
+            ])
         self.smbus_telem_info = []
         self.firmware_infos = []
         self.device_infos = []
@@ -51,7 +65,24 @@ class TTSMIBackend():
             self.device_infos.append(self.get_device_info(i))
             self.device_telemetrys.append(self.get_chip_telemetry(i))
             self.chip_limits.append(self.get_chip_limits(i))
-            
+        
+    def save_logs(self, result_filename: str = None):
+        time_now = datetime.datetime.now()
+        date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
+        log_filename = f"{LOG_FOLDER}{date_string}_results.json"
+        if result_filename:
+            dir_path = os.path.dirname(os.path.realpath(result_filename))
+            Path(dir_path).mkdir(parents=True, exist_ok=True)
+            log_filename = result_filename
+        for i in range(0, len(self.devices)):
+            self.log.device_info[i].board_info = self.device_infos[i]
+            self.log.device_info[i].telemetry = self.device_telemetrys[i]
+            self.log.device_info[i].firmwares = self.firmware_infos[i]
+            self.log.device_info[i].limits = self.chip_limits[i]
+            self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
+        self.log.save_as_json(log_filename)
+        return log_filename
+       
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """ Update board info by reading SMBUS_TELEMETRY"""
         pylewen_chip = self.devices[board_num]
@@ -61,7 +92,8 @@ class TTSMIBackend():
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
         
         for key, value in map.items():
-            smbus_telem_dict[key.upper()] = hex(value)
+            if value:
+                smbus_telem_dict[key.upper()] = hex(value)
         return smbus_telem_dict
 
     def update_telem(self):
@@ -83,23 +115,28 @@ class TTSMIBackend():
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip""" 
+        if self.devices[board_num].as_gs():
+            val = int(self.smbus_telem_info[board_num][f"SMBUS_TX_DDR_SPEED"],16)
+            return f"{val}"
         dram_speed_raw = int(self.smbus_telem_info[board_num][f"SMBUS_TX_DDR_STATUS"],16) >> 24
         if dram_speed_raw == 0:
-            return 16
+            return "16G"
         elif dram_speed_raw == 1:
-            return 14
+            return "14G"
         elif dram_speed_raw == 2:
-            return 12
+            return "12G"
         elif dram_speed_raw == 3:
-            return 10
+            return "10G"
         elif dram_speed_raw == 4:
-            return 8
+            return "8G"
         else:
             return None      
 
     def get_pci_speed_width(self, board_num):
-        pci_val = int(self.smbus_telem_info[board_num][f"SMBUS_TX_PCIE_STATUS"],16)
+        pci_val = int(self.smbus_telem_info[board_num][f"SMBUS_TX_PCIE_STATUS"],16) if self.smbus_telem_info[board_num][f"SMBUS_TX_PCIE_STATUS"] is not None else None
         
+        if pci_val == None:
+            return 0,0
         width = (pci_val >> 16) & 0xF
         speed = (pci_val >> 20) & 0x3F
 
@@ -109,23 +146,27 @@ class TTSMIBackend():
         """Get DRAM Training Status, True means it passed training, False means it failed or did not train at all"""
         if self.devices[board_num].as_wh():
             num_channels = 8
-        else:
+            for i in range(num_channels):
+                if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] == None:
+                    return False
+                dram_status = (int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"],16) >> (4*i)) & 0xF
+                if dram_status != 2:
+                    return False
+                return True
+        elif self.devices[board_num].as_gs():
             num_channels = 6 
-        # if self.chip.chip_name == "wormhole" else 8
-
-        for i in range(num_channels):
-            if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] == None:
-                return False
-            dram_status = (int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"],16) >> (4*i)) & 0xF
-            if dram_status != 2:
-                return False
-
-            return True
+            for i in range(num_channels):
+                if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] == None:
+                    return False
+                dram_status = (int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"],16) >> (4*i)) & 0xF
+                if dram_status != 1:
+                    return False
+                return True           
 
     def get_device_info(self, board_num) -> OrderedDict:
         dev_info = OrderedDict()
         for field in constants.DEV_INFO_LIST:
-            if field == "dev_id":
+            if field == "bus_id":
                 try:
                     dev_info[field] = self.devices[board_num].get_pci_bdf() 
                 except:
@@ -155,11 +196,11 @@ class TTSMIBackend():
         voltage = int(self.smbus_telem_info[board_num][f"SMBUS_TX_VCORE"], 16) / 1000
         power = int(self.smbus_telem_info[board_num][f"SMBUS_TX_TDP"], 16) & 0xFFFF
         asic_temperature = (int(self.smbus_telem_info[board_num][f"SMBUS_TX_ASIC_TEMPERATURE"],16) & 0xFFFF)/16
-        vreg_temperature = int(self.smbus_telem_info[board_num][f"SMBUS_TX_VREG_TEMPERATURE"],16) & 0xFFFF
-        board_temperature = int(self.smbus_telem_info[board_num][f"SMBUS_TX_BOARD_TEMPERATURE"],16)
+        # vreg_temperature = int(self.smbus_telem_info[board_num][f"SMBUS_TX_VREG_TEMPERATURE"],16) & 0xFFFF
+        # board_temperature = int(self.smbus_telem_info[board_num][f"SMBUS_TX_BOARD_TEMPERATURE"],16)
         aiclk = int(self.smbus_telem_info[board_num][f"SMBUS_TX_AICLK"], 16) & 0xFFFF
-        arcclk = int(self.smbus_telem_info[board_num][f"SMBUS_TX_ARCCLK"], 16)
-        axiclk = int(self.smbus_telem_info[board_num][f"SMBUS_TX_AXICLK"], 16)
+        # arcclk = int(self.smbus_telem_info[board_num][f"SMBUS_TX_ARCCLK"], 16)
+        # axiclk = int(self.smbus_telem_info[board_num][f"SMBUS_TX_AXICLK"], 16)
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -214,38 +255,38 @@ class TTSMIBackend():
             if field == "arc_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_ARC0_FW_VERSION"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_semver(int(val,16))
             elif field == "arc_fw_date":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_WH_FW_DATE"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_date(int(val,16), include_time=False)                
             elif field == "eth_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_ETH_FW_VERSION"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_semver_eth(int(val,16)) 
             elif field == "m3_bl_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_BL_FW_VERSION"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16)) 
                     
             elif field == "m3_app_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_APP_FW_VERSION"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16)) 
             elif field == "tt_flash_version":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_TT_FLASH_VERSION"]
                 if val == None:
-                    fw_versions[field] == "N/A"
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16))                             
         return fw_versions

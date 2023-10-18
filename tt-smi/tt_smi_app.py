@@ -22,6 +22,7 @@ from textual.containers import Container, Vertical
 from ui.common_widgets import TTHeader, TTDataTable, TTMenu, TTCompatibilityMenu
 from ui.common_themes import create_tt_tools_theme
 from utils import TTSMIBackend
+
 from pyluwen import PciChip
 from pyluwen import detect_chips
 
@@ -78,7 +79,7 @@ class TTSMI(App):
                 yield TTCompatibilityMenu(id="compatibility_menu",
                              title="Compatibility Check",
                              data=system_compatibility())
-            with TabbedContent("Information (1)", "Telemetry(2)", "Firmwares(3)", id="tab_container"):
+            with TabbedContent("Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"):
                 yield TTDataTable(
                     title="Device Information",
                     id="tt_smi_device_info",
@@ -115,10 +116,13 @@ class TTSMI(App):
         firmware_table.dt.add_rows(self.format_firmware_rows())
            
     def update_telem_table(self) -> None:
+        # start = time.time()
         telem_table = self.get_widget_by_id(id="tt_smi_telem")
         self.backend.update_telem()
         rows = self.format_telemetry_rows()
         telem_table.update_data(rows)
+        # delta = time.time() - start
+        # print(delta)
 
     def format_firmware_rows(self):
         all_rows = []
@@ -126,7 +130,10 @@ class TTSMI(App):
             rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
-                rows.append(Text(f"{val}", style=self.theme["text_green"], justify="center"))
+                if val == "N/A":
+                    rows.append(Text(f"{val}", style=self.theme["gray"], justify="center"))
+                else:
+                    rows.append(Text(f"{val}", style=self.theme["text_green"], justify="center"))
             all_rows.append(rows)
         return all_rows
 
@@ -176,13 +183,13 @@ class TTSMI(App):
                     if val == True:
                         rows.append(Text(f"Y", style=self.theme["text_green"], justify="center"))
                     else:
-                        rows.append(Text(f"N", style=self.theme["text_green"], justify="center"))
+                        rows.append(Text(f"N", style=self.theme["attention"], justify="center"))
                 elif info == "dram_speed":
                     if val: 
-                        if val < 12:
-                            rows.append(Text(f"{val}G", style=self.theme["attention"], justify="center"))
-                        else:
-                            rows.append(Text(f"{val}G", style=self.theme["text_green"], justify="center"))
+                        # if val < 12:
+                        #     rows.append(Text(f"{val}G", style=self.theme["attention"], justify="center"))
+                        # else:
+                        rows.append(Text(f"{val}", style=self.theme["text_green"], justify="center"))
                     else:
                         rows.append(Text(f"N/A", style=self.theme["red_bold"], justify="center"))
                 else:
@@ -285,12 +292,12 @@ def main():
             return
     try:
         devices = detect_chips()
-        # print(dir(devices[0]))
     except Exception as e:
         print(e)
         print("Exiting...")
         return -1
     backend = TTSMIBackend(devices=devices)
+    # print(backend.save_logs())
     
     tt_smi_app = TTSMI(backend=backend, no_log=args.no_log, result_filename=args.filename)
     tt_smi_app.run()

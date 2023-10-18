@@ -18,6 +18,7 @@ SMBUS_TELEMETRY_LIST = [
 "SMBUS_TX_ETH_FW_VERSION",
 "SMBUS_TX_M3_BL_FW_VERSION",
 "SMBUS_TX_M3_APP_FW_VERSION",
+"SMBUS_TX_DDR_SPEED",
 "SMBUS_TX_DDR_STATUS",
 "SMBUS_TX_ETH_STATUS0",
 "SMBUS_TX_ETH_STATUS1",
@@ -48,6 +49,7 @@ SMBUS_TELEMETRY_LIST = [
 "SMBUS_TX_GDDR_TRAIN_TEMP1",
 "SMBUS_TX_BOOT_DATE",
 "SMBUS_TX_RT_SECONDS",
+"SMBUS_TX_AUX_STATUS",
 "SMBUS_TX_ETH_DEBUG_STATUS0",
 "SMBUS_TX_ETH_DEBUG_STATUS1",
 "SMBUS_TX_TT_FLASH_VERSION",
@@ -88,7 +90,7 @@ FW_LIST = [
 ]
 
 DEV_INFO_LIST = [ 
-    "dev_id", 
+    "bus_id", 
     "board_type", 
     "board_id", 
     "coords", 
@@ -128,8 +130,8 @@ TELEMETRY_TABLE_HEADER = [
     "#",
     "Core Voltage (V)",
     "Core Current (A)",
-    "Core Power (W)",
     "AICLK (MHz)",
+    "Core Power (W)",
     "Core Temp (°C)",
 ]
 
@@ -158,3 +160,25 @@ FIRMWARES_TABLE_HEADER = [
     "M3 App Version",
     "TT-Flash Version",
 ]
+
+# HELP MARKDOWN DOCUMENT
+
+HELP_MENU_MARKDOWN = """\
+# TT-MOD HELP MENU
+
+TT-Mod is a command-line utility for updating the contents of the SPI flash memory on Tenstorrent WH Boards. 
+It operates through a text user interface that the user can interact with via cursor or keyboard input.
+
+## Features
+
+Use cursor or keyboard arrow keys to navigate the table. The following table details the keyboard keys that can be used and their functions
+
+|            Action            |    Key           |                     Detailed Description                     |
+| :--------------------------: | :--------------: | :----------------------------------------------------------: |
+|             Quit             |   q  |        Exit the program and get a SPI dump yaml file        |
+|             Help             |   h   |                   Opens up this help menu                   |
+|   Go to device(s) info tab  |        1        |          Switch to tab with device info         |
+|   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
+|   Go to device(s) telemetry tab     |        3        |          Switch to tab with telemetry info that is updated every 100ms           |
+
+"""
