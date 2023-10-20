@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 from textual.app import RenderResult, ComposeResult
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, ListView, ListItem, Label
