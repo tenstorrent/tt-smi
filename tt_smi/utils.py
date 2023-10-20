@@ -15,17 +15,16 @@ from typing import List
 from pathlib import Path
 from copy import deepcopy
 from tqdm.rich import tqdm
-import constants as constants
 from collections import OrderedDict
 from tqdm import TqdmExperimentalWarning
 # from version import VERSION_STR, APP_SIGNATURE
-from utils_common import get_host_info, init_logging
+from tt_utils_common import get_host_info, init_logging
 from typing import Dict, List, OrderedDict, Tuple, Union, Optional
 from pyluwen import PciChip
 import jsons
-import utils_common
+import tt_utils_common
 import re
-import log
+from tt_smi import log, constants
 
 IS_PYINSTALLER_BIN = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
@@ -172,7 +171,7 @@ class TTSMIBackend():
                 except:
                     dev_info[field] = "N/A"
             elif field == "board_type":
-                dev_info[field] = utils_common.get_board_type(self.get_board_id(board_num))
+                dev_info[field] = tt_utils_common.get_board_type(self.get_board_id(board_num))
             elif field == "board_id":
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
@@ -257,37 +256,37 @@ class TTSMIBackend():
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_semver(int(val,16))
+                    fw_versions[field] = tt_utils_common.hex_to_semver(int(val,16))
             elif field == "arc_fw_date":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_WH_FW_DATE"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_date(int(val,16), include_time=False)                
+                    fw_versions[field] = tt_utils_common.hex_to_date(int(val,16), include_time=False)                
             elif field == "eth_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_ETH_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_semver_eth(int(val,16)) 
+                    fw_versions[field] = tt_utils_common.hex_to_semver_eth(int(val,16)) 
             elif field == "m3_bl_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_BL_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16)) 
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16)) 
                     
             elif field == "m3_app_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_APP_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16)) 
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16)) 
             elif field == "tt_flash_version":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_TT_FLASH_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = utils_common.hex_to_semver_m3_fw(int(val,16))                             
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16))                             
         return fw_versions
 

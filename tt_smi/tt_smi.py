@@ -2,7 +2,6 @@ import sys
 import copy
 import signal
 import argparse
-import constants
 import time
 import asyncio
 import threading
@@ -14,14 +13,15 @@ from typing import List, Tuple, Dict
 from collections import OrderedDict
 from textual.css.query import NoMatches
 from textual.app import App, ComposeResult
-from ui.common_themes import CMD_LINE_COLOR
+from tt_smi.ui.common_themes import CMD_LINE_COLOR
 # from version import VERSION_STR, APP_SIGNATURE
 from textual.widgets import DataTable, Footer, TabbedContent
-from utils_common import get_host_info, system_compatibility 
+from tt_utils_common import get_host_info, system_compatibility 
 from textual.containers import Container, Vertical
-from ui.common_widgets import TTHeader, TTDataTable, TTMenu, TTCompatibilityMenu
-from ui.common_themes import create_tt_tools_theme
-from utils import TTSMIBackend
+from tt_smi.ui.common_widgets import TTHeader, TTDataTable, TTMenu, TTCompatibilityMenu
+from tt_smi.ui.common_themes import create_tt_tools_theme
+from tt_smi.utils import TTSMIBackend
+from tt_smi import constants
 
 from pyluwen import PciChip
 from pyluwen import detect_chips
@@ -47,7 +47,7 @@ class TTSMI(App):
                 ("3", "tab_three", "Firmware tab")
                 ]
 
-    CSS_PATH = ["../ui/common_style.css", "tt_smi_style.css"]
+    CSS_PATH = ["ui/common_style.css", "tt_smi_style.css"]
 
     def __init__(self,
                  result_filename: str = None,
