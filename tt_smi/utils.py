@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 This is the backend of tt-smi.
     - Keeps track of chip objects and tasks related to update SPI on them

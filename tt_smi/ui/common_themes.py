@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 from rich.text import Text
 from rich.style import Style
 
