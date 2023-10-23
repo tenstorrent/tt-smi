@@ -12,14 +12,14 @@ from rich.text import Text
 from sys import path
 from pathlib import Path
 from datetime import datetime
-from typing import List, Tuple, Dict
+from typing import Callable, List, Optional, Tuple, Dict
 from collections import OrderedDict
 from textual.css.query import NoMatches
 from textual.app import App, ComposeResult
 from tt_smi.ui.common_themes import CMD_LINE_COLOR
 # from version import VERSION_STR, APP_SIGNATURE
 from textual.widgets import DataTable, Footer, TabbedContent
-from tt_utils_common import get_host_info, system_compatibility 
+from tt_utils_common import get_host_info, system_compatibility
 from textual.containers import Container, Vertical
 from tt_smi.ui.common_widgets import TTHeader, TTDataTable, TTMenu, TTCompatibilityMenu
 from tt_smi.ui.common_themes import create_tt_tools_theme
@@ -32,6 +32,7 @@ from pyluwen import detect_chips
 TextualKeyBindings = List[Tuple[str, str, str]]
 interrupt_received = False
 telem_threads = []
+running_telem_thread = False
 
 def interrupt_handler(sig, action) -> None:
     """Handle interrupts to exit processes gracefully"""
@@ -66,14 +67,14 @@ class TTSMI(App):
         self.backend = backend
         self.no_log = no_log
         self.theme = create_tt_tools_theme()
-        
+
         if key_bindings:
             self.BINDINGS += key_bindings
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
 
-        yield TTHeader(self.app_name, self.app_version)        
+        yield TTHeader(self.app_name, self.app_version)
         with Container(id="app_grid"):
             with Vertical(id="left_col"):
                 yield TTMenu(id="host_info",
@@ -105,19 +106,19 @@ class TTSMI(App):
 
     def on_mount(self) -> None:
         """Event handler called when widget is added to the app."""
-        smi_table = self.get_widget_by_id(id="tt_smi_device_info") 
+        smi_table = self.get_widget_by_id(id="tt_smi_device_info")
         smi_table.dt.cursor_type = "none"
         # smi_table.dt.add_rows([[f"{n}", f"Status {n}", f"This is description {n}", datetime.now().strftime("%b %d %Y %I:%M:%S %p")] for n in range(42)])
         smi_table.dt.add_rows(self.format_device_info_rows())
-        
+
         telem_table = self.get_widget_by_id(id="tt_smi_telem")
         telem_table.dt.cursor_type = "none"
         telem_table.dt.add_rows(self.format_telemetry_rows())
-        
+
         firmware_table = self.get_widget_by_id(id="tt_smi_firmware")
         firmware_table.dt.cursor_type = "none"
         firmware_table.dt.add_rows(self.format_firmware_rows())
-           
+
     def update_telem_table(self) -> None:
         # start = time.time()
         telem_table = self.get_widget_by_id(id="tt_smi_telem")
@@ -145,7 +146,7 @@ class TTSMI(App):
         for i, _ in enumerate(self.backend.devices):
             rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
             for telem in constants.TELEM_LIST:
-                val = self.backend.device_telemetrys[i][telem]   
+                val = self.backend.device_telemetrys[i][telem]
                 if telem == "voltage":
                     vdd_max = self.backend.chip_limits[i]["vdd_max"]
                     rows.append(Text(f"{val}", style=self.theme["text_green"], justify="center") + Text(f"/ {vdd_max}", style=self.theme["yellow_bold"], justify="center"))
@@ -188,7 +189,7 @@ class TTSMI(App):
                     else:
                         rows.append(Text(f"N", style=self.theme["attention"], justify="center"))
                 elif info == "dram_speed":
-                    if val: 
+                    if val:
                         # if val < 12:
                         #     rows.append(Text(f"{val}G", style=self.theme["attention"], justify="center"))
                         # else:
@@ -202,7 +203,7 @@ class TTSMI(App):
                         rows.append(Text(f"{val}", style=self.theme["text_green"], justify="center"))
             all_rows.append(rows)
         return all_rows
-    
+
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
@@ -222,20 +223,23 @@ class TTSMI(App):
 
     async def action_tab_two(self) -> None:
         """Switch to read-only tab"""
-        global interrupt_received, telem_threads
+        global interrupt_received, telem_threads, running_telem_thread
         self.query_one(TabbedContent).active = "tab-2"
-        signal.signal(signal.SIGTERM, interrupt_handler)
-        signal.signal(signal.SIGINT, interrupt_handler)
-        
-        def update_telem():
-            global interrupt_received
-            while not interrupt_received:
-                self.update_telem_table()
-                time.sleep(constants.GUI_INTERVAL_TIME)
-        thread = threading.Thread(target=update_telem, name="telem_thread")
-        thread.setDaemon(True)
-        thread.start()
-        telem_threads.append(thread)
+
+        if not running_telem_thread:
+            signal.signal(signal.SIGTERM, interrupt_handler)
+            signal.signal(signal.SIGINT, interrupt_handler)
+
+            def update_telem():
+                global interrupt_received
+                while not interrupt_received:
+                    self.update_telem_table()
+                    time.sleep(constants.GUI_INTERVAL_TIME)
+            thread = threading.Thread(target=update_telem, name="telem_thread")
+            thread.setDaemon(True)
+            thread.start()
+            telem_threads.append(thread)
+            running_telem_thread = True
 
     def action_tab_three(self) -> None:
         """Switch to read-only tab"""
@@ -281,13 +285,13 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def main():
+def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None):
     global interrupt_received
     interrupt_received = False
 
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
-    
+
     args = parse_args()
     if args.filename:
         if Path(args.filename).suffix != ".json":
@@ -299,13 +303,13 @@ def main():
         print(e)
         print("Exiting...")
         return -1
-    backend = TTSMIBackend(devices=devices)
+    backend = TTSMIBackend(devices=devices, telem_struct_override=telemetry_builder_overload)
     # print(backend.save_logs())
-    
+
     tt_smi_app = TTSMI(backend=backend, no_log=args.no_log, result_filename=args.filename)
     tt_smi_app.run()
 
 if __name__ == "__main__":
     main()
-    
+
 

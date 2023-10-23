@@ -22,7 +22,7 @@ from collections import OrderedDict
 from tqdm import TqdmExperimentalWarning
 # from version import VERSION_STR, APP_SIGNATURE
 from tt_utils_common import get_host_info, init_logging
-from typing import Dict, List, OrderedDict, Tuple, Union, Optional
+from typing import Dict, List, OrderedDict, Tuple, Union, Optional, Callable
 from pyluwen import PciChip
 import jsons
 import tt_utils_common
@@ -38,8 +38,9 @@ class TTSMIBackend():
     It handles running of tests, sanitizing and logging of results
     """
 
-    def __init__(self, devices: List[PciChip]):
+    def __init__(self, devices: List[PciChip], telem_struct_override: Optional[Callable[[PciChip], dict]] = None):
         self.devices = devices
+        self.telem_struct_override = telem_struct_override
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
@@ -67,7 +68,7 @@ class TTSMIBackend():
             self.device_infos.append(self.get_device_info(i))
             self.device_telemetrys.append(self.get_chip_telemetry(i))
             self.chip_limits.append(self.get_chip_limits(i))
-        
+
     def save_logs(self, result_filename: str = None):
         time_now = datetime.datetime.now()
         date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
@@ -84,15 +85,18 @@ class TTSMIBackend():
             self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
         self.log.save_as_json(log_filename)
         return log_filename
-       
+
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """ Update board info by reading SMBUS_TELEMETRY"""
         pylewen_chip = self.devices[board_num]
-        telem_struct = pylewen_chip.get_telemetry()
-        
+        if self.telem_struct_override is not None:
+            telem_struct = self.telem_struct_override(pylewen_chip)
+        else:
+            telem_struct = pylewen_chip.get_telemetry()
+
         map = jsons.dump(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
-        
+
         for key, value in map.items():
             if value:
                 smbus_telem_dict[key.upper()] = hex(value)
@@ -103,7 +107,7 @@ class TTSMIBackend():
         for i, _ in enumerate(self.devices):
             self.smbus_telem_info[i] = self.get_smbus_board_info(i)
             self.device_telemetrys[i] = self.get_chip_telemetry(i)
-        
+
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
 
@@ -116,7 +120,7 @@ class TTSMIBackend():
         return f"{board_info_1}{board_info_0}"
 
     def get_dram_speed(self, board_num) -> int:
-        """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip""" 
+        """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
         if self.devices[board_num].as_gs():
             val = int(self.smbus_telem_info[board_num][f"SMBUS_TX_DDR_SPEED"],16)
             return f"{val}"
@@ -132,18 +136,18 @@ class TTSMIBackend():
         elif dram_speed_raw == 4:
             return "8G"
         else:
-            return None      
+            return None
 
     def get_pci_speed_width(self, board_num):
         pci_val = int(self.smbus_telem_info[board_num][f"SMBUS_TX_PCIE_STATUS"],16) if self.smbus_telem_info[board_num][f"SMBUS_TX_PCIE_STATUS"] is not None else None
-        
+
         if pci_val == None:
             return 0,0
         width = (pci_val >> 16) & 0xF
         speed = (pci_val >> 20) & 0x3F
 
         return width, speed
-        
+
     def get_dram_training_status(self, board_num) -> bool:
         """Get DRAM Training Status, True means it passed training, False means it failed or did not train at all"""
         if self.devices[board_num].as_wh():
@@ -156,21 +160,21 @@ class TTSMIBackend():
                     return False
                 return True
         elif self.devices[board_num].as_gs():
-            num_channels = 6 
+            num_channels = 6
             for i in range(num_channels):
                 if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] == None:
                     return False
                 dram_status = (int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"],16) >> (4*i)) & 0xF
                 if dram_status != 1:
                     return False
-                return True           
+                return True
 
     def get_device_info(self, board_num) -> OrderedDict:
         dev_info = OrderedDict()
         for field in constants.DEV_INFO_LIST:
             if field == "bus_id":
                 try:
-                    dev_info[field] = self.devices[board_num].get_pci_bdf() 
+                    dev_info[field] = self.devices[board_num].get_pci_bdf()
                 except:
                     dev_info[field] = "N/A"
             elif field == "board_type":
@@ -187,13 +191,13 @@ class TTSMIBackend():
                 dev_info[field], _ = self.get_pci_speed_width(board_num)
             elif field == "pcie_width":
                 _, dev_info[field] = self.get_pci_speed_width(board_num)
-        
+
         return dev_info
- 
-        
+
+
     def get_chip_telemetry(self, board_num)-> Dict:
         """Get telemetry data for chip. None if ARC FW not running"""
-        
+
         current = int(self.smbus_telem_info[board_num][f"SMBUS_TX_TDC"], 16) & 0xFFFF
         voltage = int(self.smbus_telem_info[board_num][f"SMBUS_TX_VCORE"], 16) / 1000
         power = int(self.smbus_telem_info[board_num][f"SMBUS_TX_TDP"], 16) & 0xFFFF
@@ -219,7 +223,7 @@ class TTSMIBackend():
         }
 
         return chip_telemetry
-    
+
     def get_chip_limits(self, board_num):
         """Get chip limits from the CSM. None if ARC FW not running"""
 
@@ -249,7 +253,7 @@ class TTSMIBackend():
             else:
                 chip_limits[field] = None
         return chip_limits
-    
+
     def get_firmware_versions(self, board_num):
         """ Translate the telem struct semver for gui"""
         fw_versions = OrderedDict()
@@ -265,31 +269,31 @@ class TTSMIBackend():
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_date(int(val,16), include_time=False)                
+                    fw_versions[field] = tt_utils_common.hex_to_date(int(val,16), include_time=False)
             elif field == "eth_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_ETH_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_eth(int(val,16)) 
+                    fw_versions[field] = tt_utils_common.hex_to_semver_eth(int(val,16))
             elif field == "m3_bl_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_BL_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16)) 
-                    
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16))
+
             elif field == "m3_app_fw":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_M3_APP_FW_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16)) 
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16))
             elif field == "tt_flash_version":
                 val = self.smbus_telem_info[board_num][f"SMBUS_TX_TT_FLASH_VERSION"]
                 if val == None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16))                             
+                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(int(val,16))
         return fw_versions
 
