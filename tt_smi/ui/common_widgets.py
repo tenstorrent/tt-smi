@@ -8,7 +8,7 @@ from textual.widgets.data_table import CellDoesNotExist
 from textual.containers import ScrollableContainer, Container, Grid
 from textual.coordinate import Coordinate
 from textual.screen import ModalScreen
-
+from textual.widgets import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.style import Style
@@ -64,11 +64,9 @@ class TTFooter(Widget):
 class TTDataTable(ScrollableContainer):
     """A custom container with a DataTable for TT-Tools."""
 
-    def __init__(self,
-                 title: str,
-                 header: List[str] = None,
-                 id: str = None,
-                 **kwargs) -> None:
+    def __init__(
+        self, title: str, header: List[str] = None, id: str = None, **kwargs
+    ) -> None:
         super().__init__(id=id)
         self.border_title = title
         self._title = title
@@ -77,9 +75,7 @@ class TTDataTable(ScrollableContainer):
 
     def style_header(self):
         for i, header_text in enumerate(self.header):
-            self.header[i] = Text(header_text,
-                                  justify="center",
-                                  style="underline")
+            self.header[i] = Text(header_text, justify="center", style="underline")
 
     def config_dt(self, **kwargs) -> DataTable:
         # initialize DataTable
@@ -107,9 +103,9 @@ class TTDataTable(ScrollableContainer):
             for j, val in enumerate(row):
                 try:
                     # update cell values one by one
-                    self.dt.update_cell_at(coordinate=Coordinate(column=j,
-                                                                 row=i),
-                                           value=val)
+                    self.dt.update_cell_at(
+                        coordinate=Coordinate(column=j, row=i), value=val
+                    )
                 except CellDoesNotExist:
                     # there are more rows than there used to be
                     self.dt.clear()
@@ -122,10 +118,8 @@ class TTDataTable(ScrollableContainer):
 
 class TTMenu(Container):
     """A custom Menu/List widget for TT-Tools."""
-    def __init__(self,
-                 id:str,
-                 title: str,
-                 data: OrderedDict[str, str]) -> None:
+
+    def __init__(self, id: str, title: str, data: OrderedDict[str, str]) -> None:
         super().__init__(id=id)
         self.border_title = title
         self.data = data
@@ -134,18 +128,22 @@ class TTMenu(Container):
     def render(self) -> RenderResult:
         text = Text()
         for key, value in self.data.items():
-            k = Text(f"{key.ljust(self.justify_width)}", style=Style(color="#ffd10a", bold=True))
-            text.append_text(Text("* ")).append_text(k).append_text(Text(f": {value}\n"))
+            k = Text(
+                f"{key.ljust(self.justify_width)}",
+                style=Style(color="#ffd10a", bold=True),
+            )
+            text.append_text(Text("* ")).append_text(k).append_text(
+                Text(f": {value}\n")
+            )
         text.rstrip()
 
         return text
 
+
 class TTCompatibilityMenu(Container):
     """A custom Menu/List widget for TT-Tools."""
-    def __init__(self,
-                 id:str,
-                 title: str,
-                 data: OrderedDict()) -> None:
+
+    def __init__(self, id: str, title: str, data: OrderedDict()) -> None:
         super().__init__(id=id)
         self.border_title = title
         self.data = data
@@ -155,22 +153,32 @@ class TTCompatibilityMenu(Container):
         text = Text()
         for key, value in self.data.items():
             if value[0] == True:
-                k = Text(f"{key.ljust(self.justify_width)}", style=Style(color="#ffd10a", bold=True))
-                text.append_text(Text("* ")).append_text(k).append_text(Text(f": {value[1]}\n"))
+                k = Text(
+                    f"{key.ljust(self.justify_width)}",
+                    style=Style(color="#ffd10a", bold=True),
+                )
+                text.append_text(Text("* ")).append_text(k).append_text(
+                    Text(f": {value[1]}\n")
+                )
             else:
-                k = Text(f"{key.ljust(self.justify_width)}", style=Style(color="#ffd10a", bold=True))
-                text.append_text(Text("* ")).append_text(k).append_text(Text(f": {value[1]}\n", style=Style(color="dark_orange")))
+                k = Text(
+                    f"{key.ljust(self.justify_width)}",
+                    style=Style(color="#ffd10a", bold=True),
+                )
+                text.append_text(Text("* ")).append_text(k).append_text(
+                    Text(f": {value[1]}\n", style=Style(color="dark_orange"))
+                )
         text.rstrip()
 
         return text
 
+
 class TTConfirmBox(ModalScreen):
     """A custom Confirm Box widget for TT-Tools."""
 
-    def __init__(self,
-                 text: str,
-                 on_yes: Callable = None,
-                 on_no: Callable = None) -> None:
+    def __init__(
+        self, text: str, on_yes: Callable = None, on_no: Callable = None
+    ) -> None:
         super().__init__()
         self.text = text
         self.on_yes = on_yes
@@ -178,14 +186,50 @@ class TTConfirmBox(ModalScreen):
         # TODO: give border title
 
     def compose(self) -> ComposeResult:
-        yield Grid(Label(self.text, id="question"),
-                   Button("Yes", id="yes"),
-                   Button("No", id="no"),
-                   id="dialog")
+        yield Grid(
+            Label(self.text, id="question"),
+            Button("Yes", id="yes"),
+            Button("No", id="no"),
+            id="dialog",
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "yes" and self.on_yes:
             self.on_yes()
         elif event.button.id == "no" and self.on_no:
             self.on_no()
+        self.app.pop_screen()
+
+
+class TTHelperMenuBox(ModalScreen):
+    """A custom modal screen with help options"""
+
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("escape", "esc_screen", "Escape the open screen"),
+        ("h", "help", "Quit the help box"),
+    ]
+
+    def __init__(self, text: str, theme: OrderedDict = {}) -> None:
+        super().__init__()
+        self.text = text
+        self.theme = theme
+
+    def compose(self) -> ComposeResult:
+        yield Markdown(self.text, id="help_menu_box")
+
+    async def action_quit(self) -> None:
+        """Return to main app"""
+        self.app.pop_screen()
+
+    async def action_esc_screen(self) -> None:
+        """An action to select test to run"""
+        self.app.pop_screen()
+
+    async def action_quit(self) -> None:
+        """Return to main app"""
+        self.app.pop_screen()
+
+    async def action_help(self) -> None:
+        """Return to main app"""
         self.app.pop_screen()

@@ -1,0 +1,38 @@
+Regsize: 32
+
+GPIO2_PAD_TRIEN_CNTL:
+  Address:          0x0240
+
+GPIO2_PAD_RXEN_CNTL:
+  Address:          0x024C
+
+GPIO2_PAD_DRV_CNTL:
+  Address:          0x0250
+
+I2C_CNTL:
+  Address:          0x00F0
+
+SPI_CNTL:
+  Address:          0x00F8
+
+I2C_PAD_CNTL:
+  Address:          0x01C0
+
+I2C_PAD_DATA:
+  Address:          0x01C4
+
+DDR_RESET:
+  Address:          0x0008
+  Fields:
+    axi_reset:  [ 0, 0, 0, "DDR_RESET_REG_AXI_RESETN_OFFSET" ]
+    ddrc_reset: [ 0, 1, 1, "DDR_RESET_REG_DDRC_RESETN_OFFSET" ]
+
+TENSIX_RESET:
+  Address:          0x0020
+  ArraySize:        8
+  AddressIncrement: 0x4
+
+RISCV_RESET:
+  Address:          0x0040
+  ArraySize:        8
+  AddressIncrement: 0x4

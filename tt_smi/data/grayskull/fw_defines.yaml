@@ -1,0 +1,11 @@
+MSG_TYPE_GET_AICLK:                       0x34
+MSG_TYPE_FORCE_AICLK:                     0x33
+MSG_TYPE_ARC_STATE0:                      0xa0
+MSG_TYPE_ARC_STATE3:                      0xa3
+MSG_TYPE_FW_VERSION:                      0xb9
+MSG_TYPE_DEASSERT_RISCV_RESET:            0xba
+MSG_TYPE_RESET_SAFE_CLKS:                 0xbb
+MSG_TYPE_ARC_GO_BUSY:                     0x52
+MSG_TYPE_ARC_GO_SHORT_IDLE:               0x53
+MSG_TYPE_ARC_GET_HARVESTING:              0x57
+MSG_TYPE_TOGGLE_TENSIX_RESET:             0xaf

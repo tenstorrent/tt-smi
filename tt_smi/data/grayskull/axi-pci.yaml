@@ -1,0 +1,7 @@
+ARC_CSM:
+  offset:    0x1FE80000
+  filename:  arc/csm.yaml
+
+ARC_RESET:
+  offset:    0x1FF30000
+  filename:  arc/reset.yaml

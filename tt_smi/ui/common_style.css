@@ -157,3 +157,38 @@ Footer {
     color: gray;
   }
   
+/* Help Menu box styling*/
+TTHelperMenuBox {
+    align: center middle;
+}
+#help_menu_box{
+    padding: 1 2;
+    width: 110;
+    height: 30;
+    border: solid $green;
+    background: $surface;
+    color: white;
+
+  }
+  
+  MarkdownH1 {
+    background: $accent-darken-2;
+    border: wide $background;
+    content-align: center middle;
+    padding: 1;
+    text-style: bold;
+    color: white;
+  }
+  
+  MarkdownTableContent {
+    width: 100%;
+    height: auto;
+  
+  }
+  MarkdownTableContent > .markdown-table--header {
+    text-style: bold;
+  }
+  
+  
+  /* Help Menu box styling end*/
+  

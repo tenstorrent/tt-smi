@@ -6,21 +6,16 @@ Generate tt-smi logs that are compatible with elasticsearch
 """
 from __future__ import annotations
 import json
-import yaml
 import base64
 import inspect
 import datetime
-import functools
 import elasticsearch
 from pathlib import Path
-from dataclasses import dataclass
-from collections import defaultdict
 from typing import Any, Union, List, TypeVar, Generic
 
-es = elasticsearch.Elasticsearch(["http://yyz-elk:9200"],
-                                 http_auth=("lab", "lab2019"))
+es = elasticsearch.Elasticsearch(["http://yyz-elk:9200"], http_auth=("lab", "lab2019"))
 
-from pydantic import BaseModel, conlist
+from pydantic import BaseModel
 from pydantic.fields import Field
 
 
@@ -37,7 +32,6 @@ class Text(str):
 
 
 class Date(datetime.datetime):
-
     @classmethod
     def build(cls, format: str):
         cls.format = format
@@ -60,8 +54,7 @@ def optional(*fields):
             _cls.__fields__[field].default = None
         return _cls
 
-    if fields and inspect.isclass(fields[0]) and issubclass(
-            fields[0], BaseModel):
+    if fields and inspect.isclass(fields[0]) and issubclass(fields[0], BaseModel):
         cls = fields[0]
         fields = cls.__fields__
         return dec(cls)
@@ -89,22 +82,20 @@ def type_to_mapping(type: Any):
     elif issubclass(type, Date):
         return type.get_mapping()
     elif issubclass(type, datetime.date):
-        return {
-            "type": "date",
-            "format": "strict_date_optional_time||epoch_millis"
-        }
+        return {"type": "date", "format": "strict_date_optional_time||epoch_millis"}
     elif issubclass(type, ElasticModel):
         return {"type": "object", "properties": type.get_mapping()}
     else:
-        raise NotImplementedError(
-            f"Have not implemented mapping support for {type}")
+        raise NotImplementedError(f"Have not implemented mapping support for {type}")
 
 
 def field_to_mapping(info: Field):
     try:
         # print(info.outer_type_, type(info.outer_type_))
-        if hasattr(info.outer_type_,
-                   "__origin__") and info.outer_type_.__origin__ == Nested:
+        if (
+            hasattr(info.outer_type_, "__origin__")
+            and info.outer_type_.__origin__ == Nested
+        ):
             inner = type_to_mapping(info.type_)
             if inner.get("type", None) == "object":
                 inner["type"] = "nested"
@@ -113,9 +104,8 @@ def field_to_mapping(info: Field):
             return inner
         else:
             return type_to_mapping(info.type_)
-    except NotImplementedError:
-        raise NotImplementedError(
-            f"Have not implemented mapping support for {info}")
+    except NotImplementedError as exc:
+        raise NotImplementedError(f'Have not implemented mapping support for {info}') from exc
 
 
 def json_load_bytes(obj):
@@ -126,7 +116,6 @@ def json_load_bytes(obj):
 
 
 class ElasticModel(BaseModel):
-
     @classmethod
     def get_mapping(cls):
         mapping = {}
@@ -155,6 +144,7 @@ class HostInfo(ElasticModel):
     Python: str
     Memory: str
     Driver: str
+
 
 @optional
 class SmbusTelem(ElasticModel):
@@ -208,49 +198,54 @@ class SmbusTelem(ElasticModel):
     SMBUS_TX_ETH_DEBUG_STATUS0: str
     SMBUS_TX_ETH_DEBUG_STATUS1: str
     SMBUS_TX_TT_FLASH_VERSION: str
+
+
 @optional
 class BoardInfo(ElasticModel):
-    bus_id: str 
-    board_type: str 
-    board_id: str 
-    coords: str 
-    dram_status: str 
-    dram_speed: str 
-    pcie_speed: str 
+    bus_id: str
+    board_type: str
+    board_id: str
+    coords: str
+    dram_status: str
+    dram_speed: str
+    pcie_speed: str
     pcie_width: str
+
 
 @optional
 class Telemetry(ElasticModel):
-    voltage : str
+    voltage: str
     current: str
     aiclk: str
-    power: str 
+    power: str
     asic_temperature: str
+
 
 @optional
 class Firmwares(ElasticModel):
-    arc_fw : str
-    arc_fw_date : str
-    eth_fw : str
-    m3_bl_fw : str
-    m3_app_fw : str
-    tt_flash_version : str
+    arc_fw: str
+    arc_fw_date: str
+    eth_fw: str
+    m3_bl_fw: str
+    m3_app_fw: str
+    tt_flash_version: str
 
 
 @optional
 class Limits(ElasticModel):
-    vdd_min : str
-    vdd_max : str
-    tdp_limit : str
-    tdc_limit : str
-    asic_fmax : str
-    therm_trip_l1_limit : str
-    thm_limit : str
-    bus_peak_limit : str
+    vdd_min: str
+    vdd_max: str
+    tdp_limit: str
+    tdc_limit: str
+    asic_fmax: str
+    therm_trip_l1_limit: str
+    thm_limit: str
+    bus_peak_limit: str
+
 
 @optional
 class TTSMIDeviceLog(ElasticModel):
-    smbus_telem: SmbusTelem
+    # smbus_telem: SmbusTelem
     board_info: BoardInfo
     telemetry: Telemetry
     firmwares: Firmwares
