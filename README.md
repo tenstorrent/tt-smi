@@ -4,20 +4,25 @@
 
 ### To Build from git:
 
-- Requirements
-    - luwen library (specifically pyluwen)
-        - pre-installed
-        - rust compiler and ability to compile rust
+- Requirements:
+    - Install and source rust for the luwen library
+    ```
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    source "$HOME/.cargo/env"
+    ```
 
 #### Optional
 ```
-pip -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 #### Required
 ```
-pip install -r requirements.txt
 pip install .
+```
+If you want to edit the source code, you can also install it in editable mode so re-instealls won't be needed.
+```
+pip install --editable .
 ```
 
 ### Help text (may not be up to date)
@@ -27,12 +32,11 @@ pip install .
 
     optional arguments:
       -h, --help            show this help message and exit
-      --local               Run only on local chips
       -v, --version         show program's version number and exit
-      -nl, --no_log         Runs tt-mod without generating the end SPI log
-      -ls, --list           List boards that are available to modify SPI on and quits
+      -ls, --list           List boards that are available on host
+      -s, --snapshot        Generates a .json file with tt-smi info
       -f [filename], --filename [filename]
-                            Change filename for test log. Default: ~/tt_mod_logs/<timestamp>_results.yaml
+                            Change filename for the .json snapshot file dump. Default: ~/tt_smi/<timestamp>_results.yaml
 ```
 
 ### Typical usage
