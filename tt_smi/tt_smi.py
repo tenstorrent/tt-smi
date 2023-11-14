@@ -433,12 +433,13 @@ def parse_args():
     return args
 
 
-def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None):
+def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None, set_safe_clock_overload: Optional[Callable[[PciChip, int], None]] = None):
     """
     Main entry point for TT-SMI
 
     Args:
         telemetry_builder_overload (): Can be overloaded if using older fw version. Default: None.
+        set_safe_clock_overload (): Can be overloaded if using older fw version. Default: None.
 
     Returns:
         None: None
@@ -469,7 +470,7 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None)
         return -1
 
     backend = TTSMIBackend(
-        devices=devices, telem_struct_override=telemetry_builder_overload
+        devices=devices, telem_struct_override=telemetry_builder_overload, set_safe_clock_override=set_safe_clock_overload
     )
     if args.list:
         backend.print_all_available_devices()

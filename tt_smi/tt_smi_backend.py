@@ -34,9 +34,11 @@ class TTSMIBackend:
         self,
         devices: List[PciChip],
         telem_struct_override: Optional[Callable[[PciChip], dict]] = None,
+        set_safe_clock_override: Optional[Callable[[PciChip, int], None]] = None,
     ):
         self.devices = devices
         self.telem_struct_override = telem_struct_override
+        self.safe_clock_override = set_safe_clock_override
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
