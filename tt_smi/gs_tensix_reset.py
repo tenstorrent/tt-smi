@@ -62,7 +62,6 @@ class GSTensixReset:
         self,
         device: PciChip,
         axi_registers: Registers,
-        safe_clk_override: Optional[Callable[[PciChip], dict]] = None,
     ):
         # GS Magic numbers for tensix resetting and NOC setup
         self.NIU_CFG_0 = 0x100  # bit 0 is CG enable, bit 12 is tile clock disable
@@ -97,7 +96,6 @@ class GSTensixReset:
         self.device = device
         self.axi_registers = axi_registers
         self.fw_defines = init_fw_defines(self.device)
-        self.safe_clk_override = safe_clk_override
         self.harvesting_fuses = self.get_harvesting()
         (
             self.core_list,

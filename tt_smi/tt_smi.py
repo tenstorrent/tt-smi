@@ -10,7 +10,7 @@ to collect and display device, telemetry and firmware information.
 
 In addition user can issue Grayskull and Wormhole board level resets.
 """
-
+import sys
 import time
 import signal
 import argparse
@@ -433,7 +433,7 @@ def parse_args():
     return args
 
 
-def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None, set_safe_clock_overload: Optional[Callable[[PciChip, int], None]] = None):
+def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None, set_safe_clock_overload: Optional[Callable[[PciChip, bool], None]] = None):
     """
     Main entry point for TT-SMI
 
@@ -451,14 +451,6 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
     signal.signal(signal.SIGTERM, interrupt_handler)
 
     args = parse_args()
-    if args.filename:
-        if Path(args.filename).suffix != ".json":
-            print(
-                CMD_LINE_COLOR.RED,
-                "Please use the .json extension on your filename!",
-                CMD_LINE_COLOR.ENDC,
-            )
-            return
 
     devices = detect_chips()
     if not devices:
@@ -467,14 +459,16 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
             "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
-        return -1
+        sys.exit(1)
 
     backend = TTSMIBackend(
-        devices=devices, telem_struct_override=telemetry_builder_overload, set_safe_clock_override=set_safe_clock_overload
+        devices=devices, 
+        telem_struct_override=telemetry_builder_overload, 
+        set_safe_clock_override=set_safe_clock_overload
     )
     if args.list:
         backend.print_all_available_devices()
-        return
+        sys.exit(0)
     if args.snapshot:
         file = backend.save_logs(args.filename)
         print(
@@ -482,7 +476,7 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
             f"Saved tt-smi log to: {file}",
             CMD_LINE_COLOR.ENDC,
         )
-        return
+        sys.exit(0)
     if args.tensix_reset is not None:
         if args.tensix_reset == []:
             print(
@@ -496,7 +490,7 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
                 "Please select grayskull board(s) from the above list",
                 CMD_LINE_COLOR.ENDC,
             )
-            return
+            sys.exit(1)
         for board_num in args.tensix_reset:
             if backend.devices[board_num].as_gs() is None:
                 print(
@@ -510,7 +504,7 @@ def main(telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
                     "Please select grayskull board(s) from the above list",
                     CMD_LINE_COLOR.ENDC,
                 )
-                return
+                sys.exit(1)
             print(
                 CMD_LINE_COLOR.GREEN,
                 f"Starting reset on board: {board_num}",
