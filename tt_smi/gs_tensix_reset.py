@@ -174,23 +174,23 @@ class GSTensixReset:
             noc1_router_cfg_3,
         )
 
-    def enter_safe_clks(self):
+    def set_safe_clks(self, enter_safe_clks: bool):
         """Send arc msg to enter safe clks mode. It lowers the clks to a safe level to toggle tensix resets"""
-        self.device.arc_msg(
-            self.fw_defines["MSG_TYPE_RESET_SAFE_CLKS"],
-            wait_for_done=True,
-            arg0=1,
-            arg1=0,
-        )
-
-    def exit_safe_clks(self):
-        """Send arc msg to exit safe clks mode. It retuns the clks to the original values"""
-        self.device.arc_msg(
-            self.fw_defines["MSG_TYPE_RESET_SAFE_CLKS"],
-            wait_for_done=True,
-            arg0=1,
-            arg1=0,
-        )
+        if enter_safe_clks:
+            self.device.arc_msg(
+                self.fw_defines["MSG_TYPE_RESET_SAFE_CLKS"],
+                wait_for_done=True,
+                arg0=1,
+                arg1=0,
+            )
+        else:
+            # Return clks to before safe clks mode
+            self.device.arc_msg(
+                self.fw_defines["MSG_TYPE_RESET_SAFE_CLKS"],
+                wait_for_done=True,
+                arg0=0,
+                arg1=0,
+            )
 
     def all_riscs_assert_reset(self):
         for i in range(8):

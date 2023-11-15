@@ -411,7 +411,7 @@ class TTSMIBackend:
             # Force clks to safe value - if user has older fw
             self.safe_clock_override(device, True)
         else:
-            gs_tensix_reset_obj.enter_safe_clks()
+            gs_tensix_reset_obj.set_safe_clks(True)
         try:
             print(
                 CMD_LINE_COLOR.YELLOW,
@@ -439,4 +439,4 @@ class TTSMIBackend:
                 # Set clks back to original value - if user has older fw
                 self.safe_clock_override(device, False)
             else:
-                gs_tensix_reset_obj.exit_safe_clks()
+                gs_tensix_reset_obj.set_safe_clks(False)
