@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
+"""
+Simple unit test to detect devices and print telemetry. 
+This is the first test to run to ensure that the library is working properly.
+"""
 
-from pyluwen import PciChip
+import jsons
 from pyluwen import detect_chips
 
 
@@ -15,24 +19,12 @@ def main():
         return -1
 
     for i, device in enumerate(devices):
-        # print(f"{i}" , dir(device))
-        try:
-            # if device.as_wh():
-            print(f"{i}: {device.get_pci_bdf()}, {device.board_id()}")
-            telem_struct = device.get_telemetry()
-            import jsons
+        print("Device", i, ":", device.get_board_id())
+        telem_struct = device.get_telemetry()
 
-            map = jsons.dump(telem_struct)
-            if device.as_gs():
-                for key in map.keys():
-                    print(key, hex(map[key]))
-
-        # elif device.as_gs():
-        #     print(dir(device.as_gs()))
-        #     print(device.board_id())
-        #     print(f"{i}: {device.get_pci_bdf()}, {device.as_gs().pci_board_type()}")
-        except:
-            print(f"{i}: REMOTE, {device.board_id()}")
+        map = jsons.dump(telem_struct)
+        for key in map.keys():
+            print(key, hex(map[key]))
 
 
 if __name__ == "__main__":
