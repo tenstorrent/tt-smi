@@ -437,6 +437,6 @@ class TTSMIBackend:
             )
             if self.safe_clock_override is not None:
                 # Set clks back to original value - if user has older fw
-                self.safe_clock_override(device, False)  
-            else:              
+                self.safe_clock_override(device, False)
+            else:
                 gs_tensix_reset_obj.exit_safe_clks()

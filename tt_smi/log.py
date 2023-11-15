@@ -105,7 +105,9 @@ def field_to_mapping(info: Field):
         else:
             return type_to_mapping(info.type_)
     except NotImplementedError as exc:
-        raise NotImplementedError(f'Have not implemented mapping support for {info}') from exc
+        raise NotImplementedError(
+            f"Have not implemented mapping support for {info}"
+        ) from exc
 
 
 def json_load_bytes(obj):
