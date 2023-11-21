@@ -1,3 +1,8 @@
+"""
+This file manages the register map for the device. 
+It loads the register map from yaml files, and provides functions to read and write registers.
+"""
+
 import os
 import re
 import struct
@@ -6,9 +11,6 @@ import importlib.resources
 from contextlib import contextmanager
 
 
-# Returns a context manager that behaves like a file. Invoke like
-# with package_data_file('data/grayskull/axi-pci.yaml') as file:
-#     yaml_load(file)
 @contextmanager
 def package_data_file(package_relative_path):
     # 3.7 doesn't have importlib.resources.files & importlib.resources.as_file.

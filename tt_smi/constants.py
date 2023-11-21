@@ -107,6 +107,7 @@ PCI_PROPERTIES = [
 MAX_PCIE_WIDTH = 16
 MAX_PCIE_SPEED = 4
 GUI_INTERVAL_TIME = 0.1
+
 ########################################
 #          GUI CONSTANTS
 ########################################

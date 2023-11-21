@@ -1,19 +1,15 @@
 # SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+"""
+This file contains common utilities used by all tt-tools.
+"""
 import os
-import sys
-import time
 import psutil
 import distro
-import signal
 import platform
-import datetime
-import traceback
-import subprocess
-from pathlib import Path
 from collections import OrderedDict
-from typing import List, OrderedDict, Tuple, Union
+from typing import OrderedDict, Union
 
 
 def get_size(size_bytes: int, suffix: str = "B") -> str:

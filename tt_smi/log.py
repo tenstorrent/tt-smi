@@ -2,19 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Generate tt-smi logs that are compatible with elasticsearch
+This file contains functions used to generate tt-smi logs that are compatible with elasticsearch.
 """
 from __future__ import annotations
 import json
 import base64
 import inspect
 import datetime
-import elasticsearch
 from pathlib import Path
 from typing import Any, Union, List, TypeVar, Generic
-
-es = elasticsearch.Elasticsearch(["http://yyz-elk:9200"], http_auth=("lab", "lab2019"))
-
 from pydantic import BaseModel
 from pydantic.fields import Field
 
@@ -126,8 +122,9 @@ class ElasticModel(BaseModel):
 
         return mapping
 
-    def save(self, index: str):
-        es.index(index=index, document=self.json())
+    # Will add the ability to save to elasticsearch as needed
+    # def save(self, index: str):
+    #     es.index(index=index, document=self.json())
 
 
 T = TypeVar("T", bound=ElasticModel)

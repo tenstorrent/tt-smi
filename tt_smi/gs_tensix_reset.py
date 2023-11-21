@@ -1,20 +1,25 @@
-from pyluwen import PciChip
-from pathlib import Path
-from importlib.resources import path
-from yaml import safe_load
+# SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+This file contains functions used to reset tensix cores on a Grayskull chip.
+"""
+
+import os
 import functools
 import itertools
-import jsons
-import time
-from typing import Optional, OrderedDict, Callable
-import os
 import importlib.resources
-from contextlib import contextmanager
-import yaml
+from yaml import safe_load
+from pyluwen import PciChip
+from typing import OrderedDict
 from tt_smi.registers import Registers
+from tt_smi.ui.common_themes import CMD_LINE_COLOR
 
 
 def get_chip_data(chip, file, internal: bool):
+    """
+    Helper function to load a file from the chip's data directory.
+    """
     with importlib.resources.path("tt_smi", "") as path:
         if chip.as_wh() is not None:
             prefix = "wormhole"
@@ -30,27 +35,11 @@ def get_chip_data(chip, file, internal: bool):
 
 
 def init_fw_defines(chip):
+    """
+    Loads the fw_defines.yaml with arc msg definitions from the chip's data directory.
+    """
     fw_defines = safe_load(get_chip_data(chip, "fw_defines.yaml", False))
     return fw_defines
-
-
-def _physical_to_routing(limit, phys):
-    if (phys % 2) == 0:
-        rout = phys // 2
-    else:
-        rout = limit - 1 - (phys // 2)
-    return rout
-
-
-def int_to_bits(x):
-    return list(filter(lambda b: x & (1 << b), range(x.bit_length())))
-
-
-def reverse_mapping_list(l):
-    ret = [0] * len(l)
-    for idx, val in enumerate(l):
-        ret[val] = idx
-    return ret
 
 
 class GSTensixReset:
@@ -58,59 +47,63 @@ class GSTensixReset:
     This class is used to reset tensix cores on a GS chip.
     """
 
+    # GS Magic numbers for tensix resetting and NOC setup
+    NIU_CFG_0 = 0x100  # bit 0 is CG enable, bit 12 is tile clock disable
+    ROUTER_CFG_0 = 0x104  # bit 0 is CG enable
+
+    ROUTER_CFG_1 = 0x108
+    ROUTER_CFG_3 = 0x110
+    GRID_SIZE_X = 13
+    GRID_SIZE_Y = 12
+    NUM_TENSIX_X = GRID_SIZE_X - 1
+    NUM_TENSIX_Y = GRID_SIZE_Y - 2
+    NOC_MAX_BACKOFF_EXP = 0xF
+    PHYS_Y_TO_NOC_0_Y = [0, 11, 1, 10, 2, 9, 3, 8, 4, 7, 5, 6]
+    DRAM_LOCATIONS = [
+        (1, 6),
+        (4, 6),
+        (7, 6),
+        (10, 6),
+        (1, 0),
+        (4, 0),
+        (7, 0),
+        (10, 0),
+    ]
+    ARC_LOCATIONS = [(0, 2)]
+    PCI_LOCATIONS = [(0, 4)]
+
     def __init__(
         self,
         device: PciChip,
         axi_registers: Registers,
     ):
-        # GS Magic numbers for tensix resetting and NOC setup
-        self.NIU_CFG_0 = 0x100  # bit 0 is CG enable, bit 12 is tile clock disable
-        self.ROUTER_CFG_0 = 0x104  # bit 0 is CG enable
-
-        self.ROUTER_CFG_1 = 0x108
-        self.ROUTER_CFG_3 = 0x110
-        self.GRID_SIZE_X = 13
-        self.GRID_SIZE_Y = 12
-        self.NUM_TENSIX_X = self.GRID_SIZE_X - 1
-        self.NUM_TENSIX_Y = self.GRID_SIZE_Y - 2
-        self.NOC_MAX_BACKOFF_EXP = 0xF
-        self.PHYS_Y_TO_NOC_0_Y = [0, 11, 1, 10, 2, 9, 3, 8, 4, 7, 5, 6]
-        self.DRAM_LOCATIONS = [
-            (1, 6),
-            (4, 6),
-            (7, 6),
-            (10, 6),
-            (1, 0),
-            (4, 0),
-            (7, 0),
-            (10, 0),
-        ]
-        self.ARC_LOCATIONS = [(0, 2)]
-        self.PCI_LOCATIONS = [(0, 4)]
         self.ROUTING_TO_PHYSICAL_TABLE = dict()
         for phys_y in range(self.GRID_SIZE_Y):
             for phys_x in range(self.GRID_SIZE_X):
-                rout_x = _physical_to_routing(self.GRID_SIZE_X, phys_x)
-                rout_y = _physical_to_routing(self.GRID_SIZE_Y, phys_y)
+                rout_x = self._physical_to_routing(self.GRID_SIZE_X, phys_x)
+                rout_y = self._physical_to_routing(self.GRID_SIZE_Y, phys_y)
                 self.ROUTING_TO_PHYSICAL_TABLE[(rout_x, rout_y)] = (phys_x, phys_y)
         self.device = device
         self.axi_registers = axi_registers
         self.fw_defines = init_fw_defines(self.device)
-        self.harvesting_fuses = self.get_harvesting()
-        (
-            self.core_list,
-            self.noc0_router_cfg_1,
-            self.noc1_router_cfg_1,
-            self.noc0_router_cfg_3,
-            self.noc1_router_cfg_3,
-        ) = self.get_core_list()
+        self.harvested_rows = self.get_harvested_rows()
+        self.core_list = self.get_core_list()
 
-    def get_harvesting(self):
+    @staticmethod
+    def _physical_to_routing(limit, phys):
+        if (phys % 2) == 0:
+            rout = phys // 2
+        else:
+            rout = limit - 1 - (phys // 2)
+        return rout
+
+    @staticmethod
+    def int_to_bits(x):
+        return list(filter(lambda b: x & (1 << b), range(x.bit_length())))
+
+    def get_harvested_rows(self):
         """
-        Get the harvesting fuses from the chip.
-
-        Returns:
-            list of harvested rows
+        Get the rows that are harvested on the chip based on efuses.
         """
         if "T6PY_HARVESTING_OVERRIDE" in os.environ:
             harvesting_fuses = int(os.environ["T6PY_HARVESTING_OVERRIDE"], 0)
@@ -123,36 +116,41 @@ class GSTensixReset:
             )
             if exit_code != 0:
                 assert False, "FW is too old, please update fw"
-        return harvesting_fuses
-
-    def get_core_list(self):
-        """
-        Using the harvesting fuses, get a list of cores that are not harvested.
-
-        Returns:
-            Dict of cores that are not harvested
-        """
-        # disable broadcast to rows 0, 6 and any in _disabled_rows.
-        bad_mem_bits = self.harvesting_fuses & 0x3FF
-        bad_logic_bits = (self.harvesting_fuses >> 10) & 0x3FF
+        bad_mem_bits = harvesting_fuses & 0x3FF
+        bad_logic_bits = (harvesting_fuses >> 10) & 0x3FF
 
         bad_row_bits = (bad_mem_bits | bad_logic_bits) << 1
-        bad_physical_rows = int_to_bits(bad_row_bits)
-        broadcast_disabled_rows = [0, 6]
+        bad_physical_rows = self.int_to_bits(bad_row_bits)
         disabled_rows = frozenset(
             map(
                 lambda y: self.PHYS_Y_TO_NOC_0_Y[self.GRID_SIZE_Y - y - 1],
                 bad_physical_rows,
             )
         )
-        broadcast_disabled_rows += disabled_rows
+        return disabled_rows
+
+    def get_core_list(self):
+        """
+        Using the harvesting fuses, get a list of tensix cores that are not harvested.
+
+        Returns:
+            Dict of cores that are not harvested
+        """
         good_rows = filter(
-            lambda y: y not in disabled_rows, [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
+            lambda y: y not in self.harvested_rows, [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
         )
         good_cores = list(
             itertools.product(list(range(1, self.GRID_SIZE_X)), good_rows)
         )
         core_list = OrderedDict(map(lambda c: (c, None), good_cores))
+        return core_list
+
+    def get_noc_router_cfg(self):
+        """
+        Compute the noc router settings for broadcast disable based on harvested rows.
+        """
+        broadcast_disabled_rows = [0, 6]
+        broadcast_disabled_rows += self.harvested_rows
         noc0_router_cfg_1 = 1 << 0  # disable broadcast to column 0
         noc1_router_cfg_1 = (
             1 << 12
@@ -167,7 +165,6 @@ class GSTensixReset:
             int.__or__, map(lambda y: 1 << y, broadcast_disabled_rows_noc1), 0
         )
         return (
-            core_list,
             noc0_router_cfg_1,
             noc1_router_cfg_1,
             noc0_router_cfg_3,
@@ -175,7 +172,10 @@ class GSTensixReset:
         )
 
     def set_safe_clks(self, enter_safe_clks: bool):
-        """Send arc msg to enter safe clks mode. It lowers the clks to a safe level to toggle tensix resets"""
+        """
+        Send arc msg to enter safe clks mode.
+        It lowers the clks to a safe level to toggle tensix resets
+        """
         if enter_safe_clks:
             self.device.arc_msg(
                 self.fw_defines["MSG_TYPE_RESET_SAFE_CLKS"],
@@ -192,24 +192,46 @@ class GSTensixReset:
                 arg1=0,
             )
 
-    def all_riscs_assert_reset(self):
+    def all_riscs_assert_hard_reset(self):
+        """
+        Place all risc's into hard reset. This requires set_safe_clks to be run prior.
+        """
         for i in range(8):
             self.axi_registers.write32(f"ARC_RESET.RISCV_RESET[{i}]", 0x0)
 
-    def msg_tensix_toggle_reset(self):
+    def tensix_toggle_reset(self):
+        """
+        Put all tensix's into hard reset and takes them out again.
+        This requires set_safe_clks to be run prior.
+        This includes both harvested and non-harvested tensix's because we need all tensix's NOC routers.
+        """
         for i in range(8):
             self.axi_registers.write32(f"ARC_RESET.TENSIX_RESET[{i}]", 0x0)
         for i in range(8):
             self.axi_registers.write32(f"ARC_RESET.TENSIX_RESET[{i}]", 0xFFFFFFFF)
 
     def is_tensix_core_loc(self, x, y):
+        """
+        Checks if the given noc 0 coordinate is a tensix core.
+        """
         return (x, y) in self.core_list
 
-    def setup_interface(self):
+    def setup_noc(self):
+        """
+        This configures all NOC notes.
+        It sets broadcast disables, CG enables, and maximum exponential backoff.
+        It activates the tile clk disable for harvested tensix's.
+        """
         self.axi_registers.write_fields(
             "ARC_RESET.DDR_RESET", {"axi_reset": 1, "ddrc_reset": 1}, init=0
         )
         device = self.device.as_gs()
+        (
+            noc0_router_cfg_1,
+            noc1_router_cfg_1,
+            noc0_router_cfg_3,
+            noc1_router_cfg_3,
+        ) = self.get_noc_router_cfg()
 
         # Write all the registers for NOC NIU & router on a node.
         # x, y are NOC0 coordinates. reg_bases[i] is NOCi reg base address
@@ -243,16 +265,16 @@ class GSTensixReset:
             n1y = self.GRID_SIZE_Y - y - 1
 
             device.noc_write32(
-                0, x, y, reg_bases[0] + self.ROUTER_CFG_1, self.noc0_router_cfg_1
+                0, x, y, reg_bases[0] + self.ROUTER_CFG_1, noc0_router_cfg_1
             )
             device.noc_write32(
-                0, x, y, reg_bases[0] + self.ROUTER_CFG_3, self.noc0_router_cfg_3
+                0, x, y, reg_bases[0] + self.ROUTER_CFG_3, noc0_router_cfg_3
             )
             device.noc_write32(
-                1, n1x, n1y, reg_bases[1] + self.ROUTER_CFG_1, self.noc1_router_cfg_1
+                1, n1x, n1y, reg_bases[1] + self.ROUTER_CFG_1, noc1_router_cfg_1
             )
             device.noc_write32(
-                1, n1x, n1y, reg_bases[1] + self.ROUTER_CFG_3, self.noc1_router_cfg_3
+                1, n1x, n1y, reg_bases[1] + self.ROUTER_CFG_3, noc1_router_cfg_3
             )
 
             setup_noc_common(x, y, 0, reg_bases[0])
@@ -277,18 +299,10 @@ class GSTensixReset:
                 rmw_val |= self.NOC_MAX_BACKOFF_EXP << 8
                 # device.pci_axi_write32(noc_reg_base + ROUTER_CFG_0, rmw_val)
 
-            device.pci_axi_write32(
-                reg_bases[0] + self.ROUTER_CFG_1, self.noc0_router_cfg_1
-            )
-            device.pci_axi_write32(
-                reg_bases[0] + self.ROUTER_CFG_3, self.noc0_router_cfg_3
-            )
-            device.pci_axi_write32(
-                reg_bases[1] + self.ROUTER_CFG_1, self.noc1_router_cfg_1
-            )
-            device.pci_axi_write32(
-                reg_bases[1] + self.ROUTER_CFG_3, self.noc1_router_cfg_3
-            )
+            device.pci_axi_write32(reg_bases[0] + self.ROUTER_CFG_1, noc0_router_cfg_1)
+            device.pci_axi_write32(reg_bases[0] + self.ROUTER_CFG_3, noc0_router_cfg_3)
+            device.pci_axi_write32(reg_bases[1] + self.ROUTER_CFG_1, noc1_router_cfg_1)
+            device.pci_axi_write32(reg_bases[1] + self.ROUTER_CFG_3, noc1_router_cfg_3)
 
             setup_noc_common(reg_bases[0])
             setup_noc_common(reg_bases[1])
@@ -335,6 +349,10 @@ class GSTensixReset:
                     )
 
     def assert_all_riscv_soft_reset(self):
+        """
+        Assert all riscv soft resets using a noc broadcast.
+        This reset includes only un-harvested tensix's.
+        """
         device = self.device.as_gs()
         BRISC_SOFT_RESET = 1 << 11
         TRISC_SOFT_RESETS = (1 << 12) | (1 << 13) | (1 << 14)
@@ -344,6 +362,10 @@ class GSTensixReset:
         )
 
     def noc_loc_to_reset_mask(self, noc_x, noc_y):
+        """
+        Get the reset bit location for a specific tensix core.
+        This applies to both RISCV_RESET and TENSIX_RESET registers.
+        """
         phys_x, phys_y = self.ROUTING_TO_PHYSICAL_TABLE[(noc_x, noc_y)]
         blue_x, blue_y = phys_x - 1, phys_y - 1
         reset_bit_index = blue_x * self.NUM_TENSIX_X + blue_y
@@ -352,6 +374,9 @@ class GSTensixReset:
         return reset_reg_index, reset_bit_mask
 
     def all_tensix_reset_mask(self):
+        """
+        Get the reset mask for un-harvested tensix cores.
+        """
         reset_mask = [0] * 8
 
         for x, y in self.core_list.keys():
@@ -360,6 +385,43 @@ class GSTensixReset:
 
         return reset_mask
 
-    def all_riscs_deassert_reset(self):
+    def all_riscs_deassert_hard_reset(self):
+        """
+        Deassert riscv hard resets. We use a mask to get the un-harvested tensix's.
+        We only deassert this on un-harvested tensix's because un-harvested tensix's recieved the soft reset signal
+        The harvested tensix's need to stay in a state of hard reset.
+        """
         for index, mask in enumerate(self.all_tensix_reset_mask()):
             self.axi_registers.write32(f"ARC_RESET.RISCV_RESET[{index}]", mask)
+
+    def tensix_reset(self) -> None:
+        """
+        This resets all tensix cores on a GS chip, leaving the un-harvested risc's in soft reset.
+        """
+        print(
+            CMD_LINE_COLOR.YELLOW, "Lowering clks to safe value...", CMD_LINE_COLOR.ENDC
+        )
+        self.set_safe_clks(True)
+        try:
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "Beginning reset sequence...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            self.all_riscs_assert_hard_reset()
+            self.tensix_toggle_reset()
+            self.setup_noc()
+            self.assert_all_riscv_soft_reset()
+            self.all_riscs_deassert_hard_reset()
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "Finishing reset sequence...",
+                CMD_LINE_COLOR.ENDC,
+            )
+        finally:
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "Returning clks to original values...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            self.set_safe_clks(False)

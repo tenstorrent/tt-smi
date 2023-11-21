@@ -16,10 +16,10 @@ from pyluwen import PciChip
 from rich.progress import track
 from tt_smi import log, constants
 from tt_smi.registers import Registers
+from typing import Dict, List, OrderedDict
 from tt_smi.gs_tensix_reset import GSTensixReset
 from tt_smi.ui.common_themes import CMD_LINE_COLOR
 from tt_utils_common import get_host_info, init_logging
-from typing import Dict, List, OrderedDict, Optional, Callable
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
 
@@ -33,12 +33,8 @@ class TTSMIBackend:
     def __init__(
         self,
         devices: List[PciChip],
-        telem_struct_override: Optional[Callable[[PciChip], dict]] = None,
-        set_safe_clock_override: Optional[Callable[[PciChip, int], None]] = None,
     ):
         self.devices = devices
-        self.telem_struct_override = telem_struct_override
-        self.safe_clock_override = set_safe_clock_override
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
@@ -48,7 +44,6 @@ class TTSMIBackend:
                     telemetry=log.Telemetry(),
                     firmwares=log.Firmwares(),
                     limits=log.Limits(),
-                    # smbus_telem=log.SmbusTelem(),
                 )
                 for device in self.devices
             ],
@@ -97,7 +92,6 @@ class TTSMIBackend:
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
-            # self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
         self.log.save_as_json(log_filename)
         return log_filename
 
@@ -119,10 +113,7 @@ class TTSMIBackend:
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
         pylewen_chip = self.devices[board_num]
-        if self.telem_struct_override is not None:
-            telem_struct = self.telem_struct_override(pylewen_chip)
-        else:
-            telem_struct = pylewen_chip.get_telemetry()
+        telem_struct = pylewen_chip.get_telemetry()
 
         json_map = jsons.dump(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
@@ -239,6 +230,9 @@ class TTSMIBackend:
                 _, dev_info[field] = self.get_pci_speed_width(board_num)
 
         return dev_info
+
+    def create_reset_helper(self, device, axi_register) -> GSTensixReset:
+        return GSTensixReset(device, axi_register)
 
     def get_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for chip. None if ARC FW not running"""
@@ -400,43 +394,9 @@ class TTSMIBackend:
         return Registers(root_yaml_path, reader_function, writer_function)
 
     def gs_tensix_reset(self, board_num) -> None:
-        """Reset the tensix's on a GS chip"""
+        """Reset the tensix cores on a GS chip"""
         device = self.devices[board_num]
         axi_registers = self.registers[board_num]
-        gs_tensix_reset_obj = GSTensixReset(device, axi_registers)
-        print(
-            CMD_LINE_COLOR.YELLOW, "Lowering clks to safe value...", CMD_LINE_COLOR.ENDC
-        )
-        if self.safe_clock_override is not None:
-            # Force clks to safe value - if user has older fw
-            self.safe_clock_override(device, True)
-        else:
-            gs_tensix_reset_obj.set_safe_clks(True)
-        try:
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                "Beginning reset sequence...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            gs_tensix_reset_obj.all_riscs_assert_reset()
-            gs_tensix_reset_obj.msg_tensix_toggle_reset()
-            gs_tensix_reset_obj.get_harvesting()
-            gs_tensix_reset_obj.setup_interface()
-            gs_tensix_reset_obj.assert_all_riscv_soft_reset()
-            gs_tensix_reset_obj.all_riscs_deassert_reset()
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                "Finishing reset sequence...",
-                CMD_LINE_COLOR.ENDC,
-            )
-        finally:
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                "Returning clks to original values...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            if self.safe_clock_override is not None:
-                # Set clks back to original value - if user has older fw
-                self.safe_clock_override(device, False)
-            else:
-                gs_tensix_reset_obj.set_safe_clks(False)
+
+        gs_tensix_reset_obj = self.create_reset_helper(device, axi_registers)
+        gs_tensix_reset_obj.tensix_reset()

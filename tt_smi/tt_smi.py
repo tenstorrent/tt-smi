@@ -16,13 +16,12 @@ import signal
 import argparse
 import threading
 import pkg_resources
-from pathlib import Path
 from rich.text import Text
 from tt_smi import constants
+from typing import List, Tuple
 from textual.app import App, ComposeResult
 from tt_smi.tt_smi_backend import TTSMIBackend
 from textual.widgets import Footer, TabbedContent
-from typing import Callable, List, Optional, Tuple
 from textual.containers import Container, Vertical
 from tt_smi.ui.common_themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_utils_common import get_host_info, system_compatibility
@@ -34,7 +33,6 @@ from tt_smi.ui.common_widgets import (
     TTHelperMenuBox,
 )
 
-from pyluwen import PciChip
 from pyluwen import detect_chips
 
 # Global variables
@@ -426,24 +424,21 @@ def parse_args():
         nargs="*",
         type=int,
         default=None,
-        help="Runs tensix reset on boards specified",
+        help="Grayskull only! Runs tensix reset on boards specified",
         dest="tensix_reset",
     )
     args = parser.parse_args()
     return args
 
 
-def main(
-    telemetry_builder_overload: Optional[Callable[[PciChip], dict]] = None,
-    set_safe_clock_overload: Optional[Callable[[PciChip, bool], None]] = None,
+def tt_smi_main(
+    backend: TTSMIBackend,
 ):
     """
-    Main entry point for TT-SMI
+    Given a backend, handle all user args and run TT-SMI frontend.
 
     Args:
-        telemetry_builder_overload (): Can be overloaded if using older fw version. Default: None.
-        set_safe_clock_overload (): Can be overloaded if using older fw version. Default: None.
-
+        backend (): Can be overloaded if using older fw version.
     Returns:
         None: None
     """
@@ -464,11 +459,6 @@ def main(
         )
         sys.exit(1)
 
-    backend = TTSMIBackend(
-        devices=devices,
-        telem_struct_override=telemetry_builder_overload,
-        set_safe_clock_override=set_safe_clock_overload,
-    )
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
@@ -525,6 +515,27 @@ def main(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
     )
     tt_smi_app.run()
+
+
+def main():
+    """
+    First entry point for TT-SMI. Detects devices and instantiates backend.
+    """
+    devices = detect_chips()
+    if not devices:
+        print(
+            CMD_LINE_COLOR.RED,
+            "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+    fin_devices = []
+    for device in devices:
+        if device.as_gs():
+            fin_devices.append(device)
+
+    backend = TTSMIBackend(fin_devices)
+    tt_smi_main(backend)
 
 
 if __name__ == "__main__":
