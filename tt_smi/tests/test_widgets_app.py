@@ -15,8 +15,6 @@ from ui.common_widgets import TTHeader, TTFooter, TTDataTable, TTMenu, TTConfirm
 
 from datetime import datetime
 
-from collections import OrderedDict
-
 TextualKeyBindings = List[Tuple[str, str, str]]
 
 
@@ -47,7 +45,7 @@ class TTApp(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        data = OrderedDict([("Menu 1", 1), ("Menu 2", 2), ("Menu 3", 3)])
+        data = {"Menu 1": 1, "Menu 2": 2, "Menu 3": 3}
         yield TTHeader(self.app_name, self.app_version)
         with Horizontal():
             with Vertical():  # TODO: Specify widget width & height on layout

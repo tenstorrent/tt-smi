@@ -11,7 +11,6 @@ import itertools
 import importlib.resources
 from yaml import safe_load
 from pyluwen import PciChip
-from typing import OrderedDict
 from tt_smi.registers import Registers
 from tt_smi.ui.common_themes import CMD_LINE_COLOR
 
@@ -142,7 +141,9 @@ class GSTensixReset:
         good_cores = list(
             itertools.product(list(range(1, self.GRID_SIZE_X)), good_rows)
         )
-        core_list = OrderedDict(map(lambda c: (c, None), good_cores))
+        core_list = {
+            c: None for c in good_cores
+        }  # dict for deterministic order and fast contains checks.
         return core_list
 
     def get_noc_router_cfg(self):
@@ -156,7 +157,7 @@ class GSTensixReset:
             1 << 12
         )  # remap noc0 to noc1: disable broadcast to column 12
         noc0_router_cfg_3 = functools.reduce(
-            int.__or__, map(lambda y: 1 << y, broadcast_disabled_rows), 0
+            int.__or__, (1 << y for y in broadcast_disabled_rows), 0
         )
         broadcast_disabled_rows_noc1 = map(
             lambda y: self.GRID_SIZE_Y - y - 1, broadcast_disabled_rows

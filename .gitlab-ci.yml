@@ -14,9 +14,13 @@
 
 stages:
   - format
-black-check:
-  stage: format
-  image: python:3.7 # Use the official Python 3 image.
-  script:
-    - pip install black
-    - black --check .
+
+before_script:
+  - python3 -m pip install --upgrade pip
+  - python3 -m pip install black
+
+black:
+    stage: format
+    script:
+        - python3 -m black . --check --verbose --diff --color
+

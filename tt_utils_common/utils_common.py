@@ -8,8 +8,7 @@ import os
 import psutil
 import distro
 import platform
-from collections import OrderedDict
-from typing import OrderedDict, Union
+from typing import Union
 
 
 def get_size(size_bytes: int, suffix: str = "B") -> str:
@@ -37,11 +36,11 @@ def get_driver_version() -> Union[str, None]:
     return driver
 
 
-def get_host_info() -> OrderedDict:
+def get_host_info() -> dict:
     """
         Reads and organizes host info
     Returns:
-        OrderedDict: with host info
+        dict: with host info
     """
     uname = platform.uname()
     svmem = psutil.virtual_memory()
@@ -51,21 +50,19 @@ def get_host_info() -> OrderedDict:
     kernel: str = uname.release
     hostname: str = uname.node
 
-    return OrderedDict(
-        [
-            ("OS", os),
-            ("Distro", distro_name),
-            ("Kernel", kernel),
-            ("Hostname", hostname),
-            ("Platform", uname.machine),
-            ("Python", platform.python_version()),
-            ("Memory", get_size(svmem.total)),
-            ("Driver", "TTKMD " + get_driver_version()),
-        ]
-    )
+    return {
+        "OS": os,
+        "Distro": distro_name,
+        "Kernel": kernel,
+        "Hostname": hostname,
+        "Platform": uname.machine,
+        "Python": platform.python_version(),
+        "Memory": get_size(svmem.total),
+        "Driver": "TTKMD " + get_driver_version(),
+    }
 
 
-def system_compatibility() -> OrderedDict:
+def system_compatibility() -> dict:
     host_info = get_host_info()
     checklist = {}
     if host_info["OS"] == "Linux":

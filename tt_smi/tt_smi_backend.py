@@ -13,10 +13,10 @@ import datetime
 import tt_utils_common
 from pathlib import Path
 from pyluwen import PciChip
+from typing import Dict, List
 from rich.progress import track
 from tt_smi import log, constants
 from tt_smi.registers import Registers
-from typing import Dict, List, OrderedDict
 from tt_smi.gs_tensix_reset import GSTensixReset
 from tt_smi.ui.common_themes import CMD_LINE_COLOR
 from tt_utils_common import get_host_info, init_logging
@@ -204,8 +204,8 @@ class TTSMIBackend:
                     return False
                 return True
 
-    def get_device_info(self, board_num) -> OrderedDict:
-        dev_info = OrderedDict()
+    def get_device_info(self, board_num) -> dict:
+        dev_info = {}
         for field in constants.DEV_INFO_LIST:
             if field == "bus_id":
                 try:
@@ -324,7 +324,7 @@ class TTSMIBackend:
 
     def get_firmware_versions(self, board_num):
         """Translate the telem struct semver for gui"""
-        fw_versions = OrderedDict()
+        fw_versions = {}
         for field in constants.FW_LIST:
             if field == "arc_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_ARC0_FW_VERSION"]

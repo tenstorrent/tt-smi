@@ -529,12 +529,8 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    fin_devices = []
-    for device in devices:
-        if device.as_gs():
-            fin_devices.append(device)
 
-    backend = TTSMIBackend(fin_devices)
+    backend = TTSMIBackend(devices)
     tt_smi_main(backend)
 
 
