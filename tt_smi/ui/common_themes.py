@@ -4,6 +4,7 @@
 from rich.text import Text
 from rich.style import Style
 
+
 def create_color_scheme(color_system: str):
     if color_system == "truecolor":
         return {
@@ -36,12 +37,15 @@ def create_color_scheme(color_system: str):
             "grey": "bright_black",
         }
 
+
 class CMD_LINE_COLOR:
     PURPLE = "\033[95m"
     BLUE = "\033[94m"
     GREEN = "\033[92m"
     RED = "\033[91m"
     ENDC = "\033[0m"
+    YELLOW = "\033[93m"
+
 
 def create_tt_tools_theme():
     """Return tt-health theme"""

@@ -1,19 +1,15 @@
 # SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+"""
+This file contains common utilities used by all tt-tools.
+"""
 import os
-import sys
-import time
 import psutil
 import distro
-import signal
 import platform
-import datetime
-import traceback
-import subprocess
-from pathlib import Path
-from collections import OrderedDict
-from typing import List, OrderedDict, Tuple, Union
+from typing import Union
+
 
 def get_size(size_bytes: int, suffix: str = "B") -> str:
     """
@@ -29,6 +25,7 @@ def get_size(size_bytes: int, suffix: str = "B") -> str:
         size_bytes /= factor
     return "N/A"
 
+
 def get_driver_version() -> Union[str, None]:
     try:
         with open("/sys/module/tenstorrent/version", "r", encoding="utf-8") as f:
@@ -38,11 +35,12 @@ def get_driver_version() -> Union[str, None]:
 
     return driver
 
-def get_host_info() -> OrderedDict:
+
+def get_host_info() -> dict:
     """
         Reads and organizes host info
     Returns:
-        OrderedDict: with host info
+        dict: with host info
     """
     uname = platform.uname()
     svmem = psutil.virtual_memory()
@@ -52,50 +50,58 @@ def get_host_info() -> OrderedDict:
     kernel: str = uname.release
     hostname: str = uname.node
 
-    return OrderedDict([("OS", os), ("Distro", distro_name),
-                        ("Kernel", kernel), ("Hostname", hostname),
-                        ("Platform", uname.machine),
-                        ("Python", platform.python_version()),
-                        ("Memory", get_size(svmem.total)),
-                        ("Driver", "TTKMD " + get_driver_version())])
+    return {
+        "OS": os,
+        "Distro": distro_name,
+        "Kernel": kernel,
+        "Hostname": hostname,
+        "Platform": uname.machine,
+        "Python": platform.python_version(),
+        "Memory": get_size(svmem.total),
+        "Driver": "TTKMD " + get_driver_version(),
+    }
 
-def system_compatibility() -> OrderedDict:
-        host_info = get_host_info()
-        checklist = {}
-        if host_info["OS"] == "Linux":
-            if distro.id() == "ubuntu":
-                distro_version = float(".".join(distro.version_parts()[:2]))
-                print(distro_version)
-                if distro_version >= 20.04:
-                    checklist["OS"] = (True, "Pass")
-                else:
-                    checklist["OS"] = (False, "Fail, not Ubuntu 20.04+")
+
+def system_compatibility() -> dict:
+    host_info = get_host_info()
+    checklist = {}
+    if host_info["OS"] == "Linux":
+        if distro.id() == "ubuntu":
+            distro_version = float(".".join(distro.version_parts()[:2]))
+            print(distro_version)
+            if distro_version >= 20.04:
+                checklist["OS"] = (True, "Pass")
             else:
                 checklist["OS"] = (False, "Fail, not Ubuntu 20.04+")
         else:
             checklist["OS"] = (False, "Fail, not Ubuntu 20.04+")
+    else:
+        checklist["OS"] = (False, "Fail, not Ubuntu 20.04+")
 
-        if host_info["Driver"]:
-            checklist["Driver"] = (True, "Pass")
-        else:
-            checklist["Driver"] = (False, "Fail, no driver")
-        if psutil.virtual_memory().total >= 32 * 1E9:
-            checklist["Memory"] = (True, "Pass")
-        else:
-            checklist["Memory"] = (False, "Fail, not 32GB+")
-        print(checklist)
-        return checklist
+    if host_info["Driver"]:
+        checklist["Driver"] = (True, "Pass")
+    else:
+        checklist["Driver"] = (False, "Fail, no driver")
+    if psutil.virtual_memory().total >= 32 * 1e9:
+        checklist["Memory"] = (True, "Pass")
+    else:
+        checklist["Memory"] = (False, "Fail, not 32GB+")
+    print(checklist)
+    return checklist
+
 
 def init_logging(log_folder: str):
     """Create tt-mod log folders if they don't exist"""
     if not os.path.isdir(log_folder):
         os.mkdir(log_folder)
-        
+
+
 def semver_to_hex(semver: str):
     """Converts a semantic version string from format 10.15.1 to hex 0x0A0F0100"""
-    major, minor, patch = semver.split('.')
+    major, minor, patch = semver.split(".")
     byte_array = bytearray([0, int(major), int(minor), int(patch)])
     return f"{int.from_bytes(byte_array, byteorder='big'):08x}"
+
 
 def date_to_hex(date: int):
     """Converts a given date string from format YYYYMMDDHHMM to hex 0xYMDDHHMM"""
@@ -104,8 +110,9 @@ def date_to_hex(date: int):
     day = int(date[6:8])
     hour = int(date[8:10])
     minute = int(date[10:12])
-    byte_array = bytearray([year*16+month, day, hour, minute])
+    byte_array = bytearray([year * 16 + month, day, hour, minute])
     return f"{int.from_bytes(byte_array, byteorder='big'):08x}"
+
 
 def hex_to_semver(hexsemver: int):
     """Converts a semantic version string from format 0x0A0F0100 to 10.15.1"""
@@ -113,10 +120,11 @@ def hex_to_semver(hexsemver: int):
         raise ValueError("hexsemver is invalid!")
 
     major = hexsemver >> 16 & 0xFF
-    minor = hexsemver >>  8 & 0xFF
-    patch = hexsemver >>  0 & 0xFF
+    minor = hexsemver >> 8 & 0xFF
+    patch = hexsemver >> 0 & 0xFF
 
     return f"{major}.{minor}.{patch}"
+
 
 def hex_to_semver_eth(hexsemver: int):
     """Converts a semantic version string from format 0x061000 to 6.1.0"""
@@ -124,22 +132,24 @@ def hex_to_semver_eth(hexsemver: int):
         return "N/A"
 
     major = hexsemver >> 16 & 0xFF
-    minor = hexsemver >>  12 & 0xF
+    minor = hexsemver >> 12 & 0xF
     patch = hexsemver & 0xFFF
 
     return f"{major}.{minor}.{patch}"
+
 
 def hex_to_semver_m3_fw(hexsemver: int):
     """Converts a semantic version string from format 0x0A0F0100 to 10.15.1"""
     if hexsemver == 0 or hexsemver == 0xFFFFFFFF:
         return "N/A"
-    
+
     major = hexsemver >> 24 & 0xFF
     minor = hexsemver >> 16 & 0xFF
-    patch = hexsemver >>  8 & 0xFF
-    ver = hexsemver >>  0 & 0xFF
+    patch = hexsemver >> 8 & 0xFF
+    ver = hexsemver >> 0 & 0xFF
 
     return f"{major}.{minor}.{patch}.{ver}"
+
 
 def hex_to_date(hexdate: int, include_time=True):
     """Converts a date given in hex from format 0xYMDDHHMM to string YYYY-MM-DD HH:MM"""
@@ -158,6 +168,7 @@ def hex_to_date(hexdate: int, include_time=True):
         date += f" {hour:02}:{minute:02}"
 
     return date
+
 
 def get_board_type(board_id: str) -> str:
     """

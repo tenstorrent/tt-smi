@@ -1,0 +1,4 @@
+MSG_TYPE_DEASSERT_RISCV_RESET:            0xba
+MSG_TYPE_RESET_SAFE_CLKS:                 0xbb
+MSG_TYPE_ARC_GET_HARVESTING:              0x57
+MSG_TYPE_TOGGLE_TENSIX_RESET:             0xaf
