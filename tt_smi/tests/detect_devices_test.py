@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
 """
-Simple unit test to detect devices and print telemetry. 
+Simple unit test to detect devices and print telemetry.
 This is the first test to run to ensure that the library is working properly.
 """
 

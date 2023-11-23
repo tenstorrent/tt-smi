@@ -164,7 +164,7 @@ FIRMWARES_TABLE_HEADER = [
 HELP_MENU_MARKDOWN = """\
 # TT-SMI HELP MENU
 
-TT-SMI is a command-line utility that allows users to look at the telemetry and device information of Tenstorrent devices. 
+TT-SMI is a command-line utility that allows users to look at the telemetry and device information of Tenstorrent devices.
 
 ## KEYBOARD SHORTCUTS
 

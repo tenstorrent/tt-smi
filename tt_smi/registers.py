@@ -1,5 +1,5 @@
 """
-This file manages the register map for the device. 
+This file manages the register map for the device.
 It loads the register map from yaml files, and provides functions to read and write registers.
 """
 
