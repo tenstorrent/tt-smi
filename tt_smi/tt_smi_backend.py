@@ -3,7 +3,7 @@
 
 """
 This is the backend of tt-smi.
-    - Keeps track of chip objects and tasks related to fetching device info and telemetry 
+    - Keeps track of chip objects and tasks related to fetching device info and telemetry
     - Sanitizes input for frontend
 """
 

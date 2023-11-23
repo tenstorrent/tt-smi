@@ -122,7 +122,7 @@ Button {
     background: $yellow;
     color: white;
 }
-  
+
 Button:hover, Button:focus {
 background: $red;
 color: white;
@@ -140,13 +140,13 @@ Footer {
   Footer > .footer--highlight {
     background: $accent-darken-1;
   }
-  
+
   Footer > .footer--highlight-key {
     background: $yellow;
     text-style: bold;
     color: white;
   }
-  
+
   Footer > .footer--key {
     text-style: bold;
     background: $accent-darken-2;
@@ -156,7 +156,7 @@ Footer {
   Input>.input--placeholder {
     color: gray;
   }
-  
+
 /* Help Menu box styling*/
 TTHelperMenuBox {
     align: center middle;
@@ -170,7 +170,7 @@ TTHelperMenuBox {
     color: white;
 
   }
-  
+
   MarkdownH1 {
     background: $accent-darken-2;
     border: wide $background;
@@ -179,16 +179,15 @@ TTHelperMenuBox {
     text-style: bold;
     color: white;
   }
-  
+
   MarkdownTableContent {
     width: 100%;
     height: auto;
-  
+
   }
   MarkdownTableContent > .markdown-table--header {
     text-style: bold;
   }
-  
-  
+
+
   /* Help Menu box styling end*/
-  
