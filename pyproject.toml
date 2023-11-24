@@ -42,7 +42,7 @@ dependencies = [
   'pydantic==1.*',
   'pyfiglet',
   'pyinstaller',
-  'pyluwen @ git+https://github.com/tenstorrent/luwen.git#subdirectory=crates/pyluwen',
+  'pyluwen @ git+ssh://git@github.com/tenstorrent/luwen.git@v0.1.0#subdirectory=crates/pyluwen',
   'pyserial',
   'python-constraint',
   'pyyaml',
