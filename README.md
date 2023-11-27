@@ -28,19 +28,25 @@ tools
 ```
 python3 -m venv .venv
 source .venv/bin/activate
+pip3 install --upgrade pip
 ```
 ### Required
+
+Install tt-smi.
 ```
 pip install .
 ```
 
 ### Optional - for TT-SMI developers
-Generate and source a python environment
+
+Generate and source a python3 environment
 ```
 python3 -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 ```
-For users who would like to edit the code without re-building, install SMI in editable mode
+
+For users who would like to edit the code without re-building, install SMI in editable mode.
 ```
 pip install --editable .
 ```
