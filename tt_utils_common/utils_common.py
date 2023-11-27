@@ -9,6 +9,8 @@ import psutil
 import distro
 import platform
 from typing import Union
+import importlib.resources
+from yaml import safe_load
 
 
 def get_size(size_bytes: int, suffix: str = "B") -> str:
@@ -215,3 +217,33 @@ def get_board_type(board_id: str) -> str:
         return "n150"
     else:
         return "N/A"
+
+
+def get_chip_data(chip, file, internal: bool):
+    """
+    Helper function to load a file from the chip's data directory.
+    """
+    with importlib.resources.path("tt_smi", "") as path:
+        if chip.as_wh() is not None:
+            prefix = "wormhole"
+        elif chip.as_gs() is not None:
+            prefix = "grayskull"
+        else:
+            raise Exception("Only support fw messages for Wh or GS chips")
+        if internal:
+            prefix = f".ignored/{prefix}"
+        else:
+            prefix = f"data/{prefix}"
+        return open(str(path.joinpath(f"{prefix}/{file}")))
+
+
+def init_fw_defines(chip):
+    """
+    Loads the fw_defines.yaml with arc msg definitions from the chip's data directory.
+    """
+    fw_defines = safe_load(get_chip_data(chip, "fw_defines.yaml", False))
+    return fw_defines
+
+
+def int_to_bits(x):
+    return list(filter(lambda b: x & (1 << b), range(x.bit_length())))
