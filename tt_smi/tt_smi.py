@@ -23,6 +23,7 @@ from textual.app import App, ComposeResult
 from tt_smi.tt_smi_backend import TTSMIBackend
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
+from tt_utils_common import init_fw_defines, hex_to_semver_m3_fw
 from tt_smi.ui.common_themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_utils_common import get_host_info, system_compatibility
 from tt_smi.ui.common_widgets import (
@@ -517,6 +518,32 @@ def tt_smi_main(
     tt_smi_app.run()
 
 
+def check_fw_version(pylewen_chip, board_num):
+    """
+    Check firmware version before running tt_smi and exit gracefully if not supported
+    For Grayskull, we only support fw version >= 1.3.0.0
+    """
+    if pylewen_chip.as_gs():
+        fw_defines = init_fw_defines(pylewen_chip)
+        fw_version, exit_code = pylewen_chip.arc_msg(
+            fw_defines["MSG_TYPE_FW_VERSION"], arg0=0, arg1=0
+        )
+        if fw_version < constants.MAGIC_FW_VERSION:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on grayskull device {board_num}.",
+                f"\n Require FW version >= {hex_to_semver_m3_fw(constants.MAGIC_FW_VERSION)} to run tt-smi",
+                CMD_LINE_COLOR.ENDC,
+            )
+            print(
+                CMD_LINE_COLOR.PURPLE,
+                "Please update FW on device using tt-flash: https://github.com/tenstorrent/tt-flash",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+    return
+
+
 def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
@@ -529,6 +556,10 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
+
+    # Check firmware version before running tt_smi to avoid crashes
+    for i, device in enumerate(devices):
+        check_fw_version(device, i)
 
     backend = TTSMIBackend(devices)
     tt_smi_main(backend)

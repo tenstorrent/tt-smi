@@ -8,37 +8,10 @@ This file contains functions used to reset tensix cores on a Grayskull chip.
 import os
 import functools
 import itertools
-import importlib.resources
-from yaml import safe_load
 from pyluwen import PciChip
 from tt_smi.registers import Registers
 from tt_smi.ui.common_themes import CMD_LINE_COLOR
-
-
-def get_chip_data(chip, file, internal: bool):
-    """
-    Helper function to load a file from the chip's data directory.
-    """
-    with importlib.resources.path("tt_smi", "") as path:
-        if chip.as_wh() is not None:
-            prefix = "wormhole"
-        elif chip.as_gs() is not None:
-            prefix = "grayskull"
-        else:
-            raise Exception("Only support fw messages for Wh or GS chips")
-        if internal:
-            prefix = f".ignored/{prefix}"
-        else:
-            prefix = f"data/{prefix}"
-        return open(str(path.joinpath(f"{prefix}/{file}")))
-
-
-def init_fw_defines(chip):
-    """
-    Loads the fw_defines.yaml with arc msg definitions from the chip's data directory.
-    """
-    fw_defines = safe_load(get_chip_data(chip, "fw_defines.yaml", False))
-    return fw_defines
+from tt_utils_common import init_fw_defines, int_to_bits
 
 
 class GSTensixReset:
@@ -96,10 +69,6 @@ class GSTensixReset:
             rout = limit - 1 - (phys // 2)
         return rout
 
-    @staticmethod
-    def int_to_bits(x):
-        return list(filter(lambda b: x & (1 << b), range(x.bit_length())))
-
     def get_harvested_rows(self):
         """
         Get the rows that are harvested on the chip based on efuses.
@@ -119,7 +88,7 @@ class GSTensixReset:
         bad_logic_bits = (harvesting_fuses >> 10) & 0x3FF
 
         bad_row_bits = (bad_mem_bits | bad_logic_bits) << 1
-        bad_physical_rows = self.int_to_bits(bad_row_bits)
+        bad_physical_rows = int_to_bits(bad_row_bits)
         disabled_rows = frozenset(
             map(
                 lambda y: self.PHYS_Y_TO_NOC_0_Y[self.GRID_SIZE_Y - y - 1],
