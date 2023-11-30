@@ -175,8 +175,14 @@ def get_board_type(board_id: str) -> str:
     Get board type from board ID string.
     Ex:
         Board ID: AA-BBBBB-C-D-EE-FF-XXX
-        BBBBB = Unique Part Identifier (UPI)
-        C = Revision
+                   ^     ^ ^ ^  ^  ^   ^
+                   |     | | |  |  |   +- XXX
+                   |     | | |  |  +----- FF
+                   |     | | |  +-------- EE
+                   |     | | +----------- D
+                   |     | +------------- C = Revision
+                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
+                   +--------------------- AA
     """
     serial_num = int(f"0x{board_id}", base=16)
     upi = (serial_num >> 36) & 0xFFFFF
@@ -190,18 +196,22 @@ def get_board_type(board_id: str) -> str:
         else:
             return "N/A"
     elif upi == 0x3:
-        return "E300_105"
+        # Formerly E300_105
+        return "e150"
     elif upi == 0x7:
-        return "E75"
+        return "e75"
     elif upi == 0x8:
         return "NEBULA_CB"
     elif upi == 0xA:
-        return "E300_X2"
+        # Formerly E300_X2
+        return "e300"
     elif upi == 0xB:
         return "GALAXY"
     elif upi == 0x14:
-        return "NEBULA_X2"
+        # Formerly NEBULA_X2
+        return "n300"
     elif upi == 0x18:
-        return "NEBULA_X1"
+        # Formerly NEBULA_X1
+        return "n150"
     else:
         return "N/A"
