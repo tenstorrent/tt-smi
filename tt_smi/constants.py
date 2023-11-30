@@ -107,6 +107,7 @@ PCI_PROPERTIES = [
 MAX_PCIE_WIDTH = 16
 MAX_PCIE_SPEED = 4
 GUI_INTERVAL_TIME = 0.1
+MAGIC_FW_VERSION = 0x01030000
 
 ########################################
 #          GUI CONSTANTS
@@ -164,7 +165,7 @@ FIRMWARES_TABLE_HEADER = [
 HELP_MENU_MARKDOWN = """\
 # TT-SMI HELP MENU
 
-TT-SMI is a command-line utility that allows users to look at the telemetry and device information of Tenstorrent devices. 
+TT-SMI is a command-line utility that allows users to look at the telemetry and device information of Tenstorrent devices.
 
 ## KEYBOARD SHORTCUTS
 

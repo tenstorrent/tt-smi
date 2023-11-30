@@ -23,4 +23,3 @@ black:
     stage: format
     script:
         - python3 -m black . --check --verbose --diff --color
-
