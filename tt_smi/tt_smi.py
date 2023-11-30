@@ -25,7 +25,7 @@ from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_utils_common import init_fw_defines, hex_to_semver_m3_fw
 from tt_smi.ui.common_themes import CMD_LINE_COLOR, create_tt_tools_theme
-from tt_utils_common import get_host_info, system_compatibility
+from tt_utils_common import get_driver_version, get_host_info, system_compatibility
 from tt_smi.ui.common_widgets import (
     TTHeader,
     TTDataTable,
@@ -548,11 +548,27 @@ def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
     """
-    devices = detect_chips()
-    if not devices:
+    driver = get_driver_version()
+    if not driver:
         print(
             CMD_LINE_COLOR.RED,
-            "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+            "No Tenstorrent driver detected! Please install driver using tt-kmd: https://github.com/tenstorrent/tt-kmd ",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+    try:
+        devices = detect_chips()
+        if not devices:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+    except Exception as e:
+        print(
+            CMD_LINE_COLOR.RED,
+            "Cannot open TT-SMI! Please check your hardware and driver and try again. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
