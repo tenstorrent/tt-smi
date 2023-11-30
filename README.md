@@ -44,6 +44,7 @@ Generate and source a python3 environment
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
+pip install pre-commit
 ```
 
 For users who would like to edit the code without re-building, install SMI in editable mode.
