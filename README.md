@@ -8,6 +8,10 @@ to collect and display device, telemetry and firmware information.
 
 In addition user can issue Grayskull board tensix core reset.
 
+## Official Repository
+
+[https://github.com/tenstorrent/tt-smi/](https://github.com/tenstorrent/tt-smi/)
+
 # Getting started
 Build and editing instruction are as follows -
 
