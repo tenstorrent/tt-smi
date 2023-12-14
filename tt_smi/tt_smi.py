@@ -19,14 +19,22 @@ import pkg_resources
 from rich.text import Text
 from tt_smi import constants
 from typing import List, Tuple
+from importlib_resources import files
 from textual.app import App, ComposeResult
 from tt_smi.tt_smi_backend import TTSMIBackend
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
-from tt_utils_common import init_fw_defines, hex_to_semver_m3_fw
-from tt_smi.ui.common_themes import CMD_LINE_COLOR, create_tt_tools_theme
-from tt_utils_common import get_driver_version, get_host_info, system_compatibility
-from tt_smi.ui.common_widgets import (
+from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
+from tt_tools_common.utils_common.tools_utils import (
+    init_fw_defines,
+    hex_to_semver_m3_fw,
+)
+from tt_tools_common.utils_common.system_utils import (
+    get_driver_version,
+    get_host_info,
+    system_compatibility,
+)
+from tt_tools_common.ui_common.widgets import (
     TTHeader,
     TTDataTable,
     TTMenu,
@@ -62,7 +70,16 @@ class TTSMI(App):
         ("3", "tab_three", "Firmware tab"),
     ]
 
-    CSS_PATH = ["ui/common_style.css", "tt_smi_style.css"]
+    try:
+        common_style_file_path = files("tt_tools_common.ui_common").joinpath(
+            "common_style.css"
+        )
+    except:
+        raise Exception(
+            "Cannot find common_style.css file, please make sure tt_tools_common lib is installed correctly."
+        )
+
+    CSS_PATH = [f"{common_style_file_path}", "tt_smi_style.css"]
 
     def __init__(
         self,

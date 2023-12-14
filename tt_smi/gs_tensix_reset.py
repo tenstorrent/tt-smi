@@ -10,8 +10,8 @@ import functools
 import itertools
 from pyluwen import PciChip
 from tt_smi.registers import Registers
-from tt_smi.ui.common_themes import CMD_LINE_COLOR
-from tt_utils_common import init_fw_defines, int_to_bits
+from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_tools_common.utils_common.tools_utils import init_fw_defines, int_to_bits
 
 
 class GSTensixReset:
