@@ -3,13 +3,12 @@ SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 SPDX-License-Identifier: Apache-2.0
 */
 
-$green: #1eb57d;
 #app_grid {
   layout: grid;
   grid-gutter: 1 1;
 }
 
-#tab_container{
+#tab_container {
   overflow: auto auto;
 }
 
@@ -25,12 +24,6 @@ $green: #1eb57d;
   dock: right
 }
 
-TabPane {
-  width: 100%;
-  /* Enable scrolling on tabs */
-  overflow: auto hidden;
-}
-
 #tt_smi {
   width: 100
 }
@@ -41,21 +34,4 @@ TabPane {
 
 #helper_menu {
   height: 12;
-}
-
-DataTable {
-  text-align: center;
-}
-
-DataTable > .datatable--header-hover {
-  background: 0%;
-  color: white 0%;
-}
-
-/* TTMenu Style */
-
-TTHealthMenu, TTTextMenu, TTTestOutput {
-  padding: 1 2;
-  border: solid $green;
-  color: $green;
 }

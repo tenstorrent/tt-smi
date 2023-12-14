@@ -10,7 +10,6 @@ This is the backend of tt-smi.
 import os
 import jsons
 import datetime
-import tt_utils_common
 from pathlib import Path
 from pyluwen import PciChip
 from typing import Dict, List
@@ -18,8 +17,17 @@ from rich.progress import track
 from tt_smi import log, constants
 from tt_smi.registers import Registers
 from tt_smi.gs_tensix_reset import GSTensixReset
-from tt_smi.ui.common_themes import CMD_LINE_COLOR
-from tt_utils_common import get_host_info, init_logging
+from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_tools_common.utils_common.system_utils import (
+    get_host_info,
+)
+from tt_tools_common.utils_common.tools_utils import (
+    get_board_type,
+    hex_to_semver_m3_fw,
+    hex_to_date,
+    hex_to_semver_eth,
+    init_logging,
+)
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
 
@@ -75,7 +83,7 @@ class TTSMIBackend:
         elif device.as_wh():
             return "wormhole"
         else:
-            assert False, "Unkown chip name, FIX!"
+            assert False, "Unknown chip name, FIX!"
 
     def save_logs(self, result_filename: str = None):
         time_now = datetime.datetime.now()
@@ -213,9 +221,7 @@ class TTSMIBackend:
                 except:
                     dev_info[field] = "N/A"
             elif field == "board_type":
-                dev_info[field] = tt_utils_common.get_board_type(
-                    self.get_board_id(board_num)
-                )
+                dev_info[field] = get_board_type(self.get_board_id(board_num))
             elif field == "board_id":
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
@@ -331,48 +337,40 @@ class TTSMIBackend:
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(
-                        int(val, 16)
-                    )
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
+
             elif field == "arc_fw_date":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_WH_FW_DATE"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_date(
-                        int(val, 16), include_time=False
-                    )
+                    fw_versions[field] = hex_to_date(int(val, 16), include_time=False)
+
             elif field == "eth_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_ETH_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_eth(int(val, 16))
+                    fw_versions[field] = hex_to_semver_eth(int(val, 16))
             elif field == "m3_bl_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_BL_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(
-                        int(val, 16)
-                    )
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
             elif field == "m3_app_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_APP_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(
-                        int(val, 16)
-                    )
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "tt_flash_version":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_TT_FLASH_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
-                    fw_versions[field] = tt_utils_common.hex_to_semver_m3_fw(
-                        int(val, 16)
-                    )
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
 
     def get_register_object(self, device) -> Registers:
