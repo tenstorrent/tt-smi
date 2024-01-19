@@ -57,7 +57,7 @@ class GSTensixReset:
                 self.ROUTING_TO_PHYSICAL_TABLE[(rout_x, rout_y)] = (phys_x, phys_y)
         self.device = device
         self.axi_registers = axi_registers
-        self.fw_defines = init_fw_defines(self.device)
+        self.fw_defines = init_fw_defines("grayskull", "tt_smi")
         self.harvested_rows = self.get_harvested_rows()
         self.core_list = self.get_core_list()
 
