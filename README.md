@@ -105,6 +105,11 @@ This should bring up a display that looks as below.
 
 This is the default mode where user can see device information, telemetry and firmware.
 
+### Latest SW Versions
+This section will display the software version of the device. If failures occur, error messages will show as below.
+
+![tt-smi](images/error.png)
+
 ### App keyboard shortcuts
 All app keyboard shortcuts can be found in the help menu that user can bring up by hitting "h" or clicking the "help" button on the footer.
 
