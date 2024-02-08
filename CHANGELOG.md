@@ -5,10 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
 
- - WH reset support
- - Galaxy reset support
+## 2.0.0 - 08/02/2024
+All WH related SMI support - no breaking changes
+### Added
+- WH support
+- Coordinate reporting in GUI
+- WH Resets
+  - WH board level reset support
+  - Mobo reset support
+- Generate a reset config file and reset boards with it
+
+### Fixed
+- PCIE gen speed reporting from sysfs
 
 
 ## 1.1.0 - 29/01/2024
@@ -21,5 +30,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 First release of opensource tt-smi
 
-### Added 
+### Added
 - GS support and tensix reset support

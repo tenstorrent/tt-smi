@@ -244,7 +244,7 @@ class Limits(ElasticModel):
 
 @optional
 class TTSMIDeviceLog(ElasticModel):
-    # smbus_telem: SmbusTelem
+    smbus_telem: SmbusTelem
     board_info: BoardInfo
     telemetry: Telemetry
     firmwares: Firmwares
@@ -256,6 +256,34 @@ class TTSMILog(ElasticModel):
     time: datetime.datetime
     host_info: HostInfo
     device_info: List[TTSMIDeviceLog]
+
+    def save_as_json(self, fname: Union[str, Path]):
+        with open(fname, "w") as f:
+            raw_json = self.json(exclude_none=True)
+            reloaded_json = json.loads(raw_json)
+            json.dump(reloaded_json, f, indent=4)
+
+
+@optional
+class PciResetDeviceInfo(ElasticModel):
+    pci_index: List[int]
+
+
+@optional
+class MoboReset(ElasticModel):
+    mobo: str
+    credo: List[str]
+    disabled_ports: List[str]
+
+
+@optional
+class TTSMIResetLog(ElasticModel):
+    time: datetime.datetime
+    host_name: str
+    gs_tensix_reset: PciResetDeviceInfo
+    wh_link_reset: PciResetDeviceInfo
+    re_init_devices: bool
+    wh_mobo_reset: List[MoboReset]
 
     def save_as_json(self, fname: Union[str, Path]):
         with open(fname, "w") as f:

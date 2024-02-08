@@ -160,6 +160,13 @@ FIRMWARES_TABLE_HEADER = [
     "TT-Flash Version",
 ]
 
+PCI_PROPERTIES = [
+    "current_link_speed",
+    "max_link_speed",
+    "current_link_width",
+    "max_link_width",
+]
+
 # HELP MARKDOWN DOCUMENT
 
 HELP_MENU_MARKDOWN = """\

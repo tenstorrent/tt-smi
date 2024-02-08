@@ -8,16 +8,20 @@ This is the backend of tt-smi.
 """
 
 import os
+import re
+import sys
 import jsons
 import datetime
+from tt_smi import log
 from pathlib import Path
 from pyluwen import PciChip
+from tt_smi import constants
 from typing import Dict, List
 from rich.progress import track
-from tt_smi import log, constants
 from tt_smi.registers import Registers
-from tt_smi.gs_tensix_reset import GSTensixReset
+from tt_smi.resets.gs_tensix_reset import GSTensixReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.resets.wh_resets import reset_wh_boards, warm_reset_mobo
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
@@ -38,16 +42,14 @@ class TTSMIBackend:
     It handles all device related tasks like fetching device info, telemetry and toggling resets
     """
 
-    def __init__(
-        self,
-        devices: List[PciChip],
-    ):
+    def __init__(self, devices: List[PciChip], fully_init: bool = True):
         self.devices = devices
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
             device_info=[
                 log.TTSMIDeviceLog(
+                    smbus_telem=log.SmbusTelem(),
                     board_info=log.BoardInfo(),
                     telemetry=log.Telemetry(),
                     firmwares=log.Firmwares(),
@@ -62,19 +64,25 @@ class TTSMIBackend:
         self.device_telemetrys = []
         self.chip_limits = []
         self.registers = []
+        self.pci_properties = []
 
-        for i, device in track(
-            enumerate(self.devices),
-            total=len(self.devices),
-            description="Gathering Information",
-            update_period=0.01,
-        ):
-            self.smbus_telem_info.append(self.get_smbus_board_info(i))
-            self.firmware_infos.append(self.get_firmware_versions(i))
-            self.device_infos.append(self.get_device_info(i))
-            self.device_telemetrys.append(self.get_chip_telemetry(i))
-            self.chip_limits.append(self.get_chip_limits(i))
-            self.registers.append(self.get_register_object(device))
+        if fully_init:
+            for i, device in track(
+                enumerate(self.devices),
+                total=len(self.devices),
+                description="Gathering Information",
+                update_period=0.01,
+            ):
+                self.smbus_telem_info.append(self.get_smbus_board_info(i))
+                self.firmware_infos.append(self.get_firmware_versions(i))
+                self.device_infos.append(self.get_device_info(i))
+                self.device_telemetrys.append(self.get_chip_telemetry(i))
+                self.chip_limits.append(self.get_chip_limits(i))
+                self.registers.append(self.get_register_object(device))
+                self.pci_properties.append(self.get_pci_properties(i))
+        else:
+            for i, device in enumerate(self.devices):
+                self.registers.append(self.get_register_object(device))
 
     def get_device_name(self, device):
         """Get device name from chip object"""
@@ -86,6 +94,7 @@ class TTSMIBackend:
             assert False, "Unknown chip name, FIX!"
 
     def save_logs(self, result_filename: str = None):
+        """Save log for smi snapshots"""
         time_now = datetime.datetime.now()
         date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
         if not os.path.exists(LOG_FOLDER):
@@ -96,11 +105,50 @@ class TTSMIBackend:
             Path(dir_path).mkdir(parents=True, exist_ok=True)
             log_filename = result_filename
         for i in range(0, len(self.devices)):
+            self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
             self.log.device_info[i].board_info = self.device_infos[i]
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
         self.log.save_as_json(log_filename)
+        return log_filename
+
+    def generate_reset_logs(self, result_filename: str = None):
+        """Generate and save reset logs"""
+        time_now = datetime.datetime.now()
+        date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
+        log_filename = f"tt_smi_reset_config_{date_string}.json"
+        gs_pci_idx = []
+        wh_pci_idx = []
+        for i, dev in enumerate(self.devices):
+            if dev.as_wh() and not dev.is_remote():
+                wh_pci_idx.append(i)
+            elif dev.as_gs():
+                gs_pci_idx.append(i)
+        reset_log = log.TTSMIResetLog(
+            time=time_now,
+            host_name=get_host_info()["Hostname"],
+            gs_tensix_reset=log.PciResetDeviceInfo(pci_index=gs_pci_idx),
+            wh_link_reset=log.PciResetDeviceInfo(pci_index=wh_pci_idx),
+            re_init_devices=True,
+            wh_mobo_reset=[
+                log.MoboReset(
+                    mobo="<MOBO NAME>",
+                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
+                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
+                ),
+                log.MoboReset(
+                    mobo="<MOBO NAME>",
+                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
+                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
+                ),
+            ],
+        )
+        if result_filename:
+            dir_path = os.path.dirname(os.path.realpath(result_filename))
+            Path(dir_path).mkdir(parents=True, exist_ok=True)
+            log_filename = result_filename
+        reset_log.save_as_json(log_filename)
         return log_filename
 
     def print_all_available_devices(self):
@@ -111,12 +159,31 @@ class TTSMIBackend:
         for i, device in enumerate(self.devices):
             board_id = self.device_infos[i]["board_id"]
             board_type = self.device_infos[i]["board_type"]
+            if device.as_wh():
+                suffix = " R" if device.is_remote() else " L"
+                board_type = board_type + suffix
 
             print(
                 CMD_LINE_COLOR.BLUE,
                 f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
                 CMD_LINE_COLOR.ENDC,
             )
+        print(CMD_LINE_COLOR.YELLOW, "Boards that can be reset:", CMD_LINE_COLOR.ENDC)
+        for i, device in enumerate(self.devices):
+            if (
+                not device.is_remote()
+                and self.device_infos[i]["board_type"] != "GALAXY"
+            ):
+                board_id = self.device_infos[i]["board_id"]
+                board_type = self.device_infos[i]["board_type"]
+                if device.as_wh():
+                    suffix = " R" if device.is_remote() else " L"
+                    board_type = board_type + suffix
+                print(
+                    CMD_LINE_COLOR.BLUE,
+                    f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
+                    CMD_LINE_COLOR.ENDC,
+                )
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
@@ -184,6 +251,43 @@ class TTSMIBackend:
 
         return width, speed
 
+    def get_pci_properties(self, board_num):
+        """Get the PCI link speed and link width details from sysfs files"""
+        if self.devices[board_num].is_remote():
+            return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
+
+        try:
+            pcie_bdf = self.devices[board_num].get_pci_bdf()
+            pci_bus_path = os.path.realpath(f"/sys/bus/pci/devices/{pcie_bdf}")
+        except:
+            return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
+
+        def get_pcie_gen(link_speed: int) -> int:
+            if link_speed == 16:
+                return 4
+            elif link_speed == 8:
+                return 3
+            elif link_speed == 5:
+                return 2
+            elif link_speed == 2.5:
+                return 1
+            else:
+                assert False, f"Invalid link speed {link_speed}"
+
+        properties = {}
+
+        for prop in constants.PCI_PROPERTIES:
+            try:
+                with open(os.path.join(pci_bus_path, prop), "r", encoding="utf-8") as f:
+                    output = f.readline().rstrip()
+                    value = int(re.findall(r"\d+", output)[0])
+                    if prop == "current_link_speed" or prop == "max_link_speed":
+                        value = get_pcie_gen(value)
+            except Exception:
+                value = "N/A"
+            properties[prop] = value
+        return properties
+
     def get_dram_training_status(self, board_num) -> bool:
         """Get DRAM Training Status
         True means it passed training, False means it failed or did not train at all"""
@@ -225,7 +329,12 @@ class TTSMIBackend:
             elif field == "board_id":
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
-                dev_info[field] = "N/A"
+                if self.devices[board_num].as_wh():
+                    dev_info[
+                        field
+                    ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
+                else:
+                    dev_info[field] = "N/A"
             elif field == "dram_status":
                 dev_info[field] = self.get_dram_training_status(board_num)
             elif field == "dram_speed":
@@ -242,9 +351,11 @@ class TTSMIBackend:
 
     def get_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for chip. None if ARC FW not running"""
-
         current = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDC"], 16) & 0xFFFF
-        voltage = int(self.smbus_telem_info[board_num]["SMBUS_TX_VCORE"], 16) / 1000
+        if self.smbus_telem_info[board_num]["SMBUS_TX_VCORE"] is not None:
+            voltage = int(self.smbus_telem_info[board_num]["SMBUS_TX_VCORE"], 16) / 1000
+        else:
+            voltage = 10000
         power = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDP"], 16) & 0xFFFF
         asic_temperature = (
             int(self.smbus_telem_info[board_num]["SMBUS_TX_ASIC_TEMPERATURE"], 16)
@@ -393,8 +504,108 @@ class TTSMIBackend:
 
     def gs_tensix_reset(self, board_num) -> None:
         """Reset the tensix cores on a GS chip"""
+        print(
+            CMD_LINE_COLOR.BLUE,
+            f"Starting tensix reset on GS board at pci index {board_num}",
+            CMD_LINE_COLOR.ENDC,
+        )
         device = self.devices[board_num]
         axi_registers = self.registers[board_num]
 
         gs_tensix_reset_obj = self.create_reset_helper(device, axi_registers)
         gs_tensix_reset_obj.tensix_reset()
+
+        print(
+            CMD_LINE_COLOR.GREEN,
+            f"Finished tensix reset on GS board at pci index {board_num}\n",
+            CMD_LINE_COLOR.ENDC,
+        )
+
+
+# Reset specific functions
+
+
+def pci_indices_from_json(json_dict):
+    """Parse pci_list from reset json"""
+    pci_indices = []
+    reinit = False
+    if "gs_tensix_reset" in json_dict.keys():
+        pci_indices.extend(json_dict["gs_tensix_reset"]["pci_index"])
+    if "wh_link_reset" in json_dict.keys():
+        pci_indices.extend(json_dict["wh_link_reset"]["pci_index"])
+    if "re_init_devices" in json_dict.keys():
+        reinit = json_dict["re_init_devices"]
+
+    return pci_indices, reinit
+
+
+def mobo_reset_from_json(json_dict):
+    """Parse pci_list from reset json and init mobo reset"""
+    if "wh_mobo_reset" in json_dict.keys():
+        mobo_dict_list = []
+        for mobo_dict in json_dict["wh_mobo_reset"]:
+            if "MOBO NAME" not in mobo_dict["mobo"]:
+                mobo_dict_list.append(mobo_dict)
+        # If any mobos - do the reset
+        if mobo_dict_list:
+            warm_reset_mobo(mobo_dict_list)
+
+
+def pci_board_reset(list_of_boards: List[int], reinit=False):
+    """Given a list of pci index's init the pci chip and call reset on it"""
+
+    reset_wh_pci_idx = []
+    reset_gs_devs = []
+    for pci_idx in list_of_boards:
+        try:
+            chip = PciChip(pci_interface=pci_idx)
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error accessing board at pci index {pci_idx}! Use -ls to see all devices available to reset",
+                CMD_LINE_COLOR.ENDC,
+            )
+        if chip.as_wh():
+            reset_wh_pci_idx.append(pci_idx)
+        elif chip.as_gs():
+            reset_gs_devs.append(chip)
+        else:
+            print(
+                CMD_LINE_COLOR.RED,
+                "Unkown chip!!",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+    # reset wh devices with pci indices
+    if reset_wh_pci_idx:
+        reset_wh_boards(reset_wh_pci_idx)
+
+    # reset gs devices by creating a partially init backend
+    if reset_gs_devs:
+        backend = TTSMIBackend(devices=reset_gs_devs, fully_init=False)
+        for i, _ in enumerate(reset_gs_devs):
+            backend.gs_tensix_reset(i)
+
+    if reinit:
+        import pyluwen
+
+        print(
+            CMD_LINE_COLOR.PURPLE,
+            f"Re-initializing boards after reset....",
+            CMD_LINE_COLOR.ENDC,
+        )
+        try:
+            chips = pyluwen.detect_chips_fallible()
+            print(
+                CMD_LINE_COLOR.GREEN,
+                f"Done! Detected {len(chips)} boards on host.",
+                CMD_LINE_COLOR.ENDC,
+            )
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error when re-initializing chips!\n {e}",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)

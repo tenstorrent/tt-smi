@@ -38,7 +38,7 @@ pip3 install --upgrade pip
 
 Install tt-smi.
 ```
-pip install .
+pip3 install .
 ```
 
 ### Optional - for TT-SMI developers
@@ -64,7 +64,7 @@ pre-commit install
 
 Command line arguments
 ```
-tt-smi [-h] [--local] [-v] [-s] [-ls] [-f [filename]] [-tr [TENSIX_RESET [TENSIX_RESET ...]]]
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [filename]] [-g] [-r 0,1 ... or config.json]
 ```
 ## Getting Help!
 
@@ -73,24 +73,24 @@ Running tt-smi with the ```-h, --help``` flag should bring up something that loo
 ```
 $ tt-smi --help
 
-    Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
-    usage: tt-smi [-h] [--local] [-v] [-s] [-ls] [-f [filename]] [-tr [TENSIX_RESET [TENSIX_RESET ...]]]
+  usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [filename]] [-g] [-r 0,1 ... or config.json]
 
-    Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. Main objective of TT-SMI is to provide a simple and easy to use
-    interface to collect and display device, telemetry and firmware information. In addition user can issue Grayskull and Wormhole board level resets.
+  Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. Main objective of TT-SMI is to provide a simple and easy to use interface to
+  collect and display device, telemetry and firmware information. In addition user can issue Grayskull and Wormhole board level resets.
 
-    optional arguments:
+  optional arguments:
     -h, --help            show this help message and exit
-    --local               Run on local chips (Wormhole only)
+    -l, --local           Run on local chips (Wormhole only)
     -v, --version         show program's version number and exit
-    -s, --snapshot        Dump snapshot of current TT-SMI information to .json log.
-                          Default: ~/tt_smi/<timestamp>_snapshot.json User can use -f to change filename
+    -s, --snapshot        Dump snapshot of current TT-SMI information to .json log.Default: ~/tt_smi/<timestamp>_snapshot.json User can use -f to change filename
     -ls, --list           List boards that are available on host and quits
     -f [filename], --filename [filename]
                           Change filename for test log. Default: ~/tt_smi/<timestamp>_snapshot.json
-    -tr [TENSIX_RESET [TENSIX_RESET ...]], --tensix_reset [TENSIX_RESET [TENSIX_RESET ...]]
-                          Grayskull only! Runs tensix reset on boards specified
-```
+    -g, --generate_reset_json
+                          Generate default reset json file that reset consumes. Update the generated file and use it as an input for the --reset option
+    -r 0,1 ... or config.json, --reset 0,1 ... or config.json
+                          Provide list of pci index or a json file with reset configs. Find pci index of board using the -ls option. Generate a default reset json file with the -g option.
+  ```
 
 Some of these flags will be discussed in more detail in the following sections.
 
@@ -117,35 +117,72 @@ All app keyboard shortcuts can be found in the help menu that user can bring up 
 
 ## Resets
 
-Another feature of tt-smi is performing tensix core resets on Grayskull devices.
+Another feature of tt-smi is performing resets on WH and GS pci cards, using the  ```-r/ --reset``` argument.
+```
+$ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
+
+    Provide list of pci index or a json file with reset configs. Find pci index of board using the -ls option. Generate a default reset json file with the -g option.
+```
+
+To perform the reset, either provide a list of comma separated values of the pci index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
+
+TT-SMI will perform different types of resets depending on the device:
+- GS devices have a tensix level reset that will reset each tensix cores.
+- WH nb150's and nb300's have a board level reset.
+
+By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
+
+
+A successful reset on a system with both WH and GS should look something like the follows:
 
 ```
-$ tt-smi -tr [TENSIX_RESET [TENSIX_RESET ...]], --tensix_reset [TENSIX_RESET [TENSIX_RESET ...]]
+$ tt-smi -r 0,1
+
+  Starting pci link reset on WH devices at pci indices: 1
+  Finishing pci link reset on WH devices at pci indices: 1
+
+  Starting tensix reset on GS board at pci index 0
+  Lowering clks to safe value...
+  Beginning reset sequence...
+  Finishing reset sequence...
+  Returning clks to original values...
+  Finished tensix reset on GS board at pci index 0
+
+  Re-initializing boards after reset....
+ Done! Detected 3 boards on host.
 ```
-A successful reset should look something like the follows:
+OR
+```
+tt-smi -r reset_config.json
+
+  Starting pci link reset on WH devices at pci indices: 1
+  Finishing pci link reset on WH devices at pci indices: 1
+
+  Starting tensix reset on GS board at pci index 0
+  Lowering clks to safe value...
+  Beginning reset sequence...
+  Finishing reset sequence...
+  Returning clks to original values...
+  Finished tensix reset on GS board at pci index 0
+
+  Re-initializing boards after reset....
+  Done! Detected 3 boards on host.
 
 ```
-$ tt-smi -tr 0
-
-    Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
-      Starting reset on board: 0
-      Lowering clks to safe value...
-      Beginning reset sequence...
-      Finishing reset sequence...
-      Returning clks to original values...
-      Finished reset on board: 0
-```
-WARNING: this is only for Grayskull devices
 
 In order to find the correct board index to call the reset on, the user can look at the GUI index or the desired device OR use the tt-smi board list function.
 Board list should produce an output that looks like:
 ```
 $ tt-smi -ls
 
-    Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
-      All available boards on host:
-      0: <BOARD NUM> (grayskull - E75)
-      1: <BOARD NUM> (grayskull - E75)
+Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+ All available boards on host:
+ 0: 0100007311523010 (grayskull - e75)
+ 1: 0100014211703001 (wormhole - n300 L)
+ 2: 0100014211703001 (wormhole - n300 R)
+ Boards that can be reset:
+ 0: 0100007311523010 (grayskull - e75)
+ 1: 0100014211703001 (wormhole - n300 L)
 ```
 
 ## Snapshots

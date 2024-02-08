@@ -12,6 +12,7 @@ In addition user can issue Grayskull and Wormhole board level resets.
 """
 import sys
 import time
+import json
 import signal
 import argparse
 import threading
@@ -22,10 +23,15 @@ from typing import List, Tuple
 from textual.reactive import reactive
 from importlib_resources import files
 from textual.app import App, ComposeResult
-from tt_smi.tt_smi_backend import TTSMIBackend
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
+from tt_smi.tt_smi_backend import (
+    TTSMIBackend,
+    pci_board_reset,
+    pci_indices_from_json,
+    mobo_reset_from_json,
+)
 from tt_tools_common.utils_common.tools_utils import (
     init_fw_defines,
     hex_to_semver_m3_fw,
@@ -258,64 +264,133 @@ class TTSMI(App):
     def format_device_info_rows(self):
         """Format device info rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i, device in enumerate(self.backend.devices):
             rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
-                if info == "pcie_width":
-                    if val < constants.MAX_PCIE_WIDTH:
+                if info == "board_type":
+                    if val == "n300":
+                        if device.is_remote():
+                            rows.append(
+                                Text(
+                                    f"{val}",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    " R",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
+                            )
+                        else:
+                            rows.append(
+                                Text(
+                                    f"{val}",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" L",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
+                            )
+                    else:
                         rows.append(
                             Text(
-                                f"x{val}",
-                                style=self.theme["attention"],
+                                f"{val}",
+                                style=self.theme["text_green"],
                                 justify="center",
                             )
-                            + Text(
-                                " / x16",
-                                style=self.theme["yellow_bold"],
+                        )
+                elif info == "pcie_width":
+                    max_link_width = self.backend.pci_properties[i]["max_link_width"]
+                    if device.is_remote():
+                        rows.append(
+                            Text(
+                                f"N/A",
+                                style=self.theme["gray"],
                                 justify="center",
                             )
                         )
                     else:
-                        rows.append(
-                            Text(
-                                f"x{val}",
-                                style=self.theme["text_green"],
-                                justify="center",
+                        if val < max_link_width:
+                            rows.append(
+                                Text(
+                                    f"x{val}",
+                                    style=self.theme["attention"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / x{max_link_width}",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
                             )
-                            + Text(
-                                " / x16",
-                                style=self.theme["yellow_bold"],
-                                justify="center",
+                        else:
+                            rows.append(
+                                Text(
+                                    f"x{val}",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / x{max_link_width}",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
                             )
-                        )
                 elif info == "pcie_speed":
-                    if val < constants.MAX_PCIE_SPEED:
+                    max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
+                    if device.is_remote():
                         rows.append(
                             Text(
-                                f"Gen{val}",
-                                style=self.theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                " / Gen4",
-                                style=self.theme["yellow_bold"],
+                                f"N/A",
+                                style=self.theme["gray"],
                                 justify="center",
                             )
                         )
                     else:
-                        rows.append(
-                            Text(
-                                f"Gen{val}",
-                                style=self.theme["text_green"],
-                                justify="center",
+                        if max_link_speed == "N/A":
+                            rows.append(
+                                Text(
+                                    f"Gen{val}",
+                                    style=self.theme["attention"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / N/A",
+                                    style=self.theme["gray"],
+                                    justify="center",
+                                )
                             )
-                            + Text(
-                                " / Gen4",
-                                style=self.theme["yellow_bold"],
-                                justify="center",
+                        elif val < int(max_link_speed):
+                            rows.append(
+                                Text(
+                                    f"Gen{val}",
+                                    style=self.theme["attention"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / Gen{max_link_speed}",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
                             )
-                        )
+                        else:
+                            rows.append(
+                                Text(
+                                    f"Gen{val}",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / Gen{max_link_speed}",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
+                            )
                 elif info == "dram_status":
                     if val:
                         rows.append(
@@ -411,8 +486,10 @@ class TTSMI(App):
 
 def parse_args():
     """Parse user args"""
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "-l",
         "--local",
         default=False,
         action="store_true",
@@ -452,21 +529,54 @@ def parse_args():
         dest="filename",
     )
     parser.add_argument(
-        "-tr",
-        "--tensix_reset",
-        nargs="*",
-        type=int,
-        default=None,
-        help="Grayskull only! Runs tensix reset on boards specified",
-        dest="tensix_reset",
+        "-g",
+        "--generate_reset_json",
+        default=False,
+        action="store_true",
+        help=(
+            "Generate default reset json file that reset consumes. "
+            "Update the generated file and use it as an input for the --reset option"
+        ),
     )
+
+    def parse_reset_input(value):
+        """Validate the reset inputs - either list of int pci IDs or a json config file"""
+        try:
+            # Attempt to parse as a JSON file
+            with open(value, "r") as json_file:
+                data = json.load(json_file)
+                return data
+        except (json.JSONDecodeError, FileNotFoundError):
+            # If parsing as JSON fails, treat it as a comma-separated list of integers
+            try:
+                return [int(item) for item in value.split(",")]
+            except ValueError:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "Invalid input! Provide list of comma separated numbers or a json file.\n To generate a reset json config file run tt-smi -g",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+
+    parser.add_argument(
+        "-r",
+        "--reset",
+        type=parse_reset_input,
+        metavar="0,1 ... or config.json",
+        default=None,
+        help=(
+            "Provide list of pci index or a json file with reset configs. "
+            "Find pci index of board using the -ls option. "
+            "Generate a default reset json file with the -g option."
+        ),
+        dest="reset",
+    )
+
     args = parser.parse_args()
     return args
 
 
-def tt_smi_main(
-    backend: TTSMIBackend,
-):
+def tt_smi_main(backend: TTSMIBackend, args):
     """
     Given a backend, handle all user args and run TT-SMI frontend.
 
@@ -481,17 +591,6 @@ def tt_smi_main(
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    args = parse_args()
-
-    devices = detect_chips()
-    if not devices:
-        print(
-            CMD_LINE_COLOR.RED,
-            "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
@@ -503,47 +602,20 @@ def tt_smi_main(
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)
-    if args.tensix_reset is not None:
-        if args.tensix_reset == []:
-            print(
-                CMD_LINE_COLOR.RED,
-                "Please Specify a board number to run tensix reset on! eg: tr 0 1 2",
-                CMD_LINE_COLOR.ENDC,
-            )
-            backend.print_all_available_devices()
-            print(
-                CMD_LINE_COLOR.RED,
-                "Please select grayskull board(s) from the above list",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-        for board_num in args.tensix_reset:
-            if backend.devices[board_num].as_gs() is None:
-                print(
-                    CMD_LINE_COLOR.RED,
-                    f"Can only run tensix reset on grayskull! Board {board_num} is not a grayskull board!",
-                    CMD_LINE_COLOR.ENDC,
-                )
-                backend.print_all_available_devices()
-                print(
-                    CMD_LINE_COLOR.RED,
-                    "Please select grayskull board(s) from the above list",
-                    CMD_LINE_COLOR.ENDC,
-                )
-                sys.exit(1)
-            print(
-                CMD_LINE_COLOR.GREEN,
-                f"Starting reset on board: {board_num}",
-                CMD_LINE_COLOR.ENDC,
-            )
-            backend.gs_tensix_reset(board_num)
-            print(
-                CMD_LINE_COLOR.GREEN,
-                f"Finished reset on board: {board_num}",
-                CMD_LINE_COLOR.ENDC,
-            )
-        return
+    if args.generate_reset_json:
+        file = backend.generate_reset_logs()
+        print(
+            CMD_LINE_COLOR.PURPLE,
+            f"Generated sample reset config file for this host: {file}",
+            CMD_LINE_COLOR.ENDC,
+        )
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"Update the generated file and use it as an input for the -r/--reset option.",
+            CMD_LINE_COLOR.ENDC,
+        )
 
+        sys.exit(0)
     tt_smi_app = TTSMI(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
     )
@@ -588,29 +660,53 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    try:
-        devices = detect_chips()
-        if not devices:
-            print(
-                CMD_LINE_COLOR.RED,
-                "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+
+    args = parse_args()
+
+    # Handle reset first, without setting up backend or
+    if args.reset is not None:
+        if isinstance(args.reset, list) and all(
+            isinstance(item, int) for item in args.reset
+        ):
+            # If input is just reset board
+            pci_board_reset(args.reset, reinit=True)
+        else:
+            #  If mobo reset, perform it first
+            mobo_dict_list = mobo_reset_from_json(args.reset)
+            pci_indices, reinit = pci_indices_from_json(args.reset)
+
+            if pci_indices:
+                pci_board_reset(pci_indices, reinit)
+            else:
+                CMD_LINE_COLOR.YELLOW,
+                "No pci devices parsed from json to reset..."
                 CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
+
+        # All went well - exit
+        sys.exit(0)
+
+    try:
+        devices = detect_chips(local_only=args.local)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
-            "Cannot open TT-SMI! Please check your hardware and driver and try again. Exiting...",
+            f"Error in detecting devices!\n{e}\n Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-
+    if not devices:
+        print(
+            CMD_LINE_COLOR.RED,
+            "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+    backend = TTSMIBackend(devices)
     # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(devices):
+    for i, device in enumerate(backend.devices):
         check_fw_version(device, i)
 
-    backend = TTSMIBackend(devices)
-    tt_smi_main(backend)
+    tt_smi_main(backend, args)
 
 
 if __name__ == "__main__":
