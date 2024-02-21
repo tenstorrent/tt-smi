@@ -9,14 +9,10 @@ import time
 import tqdm
 import requests
 import threading
-from rich.live import Live
-from rich.status import Status
-from typing import List, Optional, Tuple
+from pyluwen import PciChip
+from typing import List, Optional
 from tt_tools_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_tools_common.utils_common.tools_utils import (
-    get_board_type,
-)
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
 )
@@ -261,7 +257,7 @@ def warm_reset_mobo(mobo_dict_list):
     threaded_mobo_reset(mobo_dict_list, boot_modules)
 
 
-def reset_wh_boards(boards_to_reset: List[int]) -> List[int]:
+def reset_wh_boards(boards_to_reset: List[int]) -> List[PciChip]:
     """Reset devices given their pci ids"""
 
     check_driver_version("board reset")
