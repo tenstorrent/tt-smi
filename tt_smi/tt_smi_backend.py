@@ -104,9 +104,15 @@ class TTSMIBackend:
             dir_path = os.path.dirname(os.path.realpath(result_filename))
             Path(dir_path).mkdir(parents=True, exist_ok=True)
             log_filename = result_filename
-        for i in range(0, len(self.devices)):
+        for i, device in enumerate(self.devices):
             self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
             self.log.device_info[i].board_info = self.device_infos[i]
+            # Add L/R for nb300 to separate local and remote asics
+            if device.as_wh():
+                board_type = self.device_infos[i]["board_type"]
+                suffix = " R" if device.is_remote() else " L"
+                board_type = board_type + suffix
+                self.log.device_info[i].board_info["board_type"] = board_type
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
@@ -596,7 +602,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             CMD_LINE_COLOR.ENDC,
         )
         try:
-            chips = pyluwen.detect_chips_fallible()
+            chips = pyluwen.detect_chips()
             print(
                 CMD_LINE_COLOR.GREEN,
                 f"Done! Detected {len(chips)} boards on host.",

@@ -134,22 +134,6 @@ TELEMETRY_TABLE_HEADER = [
     "Core Temp (°C)",
 ]
 
-TELEMETRY_TABLE_HEADER_INTERNAL = [
-    "#",
-    "Core Voltage (V)",
-    "Core Current (A)",
-    "Core Power (W)",
-    "AICLK (MHz)",
-    "ARCCLK (MHz)",
-    "AXICLK (MHz)",
-    "Core Temp (°C)",
-    "VREG Temp (°C)",
-    "Outlet Temp 1 (°C)",
-    "Outlet Temp 2 (°C)",
-    "Inlet Temp (°C)",
-    "12V Bus Current (A)",
-]
-
 FIRMWARES_TABLE_HEADER = [
     "#",
     "FW Version",
