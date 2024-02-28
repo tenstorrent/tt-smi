@@ -1,3 +1,0 @@
-ARC_RESET:
-  offset:    0x1FF30000
-  filename:  arc/reset.yaml

@@ -108,7 +108,7 @@ MAX_PCIE_WIDTH = 16
 MAX_PCIE_SPEED = 4
 GUI_INTERVAL_TIME = 0.1
 MAGIC_FW_VERSION = 0x01030000
-
+MSG_TYPE_FW_VERSION = 0xB9
 ########################################
 #          GUI CONSTANTS
 ########################################

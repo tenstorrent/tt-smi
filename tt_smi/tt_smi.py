@@ -718,9 +718,8 @@ def check_fw_version(pylewen_chip, board_num):
     For Grayskull, we only support fw version >= 1.3.0.0
     """
     if pylewen_chip.as_gs():
-        fw_defines = init_fw_defines("grayskull", "tt_smi")
         fw_version, exit_code = pylewen_chip.arc_msg(
-            fw_defines["MSG_TYPE_FW_VERSION"], arg0=0, arg1=0
+            constants.MSG_TYPE_FW_VERSION, arg0=0, arg1=0
         )
         if fw_version < constants.MAGIC_FW_VERSION:
             print(

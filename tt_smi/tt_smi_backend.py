@@ -18,10 +18,9 @@ from pyluwen import PciChip
 from tt_smi import constants
 from typing import Dict, List
 from rich.progress import track
-from tt_smi.registers import Registers
-from tt_smi.resets.gs_tensix_reset import GSTensixReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_smi.resets.wh_resets import reset_wh_boards, warm_reset_mobo
+from tt_tools_common.reset_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
@@ -63,7 +62,6 @@ class TTSMIBackend:
         self.device_infos = []
         self.device_telemetrys = []
         self.chip_limits = []
-        self.registers = []
         self.pci_properties = []
 
         if fully_init:
@@ -78,11 +76,7 @@ class TTSMIBackend:
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-                self.registers.append(self.get_register_object(device))
                 self.pci_properties.append(self.get_pci_properties(i))
-        else:
-            for i, device in enumerate(self.devices):
-                self.registers.append(self.get_register_object(device))
 
     def get_device_name(self, device):
         """Get device name from chip object"""
@@ -352,9 +346,6 @@ class TTSMIBackend:
 
         return dev_info
 
-    def create_reset_helper(self, device, axi_register) -> GSTensixReset:
-        return GSTensixReset(device, axi_register)
-
     def get_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for chip. None if ARC FW not running"""
         current = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDC"], 16) & 0xFFFF
@@ -490,24 +481,6 @@ class TTSMIBackend:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
 
-    def get_register_object(self, device) -> Registers:
-        """
-        Generate register object for a given device.
-        This is used to read/write registers
-        """
-
-        def reader_function(byte_addr: int, path) -> int:
-            return device.axi_read32(byte_addr)
-
-        def writer_function(byte_addr: int, value: int, path) -> None:
-            device.axi_write32(byte_addr, value)
-
-        if self.get_device_name(device) == "wormhole":
-            return None
-
-        root_yaml_path = f"data/{self.get_device_name(device)}/axi-pci.yaml"
-        return Registers(root_yaml_path, reader_function, writer_function)
-
     def gs_tensix_reset(self, board_num) -> None:
         """Reset the tensix cores on a GS chip"""
         print(
@@ -516,10 +489,8 @@ class TTSMIBackend:
             CMD_LINE_COLOR.ENDC,
         )
         device = self.devices[board_num]
-        axi_registers = self.registers[board_num]
-
-        gs_tensix_reset_obj = self.create_reset_helper(device, axi_registers)
-        gs_tensix_reset_obj.tensix_reset()
+        # Init reset object and call reset
+        GSTensixReset(device).tensix_reset()
 
         print(
             CMD_LINE_COLOR.GREEN,
@@ -585,7 +556,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
-        reset_wh_boards(reset_wh_pci_idx)
+        reset_devices = WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
     # reset gs devices by creating a partially init backend
     if reset_gs_devs:
