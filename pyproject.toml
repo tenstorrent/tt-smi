@@ -32,7 +32,7 @@ dependencies = [
   'pydantic==1.*',
   'psutil==5.9.6',
   'pyyaml==6.0.1',
-  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.2.1#subdirectory=crates/pyluwen',
+  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.3.3#subdirectory=crates/pyluwen',
   'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git',
   'rich==13.7.0',
   'textual==0.42.0',
