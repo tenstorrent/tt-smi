@@ -113,44 +113,6 @@ class TTSMIBackend:
         self.log.save_as_json(log_filename)
         return log_filename
 
-    def generate_reset_logs(self, result_filename: str = None):
-        """Generate and save reset logs"""
-        time_now = datetime.datetime.now()
-        date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
-        log_filename = f"tt_smi_reset_config_{date_string}.json"
-        gs_pci_idx = []
-        wh_pci_idx = []
-        for i, dev in enumerate(self.devices):
-            if dev.as_wh() and not dev.is_remote():
-                wh_pci_idx.append(i)
-            elif dev.as_gs():
-                gs_pci_idx.append(i)
-        reset_log = log.TTSMIResetLog(
-            time=time_now,
-            host_name=get_host_info()["Hostname"],
-            gs_tensix_reset=log.PciResetDeviceInfo(pci_index=gs_pci_idx),
-            wh_link_reset=log.PciResetDeviceInfo(pci_index=wh_pci_idx),
-            re_init_devices=True,
-            wh_mobo_reset=[
-                log.MoboReset(
-                    mobo="<MOBO NAME>",
-                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
-                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
-                ),
-                log.MoboReset(
-                    mobo="<MOBO NAME>",
-                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
-                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
-                ),
-            ],
-        )
-        if result_filename:
-            dir_path = os.path.dirname(os.path.realpath(result_filename))
-            Path(dir_path).mkdir(parents=True, exist_ok=True)
-            log_filename = result_filename
-        reset_log.save_as_json(log_filename)
-        return log_filename
-
     def print_all_available_devices(self):
         """Print all available boards on host"""
         print(

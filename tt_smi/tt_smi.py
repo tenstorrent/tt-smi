@@ -26,6 +26,10 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
+from tt_tools_common.reset_common.reset_utils import (
+    generate_reset_logs,
+    parse_reset_input,
+)
 from tt_smi.tt_smi_backend import (
     TTSMIBackend,
     pci_board_reset,
@@ -621,32 +625,14 @@ def parse_args():
     parser.add_argument(
         "-g",
         "--generate_reset_json",
+        nargs="?",
+        const=True,
         default=False,
-        action="store_true",
         help=(
-            "Generate default reset json file that reset consumes. "
+            "Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json.\n"
             "Update the generated file and use it as an input for the --reset option"
         ),
     )
-
-    def parse_reset_input(value):
-        """Validate the reset inputs - either list of int pci IDs or a json config file"""
-        try:
-            # Attempt to parse as a JSON file
-            with open(value, "r") as json_file:
-                data = json.load(json_file)
-                return data
-        except (json.JSONDecodeError, FileNotFoundError):
-            # If parsing as JSON fails, treat it as a comma-separated list of integers
-            try:
-                return [int(item) for item in value.split(",")]
-            except ValueError:
-                print(
-                    CMD_LINE_COLOR.RED,
-                    "Invalid input! Provide list of comma separated numbers or a json file.\n To generate a reset json config file run tt-smi -g",
-                    CMD_LINE_COLOR.ENDC,
-                )
-                sys.exit(1)
 
     parser.add_argument(
         "-r",
@@ -693,7 +679,12 @@ def tt_smi_main(backend: TTSMIBackend, args):
         )
         sys.exit(0)
     if args.generate_reset_json:
-        file = backend.generate_reset_logs()
+        # Use filename if provided, else use default
+        file = (
+            generate_reset_logs(backend.devices)
+            if isinstance(args.generate_reset_json, bool)
+            else generate_reset_logs(backend.devices, args.generate_reset_json)
+        )
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Generated sample reset config file for this host: {file}",
@@ -704,7 +695,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
             f"Update the generated file and use it as an input for the -r/--reset option.",
             CMD_LINE_COLOR.ENDC,
         )
-
         sys.exit(0)
     tt_smi_app = TTSMI(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
