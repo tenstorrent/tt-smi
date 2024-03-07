@@ -21,6 +21,7 @@ from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
+from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
@@ -474,20 +475,36 @@ def pci_indices_from_json(json_dict):
         pci_indices.extend(json_dict["wh_link_reset"]["pci_index"])
     if "re_init_devices" in json_dict.keys():
         reinit = json_dict["re_init_devices"]
-
     return pci_indices, reinit
 
 
-def mobo_reset_from_json(json_dict):
+def mobo_reset_from_json(json_dict) -> dict:
     """Parse pci_list from reset json and init mobo reset"""
     if "wh_mobo_reset" in json_dict.keys():
         mobo_dict_list = []
         for mobo_dict in json_dict["wh_mobo_reset"]:
+            # Only add the mobos that have a name
             if "MOBO NAME" not in mobo_dict["mobo"]:
                 mobo_dict_list.append(mobo_dict)
         # If any mobos - do the reset
         if mobo_dict_list:
-            warm_reset_mobo(mobo_dict_list)
+            GalaxyReset().warm_reset_mobo(mobo_dict_list)
+            # If there are mobos to reset, remove link reset pci index's from the json
+            try:
+                wh_link_pci_indices = json_dict["wh_link_reset"]["pci_index"]
+                for entry in mobo_dict_list:
+                    if "nb_host_pci_idx" in entry.keys() and entry["nb_host_pci_idx"]:
+                        # remove the list of WH pcie index's from the reset list
+                        wh_link_pci_indices = list(set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"]))
+                json_dict["wh_link_reset"]["pci_index"] = wh_link_pci_indices
+            except Exception as e:
+                print(
+                CMD_LINE_COLOR.RED,
+                f"Error! {e}",
+                CMD_LINE_COLOR.ENDC,
+                )
+
+    return json_dict
 
 
 def pci_board_reset(list_of_boards: List[int], reinit=False):

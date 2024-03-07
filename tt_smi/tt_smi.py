@@ -37,7 +37,6 @@ from tt_smi.tt_smi_backend import (
     mobo_reset_from_json,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    init_fw_defines,
     hex_to_semver_m3_fw,
 )
 from tt_tools_common.utils_common.system_utils import (
@@ -750,16 +749,11 @@ def main():
             # If input is just reset board
             pci_board_reset(args.reset, reinit=True)
         else:
-            #  If mobo reset, perform it first
-            mobo_dict_list = mobo_reset_from_json(args.reset)
-            pci_indices, reinit = pci_indices_from_json(args.reset)
-
+            # If mobo reset, perform it first
+            parsed_dict = mobo_reset_from_json(args.reset)
+            pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
                 pci_board_reset(pci_indices, reinit)
-            else:
-                CMD_LINE_COLOR.YELLOW,
-                "No pci devices parsed from json to reset..."
-                CMD_LINE_COLOR.ENDC,
 
         # All went well - exit
         sys.exit(0)
