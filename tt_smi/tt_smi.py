@@ -398,6 +398,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
+                    val = self.backend.pci_properties[i]["current_link_width"]
                     if device.is_remote():
                         rows.append(
                             Text(
@@ -435,6 +436,7 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
+                    val = self.backend.pci_properties[i]["current_link_speed"]
                     if device.is_remote():
                         rows.append(
                             Text(
