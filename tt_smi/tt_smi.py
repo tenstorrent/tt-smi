@@ -75,7 +75,6 @@ class TTSMI(App):
         ("q, Q", "quit", "Quit"),
         ("h, H", "help", "Help"),
         ("d, D", "toggle_dark", "Toggle dark mode"),
-        ("t, T", "toggle_default", "Toggle default"),
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
