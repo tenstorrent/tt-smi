@@ -86,8 +86,9 @@ $ tt-smi --help
     -ls, --list           List boards that are available on host and quits
     -f [filename], --filename [filename]
                           Change filename for test log. Default: ~/tt_smi/<timestamp>_snapshot.json
-    -g, --generate_reset_json
-                          Generate default reset json file that reset consumes. Update the generated file and use it as an input for the --reset option
+  -g [GENERATE_RESET_JSON], --generate_reset_json [GENERATE_RESET_JSON]
+                        Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an
+                        input for the --reset option
     -r 0,1 ... or config.json, --reset 0,1 ... or config.json
                           Provide list of pci index or a json file with reset configs. Find pci index of board using the -ls option. Generate a default reset json file with the -g option.
   ```

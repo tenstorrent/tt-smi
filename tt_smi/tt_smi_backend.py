@@ -18,10 +18,10 @@ from pyluwen import PciChip
 from tt_smi import constants
 from typing import Dict, List
 from rich.progress import track
-from tt_smi.registers import Registers
-from tt_smi.resets.gs_tensix_reset import GSTensixReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_smi.resets.wh_resets import reset_wh_boards, warm_reset_mobo
+from tt_tools_common.reset_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
+from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
@@ -63,7 +63,6 @@ class TTSMIBackend:
         self.device_infos = []
         self.device_telemetrys = []
         self.chip_limits = []
-        self.registers = []
         self.pci_properties = []
 
         if fully_init:
@@ -78,11 +77,7 @@ class TTSMIBackend:
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-                self.registers.append(self.get_register_object(device))
                 self.pci_properties.append(self.get_pci_properties(i))
-        else:
-            for i, device in enumerate(self.devices):
-                self.registers.append(self.get_register_object(device))
 
     def get_device_name(self, device):
         """Get device name from chip object"""
@@ -117,44 +112,6 @@ class TTSMIBackend:
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
         self.log.save_as_json(log_filename)
-        return log_filename
-
-    def generate_reset_logs(self, result_filename: str = None):
-        """Generate and save reset logs"""
-        time_now = datetime.datetime.now()
-        date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
-        log_filename = f"tt_smi_reset_config_{date_string}.json"
-        gs_pci_idx = []
-        wh_pci_idx = []
-        for i, dev in enumerate(self.devices):
-            if dev.as_wh() and not dev.is_remote():
-                wh_pci_idx.append(i)
-            elif dev.as_gs():
-                gs_pci_idx.append(i)
-        reset_log = log.TTSMIResetLog(
-            time=time_now,
-            host_name=get_host_info()["Hostname"],
-            gs_tensix_reset=log.PciResetDeviceInfo(pci_index=gs_pci_idx),
-            wh_link_reset=log.PciResetDeviceInfo(pci_index=wh_pci_idx),
-            re_init_devices=True,
-            wh_mobo_reset=[
-                log.MoboReset(
-                    mobo="<MOBO NAME>",
-                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
-                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
-                ),
-                log.MoboReset(
-                    mobo="<MOBO NAME>",
-                    credo=["<group id>:<credo id>", "<group id>:<credo id>"],
-                    disabled_ports=["<group id>:<credo id>", "<group id>:<credo id>"],
-                ),
-            ],
-        )
-        if result_filename:
-            dir_path = os.path.dirname(os.path.realpath(result_filename))
-            Path(dir_path).mkdir(parents=True, exist_ok=True)
-            log_filename = result_filename
-        reset_log.save_as_json(log_filename)
         return log_filename
 
     def print_all_available_devices(self):
@@ -352,9 +309,6 @@ class TTSMIBackend:
 
         return dev_info
 
-    def create_reset_helper(self, device, axi_register) -> GSTensixReset:
-        return GSTensixReset(device, axi_register)
-
     def get_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for chip. None if ARC FW not running"""
         current = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDC"], 16) & 0xFFFF
@@ -490,24 +444,6 @@ class TTSMIBackend:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
 
-    def get_register_object(self, device) -> Registers:
-        """
-        Generate register object for a given device.
-        This is used to read/write registers
-        """
-
-        def reader_function(byte_addr: int, path) -> int:
-            return device.axi_read32(byte_addr)
-
-        def writer_function(byte_addr: int, value: int, path) -> None:
-            device.axi_write32(byte_addr, value)
-
-        if self.get_device_name(device) == "wormhole":
-            return None
-
-        root_yaml_path = f"data/{self.get_device_name(device)}/axi-pci.yaml"
-        return Registers(root_yaml_path, reader_function, writer_function)
-
     def gs_tensix_reset(self, board_num) -> None:
         """Reset the tensix cores on a GS chip"""
         print(
@@ -516,10 +452,8 @@ class TTSMIBackend:
             CMD_LINE_COLOR.ENDC,
         )
         device = self.devices[board_num]
-        axi_registers = self.registers[board_num]
-
-        gs_tensix_reset_obj = self.create_reset_helper(device, axi_registers)
-        gs_tensix_reset_obj.tensix_reset()
+        # Init reset object and call reset
+        GSTensixReset(device).tensix_reset()
 
         print(
             CMD_LINE_COLOR.GREEN,
@@ -541,20 +475,36 @@ def pci_indices_from_json(json_dict):
         pci_indices.extend(json_dict["wh_link_reset"]["pci_index"])
     if "re_init_devices" in json_dict.keys():
         reinit = json_dict["re_init_devices"]
-
     return pci_indices, reinit
 
 
-def mobo_reset_from_json(json_dict):
+def mobo_reset_from_json(json_dict) -> dict:
     """Parse pci_list from reset json and init mobo reset"""
     if "wh_mobo_reset" in json_dict.keys():
         mobo_dict_list = []
         for mobo_dict in json_dict["wh_mobo_reset"]:
+            # Only add the mobos that have a name
             if "MOBO NAME" not in mobo_dict["mobo"]:
                 mobo_dict_list.append(mobo_dict)
         # If any mobos - do the reset
         if mobo_dict_list:
-            warm_reset_mobo(mobo_dict_list)
+            GalaxyReset().warm_reset_mobo(mobo_dict_list)
+            # If there are mobos to reset, remove link reset pci index's from the json
+            try:
+                wh_link_pci_indices = json_dict["wh_link_reset"]["pci_index"]
+                for entry in mobo_dict_list:
+                    if "nb_host_pci_idx" in entry.keys() and entry["nb_host_pci_idx"]:
+                        # remove the list of WH pcie index's from the reset list
+                        wh_link_pci_indices = list(set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"]))
+                json_dict["wh_link_reset"]["pci_index"] = wh_link_pci_indices
+            except Exception as e:
+                print(
+                CMD_LINE_COLOR.RED,
+                f"Error! {e}",
+                CMD_LINE_COLOR.ENDC,
+                )
+
+    return json_dict
 
 
 def pci_board_reset(list_of_boards: List[int], reinit=False):
@@ -585,7 +535,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
-        reset_wh_boards(reset_wh_pci_idx)
+        reset_devices = WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
     # reset gs devices by creating a partially init backend
     if reset_gs_devs:

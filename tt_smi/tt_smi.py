@@ -26,6 +26,10 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
+from tt_tools_common.reset_common.reset_utils import (
+    generate_reset_logs,
+    parse_reset_input,
+)
 from tt_smi.tt_smi_backend import (
     TTSMIBackend,
     pci_board_reset,
@@ -33,7 +37,6 @@ from tt_smi.tt_smi_backend import (
     mobo_reset_from_json,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    init_fw_defines,
     hex_to_semver_m3_fw,
 )
 from tt_tools_common.utils_common.system_utils import (
@@ -72,7 +75,6 @@ class TTSMI(App):
         ("q, Q", "quit", "Quit"),
         ("h, H", "help", "Help"),
         ("d, D", "toggle_dark", "Toggle dark mode"),
-        ("t, T", "toggle_default", "Toggle default"),
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
@@ -396,6 +398,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
+                    val = self.backend.pci_properties[i]["current_link_width"]
                     if device.is_remote():
                         rows.append(
                             Text(
@@ -433,6 +436,7 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
+                    val = self.backend.pci_properties[i]["current_link_speed"]
                     if device.is_remote():
                         rows.append(
                             Text(
@@ -621,32 +625,14 @@ def parse_args():
     parser.add_argument(
         "-g",
         "--generate_reset_json",
+        nargs="?",
+        const=True,
         default=False,
-        action="store_true",
         help=(
-            "Generate default reset json file that reset consumes. "
+            "Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json.\n"
             "Update the generated file and use it as an input for the --reset option"
         ),
     )
-
-    def parse_reset_input(value):
-        """Validate the reset inputs - either list of int pci IDs or a json config file"""
-        try:
-            # Attempt to parse as a JSON file
-            with open(value, "r") as json_file:
-                data = json.load(json_file)
-                return data
-        except (json.JSONDecodeError, FileNotFoundError):
-            # If parsing as JSON fails, treat it as a comma-separated list of integers
-            try:
-                return [int(item) for item in value.split(",")]
-            except ValueError:
-                print(
-                    CMD_LINE_COLOR.RED,
-                    "Invalid input! Provide list of comma separated numbers or a json file.\n To generate a reset json config file run tt-smi -g",
-                    CMD_LINE_COLOR.ENDC,
-                )
-                sys.exit(1)
 
     parser.add_argument(
         "-r",
@@ -693,7 +679,12 @@ def tt_smi_main(backend: TTSMIBackend, args):
         )
         sys.exit(0)
     if args.generate_reset_json:
-        file = backend.generate_reset_logs()
+        # Use filename if provided, else use default
+        file = (
+            generate_reset_logs(backend.devices)
+            if isinstance(args.generate_reset_json, bool)
+            else generate_reset_logs(backend.devices, args.generate_reset_json)
+        )
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Generated sample reset config file for this host: {file}",
@@ -704,7 +695,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
             f"Update the generated file and use it as an input for the -r/--reset option.",
             CMD_LINE_COLOR.ENDC,
         )
-
         sys.exit(0)
     tt_smi_app = TTSMI(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
@@ -718,9 +708,8 @@ def check_fw_version(pylewen_chip, board_num):
     For Grayskull, we only support fw version >= 1.3.0.0
     """
     if pylewen_chip.as_gs():
-        fw_defines = init_fw_defines("grayskull", "tt_smi")
         fw_version, exit_code = pylewen_chip.arc_msg(
-            fw_defines["MSG_TYPE_FW_VERSION"], arg0=0, arg1=0
+            constants.MSG_TYPE_FW_VERSION, arg0=0, arg1=0
         )
         if fw_version < constants.MAGIC_FW_VERSION:
             print(
@@ -761,16 +750,11 @@ def main():
             # If input is just reset board
             pci_board_reset(args.reset, reinit=True)
         else:
-            #  If mobo reset, perform it first
-            mobo_dict_list = mobo_reset_from_json(args.reset)
-            pci_indices, reinit = pci_indices_from_json(args.reset)
-
+            # If mobo reset, perform it first
+            parsed_dict = mobo_reset_from_json(args.reset)
+            pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
                 pci_board_reset(pci_indices, reinit)
-            else:
-                CMD_LINE_COLOR.YELLOW,
-                "No pci devices parsed from json to reset..."
-                CMD_LINE_COLOR.ENDC,
 
         # All went well - exit
         sys.exit(0)

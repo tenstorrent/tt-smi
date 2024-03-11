@@ -1,6 +1,6 @@
 [project]
 name = "tt-smi"
-version = "2.0.1"
+version = "2.1.0"
 description = "ncurses based hardware monitoring for Tenstorrent silicon"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -33,12 +33,12 @@ dependencies = [
   'psutil==5.9.6',
   'pyyaml==6.0.1',
   'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.3.3#subdirectory=crates/pyluwen',
-  'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git',
+  # 'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git',
+  'tt_tools_common @ git+ssh://git@yyz-gitlab.local.tenstorrent.com/syseng-platform/tt-tools-common.git',
   'rich==13.7.0',
   'textual==0.42.0',
   'pre-commit==3.5.0',
   'importlib_resources==6.1.1',
-  'tqdm==4.66.1',
 ]
 
 [project.urls]
