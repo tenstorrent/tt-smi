@@ -34,7 +34,7 @@ dependencies = [
   'pyyaml==6.0.1',
   'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.3.3#subdirectory=crates/pyluwen',
   # 'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git',
-  'tt_tools_common @git+ssh://git@yyz-gitlab.local.tenstorrent.com/syseng-platform/tt-tools-common.git@sbansal/check_driver',
+  'tt_tools_common @ git+ssh://git@yyz-gitlab.local.tenstorrent.com/syseng-platform/tt-tools-common.git',
   'rich==13.7.0',
   'textual==0.42.0',
   'pre-commit==3.5.0',
