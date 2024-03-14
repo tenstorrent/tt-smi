@@ -14,8 +14,11 @@ import jsons
 import datetime
 from tt_smi import log
 from pathlib import Path
+from rich.text import Text
 from pyluwen import PciChip
+from rich.table import Table
 from tt_smi import constants
+from rich import get_console
 from typing import Dict, List
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -116,22 +119,34 @@ class TTSMIBackend:
 
     def print_all_available_devices(self):
         """Print all available boards on host"""
-        print(
-            CMD_LINE_COLOR.YELLOW, "All available boards on host:", CMD_LINE_COLOR.ENDC
-        )
+        console = get_console()
+        table_1 = Table(title="All available boards on host:")
+        table_1.add_column("Pci Dev ID")
+        table_1.add_column("Board Type")
+        table_1.add_column("Device Series")
+        table_1.add_column("Board Number")
         for i, device in enumerate(self.devices):
             board_id = self.device_infos[i]["board_id"]
             board_type = self.device_infos[i]["board_type"]
+            pci_dev_id = (
+                device.get_pci_interface_id() if not device.is_remote() else "N/A"
+            )
             if device.as_wh():
                 suffix = " R" if device.is_remote() else " L"
                 board_type = board_type + suffix
 
-            print(
-                CMD_LINE_COLOR.BLUE,
-                f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
-                CMD_LINE_COLOR.ENDC,
+            table_1.add_row(
+                f"{pci_dev_id}",
+                f"{self.get_device_name(device)}",
+                f"{board_type}",
+                f"{board_id}",
             )
-        print(CMD_LINE_COLOR.YELLOW, "Boards that can be reset:", CMD_LINE_COLOR.ENDC)
+        console.print(table_1)
+        table_2 = Table(title="Boards that can be reset:")
+        table_2.add_column("Pci Dev ID")
+        table_2.add_column("Board Type")
+        table_2.add_column("Device Series")
+        table_2.add_column("Board Number")
         for i, device in enumerate(self.devices):
             if (
                 not device.is_remote()
@@ -139,14 +154,17 @@ class TTSMIBackend:
             ):
                 board_id = self.device_infos[i]["board_id"]
                 board_type = self.device_infos[i]["board_type"]
+                pci_dev_id = device.get_pci_interface_id()
                 if device.as_wh():
                     suffix = " R" if device.is_remote() else " L"
                     board_type = board_type + suffix
-                print(
-                    CMD_LINE_COLOR.BLUE,
-                    f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
-                    CMD_LINE_COLOR.ENDC,
+                table_2.add_row(
+                    f"{pci_dev_id}",
+                    f"{self.get_device_name(device)}",
+                    f"{board_type}",
+                    f"{board_id}",
                 )
+        console.print(table_2)
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
