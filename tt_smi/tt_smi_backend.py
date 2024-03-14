@@ -495,13 +495,15 @@ def mobo_reset_from_json(json_dict) -> dict:
                 for entry in mobo_dict_list:
                     if "nb_host_pci_idx" in entry.keys() and entry["nb_host_pci_idx"]:
                         # remove the list of WH pcie index's from the reset list
-                        wh_link_pci_indices = list(set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"]))
+                        wh_link_pci_indices = list(
+                            set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"])
+                        )
                 json_dict["wh_link_reset"]["pci_index"] = wh_link_pci_indices
             except Exception as e:
                 print(
-                CMD_LINE_COLOR.RED,
-                f"Error! {e}",
-                CMD_LINE_COLOR.ENDC,
+                    CMD_LINE_COLOR.RED,
+                    f"Error! {e}",
+                    CMD_LINE_COLOR.ENDC,
                 )
 
     return json_dict
@@ -545,6 +547,9 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
 
     if reinit:
         import pyluwen
+
+        # Enable backtrace for debugging
+        os.environ["RUST_BACKTRACE"] = "full"
 
         print(
             CMD_LINE_COLOR.PURPLE,

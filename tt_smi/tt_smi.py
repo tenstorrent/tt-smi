@@ -10,6 +10,7 @@ to collect and display device, telemetry and firmware information.
 
 In addition user can issue Grayskull and Wormhole board level resets.
 """
+import os
 import sys
 import time
 import json
@@ -731,6 +732,9 @@ def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
     """
+    # Enable backtrace for debugging
+    os.environ["RUST_BACKTRACE"] = "full"
+
     driver = get_driver_version()
     if not driver:
         print(
