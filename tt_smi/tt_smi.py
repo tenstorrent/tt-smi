@@ -13,7 +13,6 @@ In addition user can issue Grayskull and Wormhole board level resets.
 import os
 import sys
 import time
-import json
 import signal
 import argparse
 import threading
@@ -677,24 +676,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)
-    if args.generate_reset_json:
-        # Use filename if provided, else use default
-        file = (
-            generate_reset_logs(backend.devices)
-            if isinstance(args.generate_reset_json, bool)
-            else generate_reset_logs(backend.devices, args.generate_reset_json)
-        )
-        print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Generated sample reset config file for this host: {file}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"Update the generated file and use it as an input for the -r/--reset option.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(0)
     tt_smi_app = TTSMI(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
     )
@@ -759,6 +740,34 @@ def main():
                 pci_board_reset(pci_indices, reinit)
 
         # All went well - exit
+        sys.exit(0)
+    if args.generate_reset_json:
+        # Use filename if provided, else use default
+        try:
+            devices = detect_chips(local_only=True)
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error in detecting devices!\n{e}\n Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+        file = (
+            generate_reset_logs(devices)
+            if isinstance(args.generate_reset_json, bool)
+            else generate_reset_logs(devices, args.generate_reset_json)
+        )
+        print(
+            CMD_LINE_COLOR.PURPLE,
+            f"Generated sample reset config file for this host: {file}",
+            CMD_LINE_COLOR.ENDC,
+        )
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"Update the generated file and use it as an input for the -r/--reset option.",
+            CMD_LINE_COLOR.ENDC,
+        )
         sys.exit(0)
 
     try:
