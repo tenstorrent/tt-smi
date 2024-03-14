@@ -74,10 +74,10 @@ class TTSMIBackend:
             ):
                 self.smbus_telem_info.append(self.get_smbus_board_info(i))
                 self.firmware_infos.append(self.get_firmware_versions(i))
+                self.pci_properties.append(self.get_pci_properties(i))
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-                self.pci_properties.append(self.get_pci_properties(i))
 
     def get_device_name(self, device):
         """Get device name from chip object"""
@@ -199,21 +199,6 @@ class TTSMIBackend:
         else:
             return None
 
-    def get_pci_speed_width(self, board_num):
-        """Get PCI Speed and Width from telemetry struct"""
-        pci_val = (
-            int(self.smbus_telem_info[board_num]["SMBUS_TX_PCIE_STATUS"], 16)
-            if self.smbus_telem_info[board_num]["SMBUS_TX_PCIE_STATUS"] is not None
-            else None
-        )
-
-        if pci_val is None:
-            return 0, 0
-        width = (pci_val >> 16) & 0xF
-        speed = (pci_val >> 20) & 0x3F
-
-        return width, speed
-
     def get_pci_properties(self, board_num):
         """Get the PCI link speed and link width details from sysfs files"""
         if self.devices[board_num].is_remote():
@@ -303,9 +288,9 @@ class TTSMIBackend:
             elif field == "dram_speed":
                 dev_info[field] = self.get_dram_speed(board_num)
             elif field == "pcie_speed":
-                dev_info[field], _ = self.get_pci_speed_width(board_num)
+                dev_info[field] = self.pci_properties[board_num]["current_link_speed"]
             elif field == "pcie_width":
-                _, dev_info[field] = self.get_pci_speed_width(board_num)
+                dev_info[field] = self.pci_properties[board_num]["current_link_width"]
 
         return dev_info
 
