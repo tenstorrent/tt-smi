@@ -34,6 +34,7 @@ from tt_tools_common.utils_common.tools_utils import (
     hex_to_date,
     hex_to_semver_eth,
     init_logging,
+    detect_chips_with_callback,
 )
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
@@ -549,8 +550,6 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             backend.gs_tensix_reset(i)
 
     if reinit:
-        import pyluwen
-
         # Enable backtrace for debugging
         os.environ["RUST_BACKTRACE"] = "full"
 
@@ -560,12 +559,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             CMD_LINE_COLOR.ENDC,
         )
         try:
-            chips = pyluwen.detect_chips()
-            print(
-                CMD_LINE_COLOR.GREEN,
-                f"Done! Detected {len(chips)} boards on host.",
-                CMD_LINE_COLOR.ENDC,
-            )
+            chips = detect_chips_with_callback()
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,

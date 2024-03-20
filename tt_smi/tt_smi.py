@@ -38,6 +38,7 @@ from tt_smi.tt_smi_backend import (
 )
 from tt_tools_common.utils_common.tools_utils import (
     hex_to_semver_m3_fw,
+    detect_chips_with_callback,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
@@ -52,8 +53,6 @@ from tt_tools_common.ui_common.widgets import (
     TTCompatibilityMenu,
     TTHelperMenuBox,
 )
-
-from pyluwen import detect_chips
 
 # Global variables
 TextualKeyBindings = List[Tuple[str, str, str]]
@@ -744,7 +743,7 @@ def main():
     if args.generate_reset_json:
         # Use filename if provided, else use default
         try:
-            devices = detect_chips(local_only=True)
+            devices = detect_chips_with_callback(local_only=True)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -771,7 +770,7 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips(local_only=args.local)
+        devices = detect_chips_with_callback(local_only=args.local)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
