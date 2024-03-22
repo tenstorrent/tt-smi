@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.2.0 - 22/03/2024
+
+### Added
+- RUST_BACKTRACE env variable to get detailed device failure logs
+- detect_device_fallible as the default device detection
+  - improved error msg's for failures
+
+### Fixed
+- pci speed/width in the snapshot
+- list option now matches dev/tenstorrent device IDS
+- reset_config generation is on local devices only
+
+### Migrated
+- All reset related code to tt_tools_common
+- All reset config generation related code to tt_tools_common
+
 ## 2.1.0 - 08/03/2024
 
 ### Migrated
