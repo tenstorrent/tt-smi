@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-  'black==23.11.0',
+  'black==24.3.0',
   'distro==1.8.0',
   'elasticsearch==8.11.0',
   'jsons==1.6.3',
