@@ -14,8 +14,11 @@ import jsons
 import datetime
 from tt_smi import log
 from pathlib import Path
+from rich.text import Text
 from pyluwen import PciChip
+from rich.table import Table
 from tt_smi import constants
+from rich import get_console
 from typing import Dict, List
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -31,6 +34,7 @@ from tt_tools_common.utils_common.tools_utils import (
     hex_to_date,
     hex_to_semver_eth,
     init_logging,
+    detect_chips_with_callback,
 )
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
@@ -74,10 +78,10 @@ class TTSMIBackend:
             ):
                 self.smbus_telem_info.append(self.get_smbus_board_info(i))
                 self.firmware_infos.append(self.get_firmware_versions(i))
+                self.pci_properties.append(self.get_pci_properties(i))
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-                self.pci_properties.append(self.get_pci_properties(i))
 
     def get_device_name(self, device):
         """Get device name from chip object"""
@@ -116,22 +120,34 @@ class TTSMIBackend:
 
     def print_all_available_devices(self):
         """Print all available boards on host"""
-        print(
-            CMD_LINE_COLOR.YELLOW, "All available boards on host:", CMD_LINE_COLOR.ENDC
-        )
+        console = get_console()
+        table_1 = Table(title="All available boards on host:")
+        table_1.add_column("Pci Dev ID")
+        table_1.add_column("Board Type")
+        table_1.add_column("Device Series")
+        table_1.add_column("Board Number")
         for i, device in enumerate(self.devices):
             board_id = self.device_infos[i]["board_id"]
             board_type = self.device_infos[i]["board_type"]
+            pci_dev_id = (
+                device.get_pci_interface_id() if not device.is_remote() else "N/A"
+            )
             if device.as_wh():
                 suffix = " R" if device.is_remote() else " L"
                 board_type = board_type + suffix
 
-            print(
-                CMD_LINE_COLOR.BLUE,
-                f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
-                CMD_LINE_COLOR.ENDC,
+            table_1.add_row(
+                f"{pci_dev_id}",
+                f"{self.get_device_name(device)}",
+                f"{board_type}",
+                f"{board_id}",
             )
-        print(CMD_LINE_COLOR.YELLOW, "Boards that can be reset:", CMD_LINE_COLOR.ENDC)
+        console.print(table_1)
+        table_2 = Table(title="Boards that can be reset:")
+        table_2.add_column("Pci Dev ID")
+        table_2.add_column("Board Type")
+        table_2.add_column("Device Series")
+        table_2.add_column("Board Number")
         for i, device in enumerate(self.devices):
             if (
                 not device.is_remote()
@@ -139,14 +155,17 @@ class TTSMIBackend:
             ):
                 board_id = self.device_infos[i]["board_id"]
                 board_type = self.device_infos[i]["board_type"]
+                pci_dev_id = device.get_pci_interface_id()
                 if device.as_wh():
                     suffix = " R" if device.is_remote() else " L"
                     board_type = board_type + suffix
-                print(
-                    CMD_LINE_COLOR.BLUE,
-                    f"{i}: {board_id} ({self.get_device_name(device)} - {board_type})",
-                    CMD_LINE_COLOR.ENDC,
+                table_2.add_row(
+                    f"{pci_dev_id}",
+                    f"{self.get_device_name(device)}",
+                    f"{board_type}",
+                    f"{board_id}",
                 )
+        console.print(table_2)
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
@@ -198,21 +217,6 @@ class TTSMIBackend:
             return "8G"
         else:
             return None
-
-    def get_pci_speed_width(self, board_num):
-        """Get PCI Speed and Width from telemetry struct"""
-        pci_val = (
-            int(self.smbus_telem_info[board_num]["SMBUS_TX_PCIE_STATUS"], 16)
-            if self.smbus_telem_info[board_num]["SMBUS_TX_PCIE_STATUS"] is not None
-            else None
-        )
-
-        if pci_val is None:
-            return 0, 0
-        width = (pci_val >> 16) & 0xF
-        speed = (pci_val >> 20) & 0x3F
-
-        return width, speed
 
     def get_pci_properties(self, board_num):
         """Get the PCI link speed and link width details from sysfs files"""
@@ -303,9 +307,9 @@ class TTSMIBackend:
             elif field == "dram_speed":
                 dev_info[field] = self.get_dram_speed(board_num)
             elif field == "pcie_speed":
-                dev_info[field], _ = self.get_pci_speed_width(board_num)
+                dev_info[field] = self.pci_properties[board_num]["current_link_speed"]
             elif field == "pcie_width":
-                _, dev_info[field] = self.get_pci_speed_width(board_num)
+                dev_info[field] = self.pci_properties[board_num]["current_link_width"]
 
         return dev_info
 
@@ -495,13 +499,15 @@ def mobo_reset_from_json(json_dict) -> dict:
                 for entry in mobo_dict_list:
                     if "nb_host_pci_idx" in entry.keys() and entry["nb_host_pci_idx"]:
                         # remove the list of WH pcie index's from the reset list
-                        wh_link_pci_indices = list(set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"]))
+                        wh_link_pci_indices = list(
+                            set(wh_link_pci_indices) - set(entry["nb_host_pci_idx"])
+                        )
                 json_dict["wh_link_reset"]["pci_index"] = wh_link_pci_indices
             except Exception as e:
                 print(
-                CMD_LINE_COLOR.RED,
-                f"Error! {e}",
-                CMD_LINE_COLOR.ENDC,
+                    CMD_LINE_COLOR.RED,
+                    f"Error! {e}",
+                    CMD_LINE_COLOR.ENDC,
                 )
 
     return json_dict
@@ -544,7 +550,8 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             backend.gs_tensix_reset(i)
 
     if reinit:
-        import pyluwen
+        # Enable backtrace for debugging
+        os.environ["RUST_BACKTRACE"] = "full"
 
         print(
             CMD_LINE_COLOR.PURPLE,
@@ -552,12 +559,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             CMD_LINE_COLOR.ENDC,
         )
         try:
-            chips = pyluwen.detect_chips()
-            print(
-                CMD_LINE_COLOR.GREEN,
-                f"Done! Detected {len(chips)} boards on host.",
-                CMD_LINE_COLOR.ENDC,
-            )
+            chips = detect_chips_with_callback()
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,

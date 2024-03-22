@@ -171,19 +171,28 @@ tt-smi -r reset_config.json
 
 ```
 
-In order to find the correct board index to call the reset on, the user can look at the GUI index or the desired device OR use the tt-smi board list function.
-Board list should produce an output that looks like:
+In order to find the correct board dev id to call the reset on, the user can use the tt-smi board list function `tt-smi -ls` or `tt-smi --list`. The dev id listed is the same as found on `/dev/tenstorrent/<dev pci id>`
+The generated output will include a list of all boards on host as well as the ones that can be reset.
+
 ```
 $ tt-smi -ls
 
 Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
- All available boards on host:
- 0: 0100007311523010 (grayskull - e75)
- 1: 0100014211703001 (wormhole - n300 L)
- 2: 0100014211703001 (wormhole - n300 R)
- Boards that can be reset:
- 0: 0100007311523010 (grayskull - e75)
- 1: 0100014211703001 (wormhole - n300 L)
+                All available boards on host:
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ Pci Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ 0          │ grayskull  │ e75           │ 0100007311523010 │
+│ 1          │ wormhole   │ n300 L        │ 010001451170801d │
+│ N/A        │ wormhole   │ n300 R        │ 010001451170801d │
+└────────────┴────────────┴───────────────┴──────────────────┘
+                  Boards that can be reset:
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ Pci Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ 0          │ grayskull  │ e75           │ 0100007311523010 │
+│ 1          │ wormhole   │ n300 L        │ 010001451170801d │
+└────────────┴────────────┴───────────────┴──────────────────┘
 ```
 
 ## Snapshots

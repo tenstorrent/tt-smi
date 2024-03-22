@@ -10,9 +10,9 @@ to collect and display device, telemetry and firmware information.
 
 In addition user can issue Grayskull and Wormhole board level resets.
 """
+import os
 import sys
 import time
-import json
 import signal
 import argparse
 import threading
@@ -38,6 +38,7 @@ from tt_smi.tt_smi_backend import (
 )
 from tt_tools_common.utils_common.tools_utils import (
     hex_to_semver_m3_fw,
+    detect_chips_with_callback,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
@@ -52,8 +53,6 @@ from tt_tools_common.ui_common.widgets import (
     TTCompatibilityMenu,
     TTHelperMenuBox,
 )
-
-from pyluwen import detect_chips
 
 # Global variables
 TextualKeyBindings = List[Tuple[str, str, str]]
@@ -398,7 +397,6 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
-                    val = self.backend.pci_properties[i]["current_link_width"]
                     if device.is_remote():
                         rows.append(
                             Text(
@@ -436,7 +434,6 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
-                    val = self.backend.pci_properties[i]["current_link_speed"]
                     if device.is_remote():
                         rows.append(
                             Text(
@@ -678,24 +675,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)
-    if args.generate_reset_json:
-        # Use filename if provided, else use default
-        file = (
-            generate_reset_logs(backend.devices)
-            if isinstance(args.generate_reset_json, bool)
-            else generate_reset_logs(backend.devices, args.generate_reset_json)
-        )
-        print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Generated sample reset config file for this host: {file}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"Update the generated file and use it as an input for the -r/--reset option.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(0)
     tt_smi_app = TTSMI(
         backend=backend, snapshot=args.snapshot, result_filename=args.filename
     )
@@ -731,6 +710,9 @@ def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
     """
+    # Enable backtrace for debugging
+    os.environ["RUST_BACKTRACE"] = "full"
+
     driver = get_driver_version()
     if not driver:
         print(
@@ -758,9 +740,37 @@ def main():
 
         # All went well - exit
         sys.exit(0)
+    if args.generate_reset_json:
+        # Use filename if provided, else use default
+        try:
+            devices = detect_chips_with_callback(local_only=True)
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error in detecting devices!\n{e}\n Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+        file = (
+            generate_reset_logs(devices)
+            if isinstance(args.generate_reset_json, bool)
+            else generate_reset_logs(devices, args.generate_reset_json)
+        )
+        print(
+            CMD_LINE_COLOR.PURPLE,
+            f"Generated sample reset config file for this host: {file}",
+            CMD_LINE_COLOR.ENDC,
+        )
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"Update the generated file and use it as an input for the -r/--reset option.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(0)
 
     try:
-        devices = detect_chips(local_only=args.local)
+        devices = detect_chips_with_callback(local_only=args.local)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
