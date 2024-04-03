@@ -1,0 +1,57 @@
+name: Build and Release Python Wheels
+
+on:
+  release:
+    types: [published]
+    tags:
+      - 'v*' # Trigger for tags like v1.0, v2.0, ...
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build wheel
+        run: |
+          python -m build
+
+      - name: Verify wheel files
+        run: |
+          twine check dist/*
+          for file in dist/*.whl; do
+            if ! [[ $file =~ .*-py3-none-any.whl$ ]]; then
+              echo "Error: Wheel $file is not marked as pure Python."
+              exit 1
+            fi
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          path: dist/*
+
+      - name: Upload wheel files to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # - name: Publish to PyPI
+      #   if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags/v')
+      #   uses: pypa/gh-action-pypi-publish@v1.4.2
+      #   with:
+      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      #     packages_dir: dist
