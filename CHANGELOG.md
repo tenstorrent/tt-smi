@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.2.3 - 12/07/2024
+
+### Updated
+
+- Added FW_Bundle_Version under the fw version tab
+- Bumped luwen lib versions (0.3.8 -> 0.3.11)
+- Bumped tt-tools-common lib versions (1.4.4 -> 1.4.5)
+
 ## 2.2.2 - 21/06/2024
 
 ### Updated

@@ -174,7 +174,7 @@ class TTSMIBackend:
 
         json_map = jsons.dump(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
-
+        
         for key, value in json_map.items():
             if value:
                 smbus_telem_dict[key.upper()] = hex(value)
@@ -407,14 +407,14 @@ class TTSMIBackend:
         """Translate the telem struct semver for gui"""
         fw_versions = {}
         for field in constants.FW_LIST:
-            if field == "arc_fw":
+            if field == "cm_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_ARC0_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
-            elif field == "arc_fw_date":
+            elif field == "cm_fw_date":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_WH_FW_DATE"]
                 if val is None:
                     fw_versions[field] = "N/A"
@@ -427,14 +427,14 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
-            elif field == "m3_bl_fw":
+            elif field == "bm_bl_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_BL_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
-            elif field == "m3_app_fw":
+            elif field == "bm_app_fw":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_APP_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
@@ -442,6 +442,12 @@ class TTSMIBackend:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "tt_flash_version":
                 val = self.smbus_telem_info[board_num]["SMBUS_TX_TT_FLASH_VERSION"]
+                if val is None:
+                    fw_versions[field] = "N/A"
+                else:
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
+            elif field == "fw_bundle_version":
+                val = self.smbus_telem_info[board_num]["SMBUS_TX_FW_BUNDLE_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:

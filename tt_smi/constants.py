@@ -56,6 +56,7 @@ SMBUS_TELEMETRY_LIST = [
     "SMBUS_TX_ETH_DEBUG_STATUS0",
     "SMBUS_TX_ETH_DEBUG_STATUS1",
     "SMBUS_TX_TT_FLASH_VERSION",
+    "SMBUS_TX_FW_BUNDLE_VERSION",
 ]
 
 TELEM_LIST = [
@@ -78,12 +79,13 @@ LIMITS = [
 ]
 
 FW_LIST = [
-    "arc_fw",
-    "arc_fw_date",
-    "eth_fw",
-    "m3_bl_fw",
-    "m3_app_fw",
+    "fw_bundle_version",
     "tt_flash_version",
+    "cm_fw",
+    "cm_fw_date",
+    "eth_fw",
+    "bm_bl_fw",
+    "bm_app_fw",
 ]
 
 DEV_INFO_LIST = [
@@ -136,12 +138,13 @@ TELEMETRY_TABLE_HEADER = [
 
 FIRMWARES_TABLE_HEADER = [
     "#",
-    "FW Version",
-    "FW Date",
-    "ETH FW Version",
-    "M3 BL Version",
-    "M3 App Version",
+    "FW Bundle Version",
     "TT-Flash Version",
+    "CM FW Version",
+    "CM FW Date",
+    "ETH FW Version",
+    "BM BL Version",
+    "BM App Version",
 ]
 
 PCI_PROPERTIES = [
