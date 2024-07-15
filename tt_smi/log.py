@@ -11,9 +11,14 @@ import inspect
 import datetime
 from pathlib import Path
 from typing import Any, Union, List, TypeVar, Generic
-from pydantic import BaseModel
-from pydantic.fields import Field
-
+try:
+    # Try the newer v2 pydantic and use that first
+    from pydantic.v1 import BaseModel
+    from pydantic.v1.fields import Field
+except:
+    # Assume we are on v1 and give that a go
+    from pydantic import BaseModel
+    from pydantic.fields import Field
 
 class Long(int):
     ...
