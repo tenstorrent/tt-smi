@@ -198,10 +198,32 @@ class TTSMI(App):
             all_rows.append(rows)
         return all_rows
 
+    def format_bh_telemetry_rows(self, board_num: int) -> List[Text]:
+        """BH spefic telemetry rows - subject to change post qual"""
+        bh_row = [Text(f"{board_num}", style=self.theme["yellow_bold"], justify="center")]
+        for telem in constants.TELEM_LIST:
+            val = self.backend.device_telemetrys[board_num][telem]
+            bh_row.append(
+                Text(
+                    f"{val}",
+                    style=self.theme["attention"],
+                    justify="center",
+                )
+                + Text(
+                    f"/ --- ",
+                    style=self.theme["gray"],
+                    justify="center",
+                )
+            )
+        return bh_row
+        
     def format_telemetry_rows(self):
         """Format telemetry rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i, chip in enumerate(self.backend.devices):
+            if chip.as_bh():
+                all_rows.append(self.format_bh_telemetry_rows(i))
+                continue
             rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
             for telem in constants.TELEM_LIST:
                 val = self.backend.device_telemetrys[i][telem]
@@ -483,27 +505,39 @@ class TTSMI(App):
                                 )
                             )
                 elif info == "dram_status":
-                    if val:
+                    # TODO: Update once DRAM status becomes availible
+                    if device.as_bh():
                         rows.append(
-                            Text("Y", style=self.theme["text_green"], justify="center")
+                            Text("N/A", style=self.theme["gray"], justify="center")
                         )
                     else:
-                        rows.append(
-                            Text("N", style=self.theme["attention"], justify="center")
-                        )
-                elif info == "dram_speed":
-                    if val:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.theme["text_green"],
-                                justify="center",
+                        if val:
+                            rows.append(
+                                Text("Y", style=self.theme["text_green"], justify="center")
                             )
+                        else:
+                            rows.append(
+                                Text("N", style=self.theme["attention"], justify="center")
+                            )
+                elif info == "dram_speed":
+                    # TODO: Update once DRAM status becomes availible
+                    if device.as_bh():
+                        rows.append(
+                            Text("N/A", style=self.theme["gray"], justify="center")
                         )
                     else:
-                        rows.append(
-                            Text("N/A", style=self.theme["red_bold"], justify="center")
-                        )
+                        if val:
+                            rows.append(
+                                Text(
+                                    f"{val}",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
+                            )
+                        else:
+                            rows.append(
+                                Text("N/A", style=self.theme["red_bold"], justify="center")
+                            )
                 else:
                     if val == "N/A":
                         rows.append(
@@ -573,7 +607,6 @@ class TTSMI(App):
             text=constants.HELP_MENU_MARKDOWN, theme=self.theme
         )
         self.push_screen(tt_confirm_box)
-
 
 def parse_args():
     """Parse user args"""

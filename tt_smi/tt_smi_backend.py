@@ -23,6 +23,7 @@ from typing import Dict, List
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from tt_tools_common.utils_common.system_utils import (
@@ -89,6 +90,8 @@ class TTSMIBackend:
             return "grayskull"
         elif device.as_wh():
             return "wormhole"
+        elif device.as_bh():
+            return "blackhole"
         else:
             assert False, "Unknown chip name, FIX!"
 
@@ -170,11 +173,15 @@ class TTSMIBackend:
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
         pylewen_chip = self.devices[board_num]
-        telem_struct = pylewen_chip.get_telemetry()
-
+        if pylewen_chip.as_bh():
+            telem_struct = pylewen_chip.as_bh().get_telemetry()
+        elif pylewen_chip.as_wh():
+            telem_struct = pylewen_chip.as_wh().get_telemetry()
+        else:
+            telem_struct = pylewen_chip.as_gs().get_telemetry()
         json_map = jsons.dump(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
-        
+
         for key, value in json_map.items():
             if value:
                 smbus_telem_dict[key.upper()] = hex(value)
@@ -188,35 +195,41 @@ class TTSMIBackend:
 
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
+        if self.smbus_telem_info[board_num]["BOARD_ID"]:
+            board_id = self.smbus_telem_info[board_num]["BOARD_ID"]
+            return (f"{board_id}").replace("0x", "")
+        else:
+            board_info_0 = self.smbus_telem_info[board_num]["BOARD_ID_LOW"]
+            board_info_1 = self.smbus_telem_info[board_num]["BOARD_ID_HIGH"]
 
-        board_info_0 = self.smbus_telem_info[board_num]["SMBUS_TX_BOARD_ID_LOW"]
-        board_info_1 = self.smbus_telem_info[board_num]["SMBUS_TX_BOARD_ID_HIGH"]
-        if board_info_0 is None or board_info_1 is None:
-            return "N/A"
-        board_info_0 = (f"{board_info_0}").replace("0x", "")
-        board_info_1 = (f"{board_info_1}").replace("x", "")
-        return f"{board_info_1}{board_info_0}"
+            if board_info_0 is None or board_info_1 is None:
+                return "N/A"
+            board_info_0 = (f"{board_info_0}").replace("0x", "")
+            board_info_1 = (f"{board_info_1}").replace("x", "")
+            return f"{board_info_1}{board_info_0}"
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
         if self.devices[board_num].as_gs():
-            val = int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_SPEED"], 16)
+            val = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
             return f"{val}"
-        dram_speed_raw = (
-            int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"], 16) >> 24
-        )
-        if dram_speed_raw == 0:
-            return "16G"
-        elif dram_speed_raw == 1:
-            return "14G"
-        elif dram_speed_raw == 2:
-            return "12G"
-        elif dram_speed_raw == 3:
-            return "10G"
-        elif dram_speed_raw == 4:
-            return "8G"
-        else:
-            return None
+        if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
+            dram_speed_raw = (
+                int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
+            )
+            if dram_speed_raw == 0:
+                return "16G"
+            elif dram_speed_raw == 1:
+                return "14G"
+            elif dram_speed_raw == 2:
+                return "12G"
+            elif dram_speed_raw == 3:
+                return "10G"
+            elif dram_speed_raw == 4:
+                return "8G"
+            else:
+                return None
+        return "N/A"
 
     def get_pci_properties(self, board_num):
         """Get the PCI link speed and link width details from sysfs files"""
@@ -230,6 +243,8 @@ class TTSMIBackend:
             return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
 
         def get_pcie_gen(link_speed: int) -> int:
+            if link_speed == 32:
+                return 5
             if link_speed == 16:
                 return 4
             elif link_speed == 8:
@@ -261,11 +276,10 @@ class TTSMIBackend:
         if self.devices[board_num].as_wh():
             num_channels = 8
             for i in range(num_channels):
-                if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] is None:
+                if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
                     return False
                 dram_status = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"], 16)
-                    >> (4 * i)
+                    int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> (4 * i)
                 ) & 0xF
                 if dram_status != 2:
                     return False
@@ -273,11 +287,10 @@ class TTSMIBackend:
         elif self.devices[board_num].as_gs():
             num_channels = 6
             for i in range(num_channels):
-                if self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"] is None:
+                if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
                     return False
                 dram_status = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_DDR_STATUS"], 16)
-                    >> (4 * i)
+                    int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> (4 * i)
                 ) & 0xF
                 if dram_status != 1:
                     return False
@@ -292,7 +305,13 @@ class TTSMIBackend:
                 except:
                     dev_info[field] = "N/A"
             elif field == "board_type":
-                dev_info[field] = get_board_type(self.get_board_id(board_num))
+                if self.get_board_id(board_num) == "N/A":
+                    dev_info[field] = "N/A"
+                # TODO: Update when we have BH type identifiers
+                elif self.devices[board_num].as_bh():
+                    dev_info[field] = "bh"
+                else:
+                    dev_info[field] = get_board_type(self.get_board_id(board_num))
             elif field == "board_id":
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
@@ -313,19 +332,62 @@ class TTSMIBackend:
 
         return dev_info
 
-    def get_chip_telemetry(self, board_num) -> Dict:
-        """Get telemetry data for chip. None if ARC FW not running"""
-        current = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDC"], 16) & 0xFFFF
-        if self.smbus_telem_info[board_num]["SMBUS_TX_VCORE"] is not None:
-            voltage = int(self.smbus_telem_info[board_num]["SMBUS_TX_VCORE"], 16) / 1000
+    def convert_signed_16_16_to_float(self, value):
+        """Convert signed 16.16 to float"""
+        return (value >> 16) + (value & 0xFFFF) / 65536.0
+
+    def get_bh_chip_telemetry(self, board_num) -> Dict:
+        """Get telemetry data for bh chip. None if ARC FW not running"""
+        current = (
+            int(self.smbus_telem_info[board_num]["TDC"], 16) & 0xFFFF
+            if self.smbus_telem_info[board_num]["TDC"] is not None
+            else 0
+        )
+        if self.smbus_telem_info[board_num]["VCORE"] is not None:
+            voltage = int(self.smbus_telem_info[board_num]["VCORE"], 16) / 1000
         else:
             voltage = 10000
-        power = int(self.smbus_telem_info[board_num]["SMBUS_TX_TDP"], 16) & 0xFFFF
+        power = (
+            int(self.smbus_telem_info[board_num]["TDP"], 16) & 0xFFFF
+            if self.smbus_telem_info[board_num]["TDP"] is not None
+            else 0
+        )
         asic_temperature = (
-            int(self.smbus_telem_info[board_num]["SMBUS_TX_ASIC_TEMPERATURE"], 16)
-            & 0xFFFF
+            (
+                self.convert_signed_16_16_to_float(
+                    int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16)
+                )
+            )
+            if self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"] is not None
+            else 0
+        )
+        aiclk = (
+            int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
+            if self.smbus_telem_info[board_num]["AICLK"] is not None
+            else 0
+        )
+
+        chip_telemetry = {
+            "voltage": f"{voltage:4.2f}",
+            "current": f"{current:5.1f}",
+            "power": f"{power:5.1f}",
+            "aiclk": f"{aiclk:4.0f}",
+            "asic_temperature": f"{asic_temperature:4.1f}",
+        }
+        return chip_telemetry
+
+    def get_wh_gs_chip_telemetry(self, board_num) -> Dict:
+        """Get telemetry data for GS and WH chip. None if ARC FW not running"""
+        current = int(self.smbus_telem_info[board_num]["TDC"], 16) & 0xFFFF
+        if self.smbus_telem_info[board_num]["VCORE"] is not None:
+            voltage = int(self.smbus_telem_info[board_num]["VCORE"], 16) / 1000
+        else:
+            voltage = 10000
+        power = int(self.smbus_telem_info[board_num]["TDP"], 16) & 0xFFFF
+        asic_temperature = (
+            int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
         ) / 16
-        aiclk = int(self.smbus_telem_info[board_num]["SMBUS_TX_AICLK"], 16) & 0xFFFF
+        aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -337,6 +399,13 @@ class TTSMIBackend:
 
         return chip_telemetry
 
+    def get_chip_telemetry(self, board_num) -> Dict:
+        """Return the correct chip telemetry for a given board"""
+        if self.devices[board_num].as_bh():
+            return self.get_bh_chip_telemetry(board_num)
+        else:
+            return self.get_wh_gs_chip_telemetry(board_num)
+
     def get_chip_limits(self, board_num):
         """Get chip limits from the CSM. None if ARC FW not running"""
 
@@ -344,61 +413,53 @@ class TTSMIBackend:
         for field in constants.LIMITS:
             if field == "vdd_min":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_VDD_LIMITS"], 16)
-                    & 0xFFFF
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_VDD_LIMITS"]
-                    is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) & 0xFFFF
+                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
             elif field == "vdd_max":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_VDD_LIMITS"], 16)
-                    >> 16
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_VDD_LIMITS"]
-                    is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) >> 16
+                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
             elif field == "tdp_limit":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_TDP"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_TDP"] is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["TDP"], 16) >> 16
+                    if self.smbus_telem_info[board_num]["TDP"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value:3.0f}" if value is not None else None
             elif field == "tdc_limit":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_TDC"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_TDC"] is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["TDC"], 16) >> 16
+                    if self.smbus_telem_info[board_num]["TDC"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value:3.0f}" if value is not None else None
             elif field == "asic_fmax":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_AICLK"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_AICLK"] is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["AICLK"], 16) >> 16
+                    if self.smbus_telem_info[board_num]["AICLK"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value:4.0f}" if value is not None else None
             elif field == "therm_trip_l1_limit":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_THM_LIMITS"], 16)
-                    >> 16
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_THM_LIMITS"]
-                    is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) >> 16
+                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
+                    else 0
                 )
                 chip_limits[field] = f"{value:2.0f}" if value is not None else None
             elif field == "thm_limit":
                 value = (
-                    int(self.smbus_telem_info[board_num]["SMBUS_TX_THM_LIMITS"], 16)
-                    & 0xFFFF
-                    if self.smbus_telem_info[board_num]["SMBUS_TX_THM_LIMITS"]
-                    is not None
-                    else None
+                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) & 0xFFFF
+                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
+                    else 0
                 )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else None
+                chip_limits[field] = f"{value:2.0f}" if value is not None else 0
             else:
                 chip_limits[field] = None
         return chip_limits
@@ -408,46 +469,45 @@ class TTSMIBackend:
         fw_versions = {}
         for field in constants.FW_LIST:
             if field == "cm_fw":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_ARC0_FW_VERSION"]
+                val = self.smbus_telem_info[board_num]["ARC0_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
             elif field == "cm_fw_date":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_WH_FW_DATE"]
+                val = self.smbus_telem_info[board_num]["WH_FW_DATE"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_date(int(val, 16), include_time=False)
 
             elif field == "eth_fw":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_ETH_FW_VERSION"]
+                val = self.smbus_telem_info[board_num]["ETH_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
             elif field == "bm_bl_fw":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_BL_FW_VERSION"]
+                val = self.smbus_telem_info[board_num]["M3_BL_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
-
             elif field == "bm_app_fw":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_M3_APP_FW_VERSION"]
+                val = self.smbus_telem_info[board_num]["M3_APP_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "tt_flash_version":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_TT_FLASH_VERSION"]
+                val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
-                val = self.smbus_telem_info[board_num]["SMBUS_TX_FW_BUNDLE_VERSION"]
+                val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
@@ -524,6 +584,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
 
     reset_wh_pci_idx = []
     reset_gs_devs = []
+    reset_bh_pci_idx = []
     for pci_idx in list_of_boards:
         try:
             chip = PciChip(pci_interface=pci_idx)
@@ -533,10 +594,14 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
                 f"Error accessing board at pci index {pci_idx}! Use -ls to see all devices available to reset",
                 CMD_LINE_COLOR.ENDC,
             )
+            # Exit the loop to go to the next chip
+            continue
         if chip.as_wh():
             reset_wh_pci_idx.append(pci_idx)
         elif chip.as_gs():
             reset_gs_devs.append(chip)
+        elif chip.as_bh():
+            reset_bh_pci_idx.append(pci_idx)
         else:
             print(
                 CMD_LINE_COLOR.RED,
@@ -554,6 +619,9 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
         backend = TTSMIBackend(devices=reset_gs_devs, fully_init=False)
         for i, _ in enumerate(reset_gs_devs):
             backend.gs_tensix_reset(i)
+
+    if reset_bh_pci_idx:
+        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
 
     if reinit:
         # Enable backtrace for debugging
