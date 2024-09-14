@@ -28,6 +28,7 @@ from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
+    system_compatibility,
 )
 from tt_tools_common.utils_common.tools_utils import (
     get_board_type,
@@ -146,6 +147,7 @@ class TTSMIBackend:
                 f"{board_id}",
             )
         console.print(table_1)
+        sys_compat = system_compatibility()
         table_2 = Table(title="Boards that can be reset:")
         table_2.add_column("Pci Dev ID")
         table_2.add_column("Board Type")
@@ -154,6 +156,7 @@ class TTSMIBackend:
         for i, device in enumerate(self.devices):
             if (
                 not device.is_remote()
+                and not (device.as_wh() and not sys_compat["WH Reset"][0])
                 and self.device_infos[i]["board_type"] != "GALAXY"
             ):
                 board_id = self.device_infos[i]["board_id"]
