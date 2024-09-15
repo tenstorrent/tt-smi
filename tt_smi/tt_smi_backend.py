@@ -172,13 +172,13 @@ class TTSMIBackend:
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
-        pylewen_chip = self.devices[board_num]
-        if pylewen_chip.as_bh():
-            telem_struct = pylewen_chip.as_bh().get_telemetry()
-        elif pylewen_chip.as_wh():
-            telem_struct = pylewen_chip.as_wh().get_telemetry()
+        pyluwen_chip = self.devices[board_num]
+        if pyluwen_chip.as_bh():
+            telem_struct = pyluwen_chip.as_bh().get_telemetry()
+        elif pyluwen_chip.as_wh():
+            telem_struct = pyluwen_chip.as_wh().get_telemetry()
         else:
-            telem_struct = pylewen_chip.as_gs().get_telemetry()
+            telem_struct = pyluwen_chip.as_gs().get_telemetry()
         json_map = jsons.dump(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
 
