@@ -85,4 +85,4 @@ All WH related SMI support - no breaking changes
 First release of opensource tt-smi
 
 ### Added
-- GS support and tensix reset support
+- GS support and Tensix reset support

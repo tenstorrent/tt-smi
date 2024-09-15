@@ -515,10 +515,10 @@ class TTSMIBackend:
         return fw_versions
 
     def gs_tensix_reset(self, board_num) -> None:
-        """Reset the tensix cores on a GS chip"""
+        """Reset the Tensix cores on a GS chip"""
         print(
             CMD_LINE_COLOR.BLUE,
-            f"Starting tensix reset on GS board at PCI index {board_num}",
+            f"Starting Tensix reset on GS board at PCI index {board_num}",
             CMD_LINE_COLOR.ENDC,
         )
         device = self.devices[board_num]
@@ -527,7 +527,7 @@ class TTSMIBackend:
 
         print(
             CMD_LINE_COLOR.GREEN,
-            f"Finished tensix reset on GS board at PCI index {board_num}\n",
+            f"Finished Tensix reset on GS board at PCI index {board_num}\n",
             CMD_LINE_COLOR.ENDC,
         )
 

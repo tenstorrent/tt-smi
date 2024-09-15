@@ -6,7 +6,7 @@ to interact with all Tenstorrent devices on host.
 Main objective of TT-SMI is to provide a simple and easy to use interface
 to collect and display device, telemetry and firmware information.
 
-In addition user can issue Grayskull board tensix core reset.
+In addition user can issue Grayskull board Tensix core reset.
 
 ## Official Repository
 
@@ -128,7 +128,7 @@ $ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
 To perform the reset, either provide a list of comma separated values of the PCI index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
 
 TT-SMI will perform different types of resets depending on the device:
-- GS devices have a tensix level reset that will reset each tensix cores.
+- GS devices have a Tensix level reset that will reset each Tensix cores.
 - WH nb150's and nb300's have a board level reset.
 
 By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
@@ -142,12 +142,12 @@ $ tt-smi -r 0,1
   Starting PCI link reset on WH devices at PCI indices: 1
   Finishing PCI link reset on WH devices at PCI indices: 1
 
-  Starting tensix reset on GS board at PCI index 0
+  Starting Tensix reset on GS board at PCI index 0
   Lowering clks to safe value...
   Beginning reset sequence...
   Finishing reset sequence...
   Returning clks to original values...
-  Finished tensix reset on GS board at PCI index 0
+  Finished Tensix reset on GS board at PCI index 0
 
   Re-initializing boards after reset....
  Done! Detected 3 boards on host.
@@ -159,12 +159,12 @@ tt-smi -r reset_config.json
   Starting PCI link reset on WH devices at PCI indices: 1
   Finishing PCI link reset on WH devices at PCI indices: 1
 
-  Starting tensix reset on GS board at PCI index 0
+  Starting Tensix reset on GS board at PCI index 0
   Lowering clks to safe value...
   Beginning reset sequence...
   Finishing reset sequence...
   Returning clks to original values...
-  Finished tensix reset on GS board at PCI index 0
+  Finished Tensix reset on GS board at PCI index 0
 
   Re-initializing boards after reset....
   Done! Detected 3 boards on host.
