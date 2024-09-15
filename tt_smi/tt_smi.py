@@ -671,8 +671,8 @@ def parse_args():
         metavar="0,1 ... or config.json",
         default=None,
         help=(
-            "Provide list of pci index or a json file with reset configs. "
-            "Find pci index of board using the -ls option. "
+            "Provide list of PCI index or a json file with reset configs. "
+            "Find PCI index of board using the -ls option. "
             "Generate a default reset json file with the -g option."
         ),
         dest="reset",

@@ -125,7 +125,7 @@ class TTSMIBackend:
         """Print all available boards on host"""
         console = get_console()
         table_1 = Table(title="All available boards on host:")
-        table_1.add_column("Pci Dev ID")
+        table_1.add_column("PCI Dev ID")
         table_1.add_column("Board Type")
         table_1.add_column("Device Series")
         table_1.add_column("Board Number")
@@ -147,7 +147,7 @@ class TTSMIBackend:
             )
         console.print(table_1)
         table_2 = Table(title="Boards that can be reset:")
-        table_2.add_column("Pci Dev ID")
+        table_2.add_column("PCI Dev ID")
         table_2.add_column("Board Type")
         table_2.add_column("Device Series")
         table_2.add_column("Board Number")
@@ -518,7 +518,7 @@ class TTSMIBackend:
         """Reset the tensix cores on a GS chip"""
         print(
             CMD_LINE_COLOR.BLUE,
-            f"Starting tensix reset on GS board at pci index {board_num}",
+            f"Starting tensix reset on GS board at PCI index {board_num}",
             CMD_LINE_COLOR.ENDC,
         )
         device = self.devices[board_num]
@@ -527,7 +527,7 @@ class TTSMIBackend:
 
         print(
             CMD_LINE_COLOR.GREEN,
-            f"Finished tensix reset on GS board at pci index {board_num}\n",
+            f"Finished tensix reset on GS board at PCI index {board_num}\n",
             CMD_LINE_COLOR.ENDC,
         )
 
@@ -559,7 +559,7 @@ def mobo_reset_from_json(json_dict) -> dict:
         # If any mobos - do the reset
         if mobo_dict_list:
             GalaxyReset().warm_reset_mobo(mobo_dict_list)
-            # If there are mobos to reset, remove link reset pci index's from the json
+            # If there are mobos to reset, remove link reset PCI index's from the json
             try:
                 wh_link_pci_indices = json_dict["wh_link_reset"]["pci_index"]
                 for entry in mobo_dict_list:
@@ -580,7 +580,7 @@ def mobo_reset_from_json(json_dict) -> dict:
 
 
 def pci_board_reset(list_of_boards: List[int], reinit=False):
-    """Given a list of pci index's init the pci chip and call reset on it"""
+    """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
     reset_gs_devs = []
@@ -591,7 +591,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
-                f"Error accessing board at pci index {pci_idx}! Use -ls to see all devices available to reset",
+                f"Error accessing board at PCI index {pci_idx}! Use -ls to see all devices available to reset",
                 CMD_LINE_COLOR.ENDC,
             )
             # Exit the loop to go to the next chip

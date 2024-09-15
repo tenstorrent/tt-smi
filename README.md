@@ -90,7 +90,7 @@ $ tt-smi --help
                         Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an
                         input for the --reset option
     -r 0,1 ... or config.json, --reset 0,1 ... or config.json
-                          Provide list of pci index or a json file with reset configs. Find pci index of board using the -ls option. Generate a default reset json file with the -g option.
+                          Provide list of PCI index or a json file with reset configs. Find PCI index of board using the -ls option. Generate a default reset json file with the -g option.
   ```
 
 Some of these flags will be discussed in more detail in the following sections.
@@ -118,14 +118,14 @@ All app keyboard shortcuts can be found in the help menu that user can bring up 
 
 ## Resets
 
-Another feature of tt-smi is performing resets on WH and GS pci cards, using the  ```-r/ --reset``` argument.
+Another feature of tt-smi is performing resets on WH and GS PCI cards, using the  ```-r/ --reset``` argument.
 ```
 $ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
 
-    Provide list of pci index or a json file with reset configs. Find pci index of board using the -ls option. Generate a default reset json file with the -g option.
+    Provide list of PCI index or a json file with reset configs. Find PCI index of board using the -ls option. Generate a default reset json file with the -g option.
 ```
 
-To perform the reset, either provide a list of comma separated values of the pci index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
+To perform the reset, either provide a list of comma separated values of the PCI index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
 
 TT-SMI will perform different types of resets depending on the device:
 - GS devices have a tensix level reset that will reset each tensix cores.
@@ -139,15 +139,15 @@ A successful reset on a system with both WH and GS should look something like th
 ```
 $ tt-smi -r 0,1
 
-  Starting pci link reset on WH devices at pci indices: 1
-  Finishing pci link reset on WH devices at pci indices: 1
+  Starting PCI link reset on WH devices at PCI indices: 1
+  Finishing PCI link reset on WH devices at PCI indices: 1
 
-  Starting tensix reset on GS board at pci index 0
+  Starting tensix reset on GS board at PCI index 0
   Lowering clks to safe value...
   Beginning reset sequence...
   Finishing reset sequence...
   Returning clks to original values...
-  Finished tensix reset on GS board at pci index 0
+  Finished tensix reset on GS board at PCI index 0
 
   Re-initializing boards after reset....
  Done! Detected 3 boards on host.
@@ -156,15 +156,15 @@ OR
 ```
 tt-smi -r reset_config.json
 
-  Starting pci link reset on WH devices at pci indices: 1
-  Finishing pci link reset on WH devices at pci indices: 1
+  Starting PCI link reset on WH devices at PCI indices: 1
+  Finishing PCI link reset on WH devices at PCI indices: 1
 
-  Starting tensix reset on GS board at pci index 0
+  Starting tensix reset on GS board at PCI index 0
   Lowering clks to safe value...
   Beginning reset sequence...
   Finishing reset sequence...
   Returning clks to original values...
-  Finished tensix reset on GS board at pci index 0
+  Finished tensix reset on GS board at PCI index 0
 
   Re-initializing boards after reset....
   Done! Detected 3 boards on host.
@@ -180,7 +180,7 @@ $ tt-smi -ls
 Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
                 All available boards on host:
 ┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
-┃ Pci Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┃ PCI Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
 ┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
 │ 0          │ grayskull  │ e75           │ 0100007311523010 │
 │ 1          │ wormhole   │ n300 L        │ 010001451170801d │
@@ -188,7 +188,7 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 └────────────┴────────────┴───────────────┴──────────────────┘
                   Boards that can be reset:
 ┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
-┃ Pci Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┃ PCI Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
 ┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
 │ 0          │ grayskull  │ e75           │ 0100007311523010 │
 │ 1          │ wormhole   │ n300 L        │ 010001451170801d │
