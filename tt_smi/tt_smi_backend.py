@@ -91,7 +91,7 @@ class TTSMIBackend:
         elif device.as_wh():
             return "Wormhole"
         elif device.as_bh():
-            return "blackhole"
+            return "Blackhole"
         else:
             assert False, "Unknown chip name, FIX!"
 
