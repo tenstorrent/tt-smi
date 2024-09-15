@@ -89,7 +89,7 @@ class TTSMIBackend:
         if device.as_gs():
             return "Grayskull"
         elif device.as_wh():
-            return "wormhole"
+            return "Wormhole"
         elif device.as_bh():
             return "blackhole"
         else:
