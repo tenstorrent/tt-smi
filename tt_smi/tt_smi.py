@@ -726,7 +726,7 @@ def check_fw_version(pylewen_chip, board_num):
         if fw_version < constants.MAGIC_FW_VERSION:
             print(
                 CMD_LINE_COLOR.RED,
-                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on grayskull device {board_num}.",
+                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on Grayskull device {board_num}.",
                 f"\n Require FW version >= {hex_to_semver_m3_fw(constants.MAGIC_FW_VERSION)} to run tt-smi",
                 CMD_LINE_COLOR.ENDC,
             )

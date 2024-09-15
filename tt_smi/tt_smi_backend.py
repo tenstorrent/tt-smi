@@ -87,7 +87,7 @@ class TTSMIBackend:
     def get_device_name(self, device):
         """Get device name from chip object"""
         if device.as_gs():
-            return "grayskull"
+            return "Grayskull"
         elif device.as_wh():
             return "wormhole"
         elif device.as_bh():
