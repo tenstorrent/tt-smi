@@ -382,7 +382,7 @@ class TTSMI(App):
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
                 if info == "board_type":
-                    if val == "n300":
+                    if device.as_wh():
                         if device.is_remote():
                             rows.append(
                                 Text(
