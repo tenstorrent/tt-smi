@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - improved error msg's for failures
 
 ### Fixed
-- pci speed/width in the snapshot
+- PCI speed/width in the snapshot
 - list option now matches dev/tenstorrent device IDS
 - reset_config generation is on local devices only
 
@@ -89,4 +89,4 @@ All WH related SMI support - no breaking changes
 First release of opensource tt-smi
 
 ### Added
-- GS support and tensix reset support
+- GS support and Tensix reset support

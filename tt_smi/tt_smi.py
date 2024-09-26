@@ -671,8 +671,8 @@ def parse_args():
         metavar="0,1 ... or config.json",
         default=None,
         help=(
-            "Provide list of pci index or a json file with reset configs. "
-            "Find pci index of board using the -ls option. "
+            "Provide list of PCI index or a json file with reset configs. "
+            "Find PCI index of board using the -ls option. "
             "Generate a default reset json file with the -g option."
         ),
         dest="reset",
@@ -714,19 +714,19 @@ def tt_smi_main(backend: TTSMIBackend, args):
     tt_smi_app.run()
 
 
-def check_fw_version(pylewen_chip, board_num):
+def check_fw_version(pyluwen_chip, board_num):
     """
     Check firmware version before running tt_smi and exit gracefully if not supported
     For Grayskull, we only support fw version >= 1.3.0.0
     """
-    if pylewen_chip.as_gs():
-        fw_version, exit_code = pylewen_chip.arc_msg(
+    if pyluwen_chip.as_gs():
+        fw_version, exit_code = pyluwen_chip.arc_msg(
             constants.MSG_TYPE_FW_VERSION, arg0=0, arg1=0
         )
         if fw_version < constants.MAGIC_FW_VERSION:
             print(
                 CMD_LINE_COLOR.RED,
-                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on grayskull device {board_num}.",
+                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on Grayskull device {board_num}.",
                 f"\n Require FW version >= {hex_to_semver_m3_fw(constants.MAGIC_FW_VERSION)} to run tt-smi",
                 CMD_LINE_COLOR.ENDC,
             )
