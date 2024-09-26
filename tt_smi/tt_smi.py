@@ -746,6 +746,8 @@ def main():
     # Enable backtrace for debugging
     os.environ["RUST_BACKTRACE"] = "full"
 
+    args = parse_args()
+
     driver = get_driver_version()
     if not driver:
         print(
@@ -754,8 +756,6 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-
-    args = parse_args()
 
     # Handle reset first, without setting up backend or
     if args.reset is not None:
