@@ -242,16 +242,16 @@ class TTSMIBackend:
         except:
             return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
 
-        def get_pcie_gen(link_speed: int) -> int:
-            if link_speed == 32:
+        def get_pcie_gen(link_speed: str) -> int:
+            if link_speed == "32.0":
                 return 5
-            if link_speed == 16:
+            if link_speed == "16.0":
                 return 4
-            elif link_speed == 8:
+            elif link_speed == "8.0":
                 return 3
-            elif link_speed == 5:
+            elif link_speed == "5.0":
                 return 2
-            elif link_speed == 2.5:
+            elif link_speed == "2.5":
                 return 1
             else:
                 assert False, f"Invalid link speed {link_speed}"
@@ -262,7 +262,7 @@ class TTSMIBackend:
             try:
                 with open(os.path.join(pci_bus_path, prop), "r", encoding="utf-8") as f:
                     output = f.readline().rstrip()
-                    value = int(re.findall(r"\d+", output)[0])
+                    value = re.findall(r"\d+\.\d+|\d+", output)[0]
                     if prop == "current_link_speed" or prop == "max_link_speed":
                         value = get_pcie_gen(value)
             except Exception:
