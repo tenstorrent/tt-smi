@@ -478,7 +478,20 @@ class TTSMI(App):
                                     justify="center",
                                 )
                             )
-                        elif val < int(max_link_speed):
+                        elif val == "N/A":
+                            rows.append(
+                                Text(
+                                    f"N/A",
+                                    style=self.theme["red_bold"],
+                                    justify="center",
+                                )
+                                + Text(
+                                    f" / Gen{max_link_speed}",
+                                    style=self.theme["yellow_bold"],
+                                    justify="center",
+                                )
+                            )
+                        elif float(val) < float(max_link_speed):
                             rows.append(
                                 Text(
                                     f"Gen{val}",
@@ -803,7 +816,7 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(local_only=args.local)
+        devices = detect_chips_with_callback(local_only=args.local, ignore_ethernet=args.local)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
