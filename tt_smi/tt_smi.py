@@ -200,7 +200,9 @@ class TTSMI(App):
 
     def format_bh_telemetry_rows(self, board_num: int) -> List[Text]:
         """BH spefic telemetry rows - subject to change post qual"""
-        bh_row = [Text(f"{board_num}", style=self.theme["yellow_bold"], justify="center")]
+        bh_row = [
+            Text(f"{board_num}", style=self.theme["yellow_bold"], justify="center")
+        ]
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
             bh_row.append(
@@ -216,7 +218,7 @@ class TTSMI(App):
                 )
             )
         return bh_row
-        
+
     def format_telemetry_rows(self):
         """Format telemetry rows"""
         all_rows = []
@@ -526,11 +528,17 @@ class TTSMI(App):
                     else:
                         if val:
                             rows.append(
-                                Text("Y", style=self.theme["text_green"], justify="center")
+                                Text(
+                                    "Y",
+                                    style=self.theme["text_green"],
+                                    justify="center",
+                                )
                             )
                         else:
                             rows.append(
-                                Text("N", style=self.theme["attention"], justify="center")
+                                Text(
+                                    "N", style=self.theme["attention"], justify="center"
+                                )
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
@@ -549,7 +557,11 @@ class TTSMI(App):
                             )
                         else:
                             rows.append(
-                                Text("N/A", style=self.theme["red_bold"], justify="center")
+                                Text(
+                                    "N/A",
+                                    style=self.theme["red_bold"],
+                                    justify="center",
+                                )
                             )
                 else:
                     if val == "N/A":
@@ -620,6 +632,7 @@ class TTSMI(App):
             text=constants.HELP_MENU_MARKDOWN, theme=self.theme
         )
         self.push_screen(tt_confirm_box)
+
 
 def parse_args():
     """Parse user args"""
@@ -816,7 +829,9 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(local_only=args.local, ignore_ethernet=args.local)
+        devices = detect_chips_with_callback(
+            local_only=args.local, ignore_ethernet=args.local
+        )
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
