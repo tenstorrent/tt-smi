@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Dev 
+
+- Specifing `tt-smi -r` now resets all pci devices
+
 ## 3.0.3 - 23/10/2024
 
 - Bumped tt-tools-common and luwen versions to improve reset reliability when chip is inaccessible.

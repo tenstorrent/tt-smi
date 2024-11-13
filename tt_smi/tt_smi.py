@@ -22,6 +22,7 @@ from tt_smi import constants
 from typing import List, Tuple
 from textual.reactive import reactive
 from importlib_resources import files
+from pyluwen import pci_scan
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
@@ -696,6 +697,7 @@ def parse_args():
         type=parse_reset_input,
         metavar="0,1 ... or config.json",
         default=None,
+        nargs="*",
         help=(
             "Provide list of PCI index or a json file with reset configs. "
             "Find PCI index of board using the -ls option. "
@@ -785,14 +787,19 @@ def main():
 
     # Handle reset first, without setting up backend or
     if args.reset is not None:
-        if isinstance(args.reset, list) and all(
-            isinstance(item, int) for item in args.reset
-        ):
+        # args.reset is a list of lists... so combine them all
+        reset_input = [j for i in args.reset for j in i]
+        if len(reset_input) == 0:
+            # Assume user wants all pci devices to be reset
+            reset_input = pci_scan()
+        # Sanity... filter out repeats
+        reset_input = list(sorted(set(reset_input)))
+        if all(isinstance(item, int) for item in reset_input):
             # If input is just reset board
-            pci_board_reset(args.reset, reinit=True)
+            pci_board_reset(reset_input, reinit=True)
         else:
             # If mobo reset, perform it first
-            parsed_dict = mobo_reset_from_json(args.reset)
+            parsed_dict = mobo_reset_from_json(reset_input)
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
                 pci_board_reset(pci_indices, reinit)
