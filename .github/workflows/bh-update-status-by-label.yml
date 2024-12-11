@@ -1,0 +1,84 @@
+Name: Tenstorrent - BH Related Board Updater 
+
+# This workflow will run once a day
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-and-update-issues:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      # Step 2: Set up Node.js (for running JavaScript-based scripts)
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16' # You can use a different version of Node.js if necessary
+      
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          npm install axios
+
+      # Step 4: Run the script to update issue statuses
+      - name: Check issues and update status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub token for authentication
+          PROJECT_ID: ${{ secrets.BH_SW_BOARD_ID }}      # You should store your project board ID in GitHub Secrets
+        run: |
+          node -e "
+            const axios = require('axios');
+            const token = process.env.GITHUB_TOKEN;
+            const projectId = process.env.BH_SW_BOARD_ID;
+
+            const headers = {
+              'Authorization': \`Bearer \${token}\`,
+              'Accept': 'application/vnd.github.v3+json',
+            };
+
+            // Fetch all issues from the project board
+            async function updateIssueStatus() {
+              try {
+                const { data: issues } = await axios.get(\`https://api.github.com/projects/columns/cards\`, {
+                  params: { project_id: projectId },
+                  headers: headers,
+                });
+
+                for (const issue of issues) {
+                  const { labels, id } = issue.content;
+
+                  // Check the labels on the issue
+                  let status = '';
+                  if (labels.some(label => label.name === 'P0')) {
+                    status = 'P0';
+                  } else if (labels.some(label => label.name === 'P1')) {
+                    status = 'P1';
+                  } else if (labels.some(label => label.name === 'P2')) {
+                    status = 'P2';
+                  } else if (labels.some(label => label.name === 'P3')) {
+                    status = 'P3';
+                  }
+
+                  // If a matching label is found, update the status field
+                  if (status) {
+                    await axios.patch(\`https://api.github.com/projects/columns/cards/\${id}\`, {
+                      note: \`Status: \${status}\`,
+                    }, {
+                      headers: headers,
+                    });
+                    console.log(\`Updated issue \${id} with status: \${status}\`);
+                  }
+                }
+              } catch (error) {
+                console.error('Error updating issue status:', error);
+              }
+            }
+
+            updateIssueStatus();
+          "
