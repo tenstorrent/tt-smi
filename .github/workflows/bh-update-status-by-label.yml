@@ -1,5 +1,3 @@
-Name: Tenstorrent - BH Related Board Updater 
-
 # This workflow will run once a day
 on:
   schedule:
