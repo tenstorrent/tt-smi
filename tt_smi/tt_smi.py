@@ -657,10 +657,7 @@ def parse_args():
         "--snapshot",
         default=False,
         action="store_true",
-        help=(
-            "Dump snapshot of current TT-SMI information to .json log."
-            "Default: ~/tt_smi/<timestamp>_snapshot.json\nUser can use -f to change filename"
-        ),
+        help="Dump snapshot of current tt-smi information to STDOUT",
     )
     parser.add_argument(
         "-ls",
@@ -672,11 +669,11 @@ def parse_args():
     parser.add_argument(
         "-f",
         "--filename",
-        metavar="filename",
+        metavar="snapshot filename",
         nargs="?",
-        const=None,
-        default=None,
-        help="Change filename for test log. Default: ~/tt_smi/<timestamp>_snapshot.json",
+        const=None,  # If -f is set with no filename
+        default=False,  # If -f is not set
+        help="Write snapshot to a file. Default: ~/tt_smi/<timestamp>_snapshot.json",
         dest="filename",
     )
     parser.add_argument(
@@ -706,6 +703,13 @@ def parse_args():
         dest="reset",
     )
 
+    parser.add_argument(
+        "--snapshot_no_tty",
+        default=False,
+        action="store_true",
+        help="Force no-tty behavior in the snapshot to stdout",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -729,7 +733,10 @@ def tt_smi_main(backend: TTSMIBackend, args):
         backend.print_all_available_devices()
         sys.exit(0)
     if args.snapshot:
-        file = backend.save_logs(args.filename)
+        backend.print_logs_to_stdout(pretty=backend.pretty_output)
+        sys.exit(0)
+    if args.filename is not False:  # The default is None, which is falsy
+        file = backend.save_logs_to_file(args.filename)
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Saved tt-smi log to: {file}",
@@ -785,6 +792,9 @@ def main():
         )
         sys.exit(1)
 
+    # Detect non-tty stdout, but allow users to override
+    is_tty = sys.stdout.isatty() and not args.snapshot_no_tty
+
     # Handle reset first, without setting up backend or
     if args.reset is not None:
         # args.reset is a list of lists... so combine them all
@@ -809,7 +819,7 @@ def main():
     if args.generate_reset_json:
         # Use filename if provided, else use default
         try:
-            devices = detect_chips_with_callback(local_only=True)
+            devices = detect_chips_with_callback(local_only=True, print_status=is_tty)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -837,7 +847,7 @@ def main():
 
     try:
         devices = detect_chips_with_callback(
-            local_only=args.local, ignore_ethernet=args.local
+            local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
         )
     except Exception as e:
         print(
@@ -853,7 +863,7 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    backend = TTSMIBackend(devices)
+    backend = TTSMIBackend(devices, pretty_output=is_tty)
     # Check firmware version before running tt_smi to avoid crashes
     for i, device in enumerate(backend.devices):
         check_fw_version(device, i)
