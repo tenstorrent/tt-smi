@@ -22,13 +22,16 @@ except:
     from pydantic.fields import Field
 
 
-class Long(int): ...
+class Long(int):
+    ...
 
 
-class Keyword(str): ...
+class Keyword(str):
+    ...
 
 
-class Text(str): ...
+class Text(str):
+    ...
 
 
 class Date(datetime.datetime):
@@ -134,7 +137,8 @@ class ElasticModel(BaseModel):
 T = TypeVar("T", bound=ElasticModel)
 
 
-class Nested(list, Generic[T]): ...
+class Nested(list, Generic[T]):
+    ...
 
 
 class HostInfo(ElasticModel):
@@ -260,11 +264,13 @@ class TTSMILog(ElasticModel):
     host_info: HostInfo
     device_info: List[TTSMIDeviceLog]
 
-    def save_as_json(self, fname: Union[str, Path]):
-        with open(fname, "w") as f:
-            raw_json = self.json(exclude_none=True)
-            reloaded_json = json.loads(raw_json)
-            json.dump(reloaded_json, f, indent=4)
+    def get_clean_json_string(self):
+        """Returns a cleaned json string"""
+        raw_json = self.json(exclude_none=True)
+        clean_json = json.loads(raw_json)
+        json_str = json.dumps(clean_json, indent=4)
+
+        return json_str
 
 
 @optional

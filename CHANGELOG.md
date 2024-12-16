@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Dev
+
+- Specifying `tt-smi -s` now prints a snapshot to stdout, per issue 39
+    - `tt-smi -f <optional filename>` now behaves like `tt-smi -s -f`
+    - tt-smi now attempts to determine if the output is a tty to better support scripting (primarily no statusbars)
+    - Added `--snapshot_no_tty` arg to force no-tty behavior
+- Updated tt-tools-common to 1.4.10
+
 ## 3.0.4 - 11/12/2024
 
 ### Changed

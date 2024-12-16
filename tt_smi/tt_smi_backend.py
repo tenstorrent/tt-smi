@@ -19,6 +19,7 @@ from pyluwen import PciChip
 from rich.table import Table
 from tt_smi import constants
 from rich import get_console
+from rich.syntax import Syntax
 from typing import Dict, List
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -47,8 +48,14 @@ class TTSMIBackend:
     It handles all device related tasks like fetching device info, telemetry and toggling resets
     """
 
-    def __init__(self, devices: List[PciChip], fully_init: bool = True):
+    def __init__(
+        self,
+        devices: List[PciChip],
+        fully_init: bool = True,
+        pretty_output: bool = True,
+    ):
         self.devices = devices
+        self.pretty_output = pretty_output
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
@@ -76,6 +83,7 @@ class TTSMIBackend:
                 total=len(self.devices),
                 description="Gathering Information",
                 update_period=0.01,
+                disable=not self.pretty_output,
             ):
                 self.smbus_telem_info.append(self.get_smbus_board_info(i))
                 self.firmware_infos.append(self.get_firmware_versions(i))
@@ -95,7 +103,7 @@ class TTSMIBackend:
         else:
             assert False, "Unknown chip name, FIX!"
 
-    def save_logs(self, result_filename: str = None):
+    def save_logs_to_file(self, result_filename: str = ""):
         """Save log for smi snapshots"""
         time_now = datetime.datetime.now()
         date_string = time_now.strftime("%m-%d-%Y_%H:%M:%S")
@@ -106,6 +114,27 @@ class TTSMIBackend:
             dir_path = os.path.dirname(os.path.realpath(result_filename))
             Path(dir_path).mkdir(parents=True, exist_ok=True)
             log_filename = result_filename
+
+        clean_json = self.get_logs_json()
+        with open(log_filename, "w") as f:
+            f.write(clean_json)
+
+        return log_filename
+
+    def print_logs_to_stdout(self, pretty: bool = True):
+        """Pretty-print (or just print) logs to stdout"""
+        clean_json = self.get_logs_json()
+
+        if not pretty:
+            print(clean_json)
+            return
+
+        formatted = Syntax(clean_json, "json", background_color="default")
+        console = get_console()
+        console.print(formatted)
+
+    def get_logs_json(self) -> str:
+        """Get logs as JSON"""
         for i, device in enumerate(self.devices):
             self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
             self.log.device_info[i].board_info = self.device_infos[i]
@@ -118,8 +147,8 @@ class TTSMIBackend:
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
-        self.log.save_as_json(log_filename)
-        return log_filename
+
+        return self.log.get_clean_json_string()
 
     def print_all_available_devices(self):
         """Print all available boards on host"""
@@ -316,9 +345,9 @@ class TTSMIBackend:
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
                 if self.devices[board_num].as_wh():
-                    dev_info[field] = (
-                        f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
-                    )
+                    dev_info[
+                        field
+                    ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
                 else:
                     dev_info[field] = "N/A"
             elif field == "dram_status":
