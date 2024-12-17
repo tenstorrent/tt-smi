@@ -10,7 +10,6 @@ This is the backend of tt-smi.
 import os
 import re
 import sys
-import jsons
 import datetime
 from tt_smi import log
 from pathlib import Path
@@ -208,7 +207,7 @@ class TTSMIBackend:
             telem_struct = pyluwen_chip.as_wh().get_telemetry()
         else:
             telem_struct = pyluwen_chip.as_gs().get_telemetry()
-        json_map = jsons.dump(telem_struct)
+        json_map = dict_from_public_attrs(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
 
         for key, value in json_map.items():
@@ -559,6 +558,17 @@ class TTSMIBackend:
             f"Finished Tensix reset on GS board at PCI index {board_num}\n",
             CMD_LINE_COLOR.ENDC,
         )
+
+
+def dict_from_public_attrs(obj) -> dict:
+    """Parse an object's public attributes into a dictionary"""
+    all_attrs = obj.__dir__()
+    # Filter private attrs
+    public = [attr for attr in all_attrs if not attr.startswith("_")]
+    ret = {}
+    for attr in public:
+        ret[attr] = getattr(obj, attr)
+    return ret
 
 
 # Reset specific functions
