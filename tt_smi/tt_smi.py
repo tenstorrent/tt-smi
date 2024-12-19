@@ -698,6 +698,7 @@ def parse_args():
         metavar="0,1 ... or config.json",
         default=None,
         nargs="*",
+        action="append",
         help=(
             "Provide list of PCI index or a json file with reset configs. "
             "Find PCI index of board using the -ls option. "
@@ -787,19 +788,46 @@ def main():
 
     # Handle reset first, without setting up backend or
     if args.reset is not None:
-        # args.reset is a list of lists... so combine them all
-        reset_input = [j for i in args.reset for j in i]
-        if len(reset_input) == 0:
-            # Assume user wants all pci devices to be reset
-            reset_input = pci_scan()
-        # Sanity... filter out repeats
-        reset_input = list(sorted(set(reset_input)))
-        if all(isinstance(item, int) for item in reset_input):
-            # If input is just reset board
+        # We do not currently support mixing integer resets with config resets so check that we are doing one or the other
+        looks_like_config = False
+        looks_like_integer = False
+        invalid = False
+        for i in args.reset:
+            for ii in i:
+                if isinstance(ii, dict):
+                    looks_like_config = True
+                elif isinstance(ii, list):
+                    looks_like_integer = True
+                else:
+                    invalid = True
+        if invalid:
+            raise AssertionError(
+                "Input reset selection \n----\n{}\n----\nDid not match any of the valid patterns ([<integer>] XOR <config>)".format(
+                    "\n".join(str(rr) for r in args.reset for rr in r)
+                )
+            )
+        elif looks_like_config and looks_like_integer:
+            raise AssertionError(
+                "It looks like you entered both a pcie index reset request and a reset config\n----\n{}\n----\nPlease enter one or the other.".format(
+                    "\n".join(str(rr) for r in args.reset for rr in r)
+                )
+            )
+
+        # Check if we are doing a config.json reset
+        if looks_like_integer or not (looks_like_config or looks_like_integer):
+            # args.reset is a list of lists... so combine them all
+            reset_input = [z for i in args.reset for j in i for z in j]
+
+            if len(reset_input) == 0:
+                # Empty, reset options assume user wants all pci devices to be reset
+                reset_input = pci_scan()
+
+            # Sanity... filter out repeats
+            reset_input = list(sorted(set(reset_input)))
             pci_board_reset(reset_input, reinit=True)
         else:
             # If mobo reset, perform it first
-            parsed_dict = mobo_reset_from_json(reset_input)
+            parsed_dict = mobo_reset_from_json(args.reset[0][0])
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
                 pci_board_reset(pci_indices, reinit)
