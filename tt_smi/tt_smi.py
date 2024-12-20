@@ -75,6 +75,7 @@ class TTSMI(App):
         ("q, Q", "quit", "Quit"),
         ("h, H", "help", "Help"),
         ("d, D", "toggle_dark", "Toggle dark mode"),
+        ("c, C", "toggle_compact", "Toggle sidebar"),
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
@@ -588,6 +589,11 @@ class TTSMI(App):
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
+
+    def action_toggle_compact(self) -> None:
+        """An action to toggle compact mode."""
+        left_sidebar = self.query_one("#left_col")
+        left_sidebar.display = not left_sidebar.display
 
     async def action_quit(self) -> None:
         """An [action](/guide/actions) to quit the app as soon as possible."""
