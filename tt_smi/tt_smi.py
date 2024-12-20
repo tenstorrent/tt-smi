@@ -102,6 +102,7 @@ class TTSMI(App):
         key_bindings: TextualKeyBindings = [],
         backend: TTSMIBackend = None,
         snapshot: bool = False,
+        show_sidebar: bool = True,
     ) -> None:
         """Initialize the textual app."""
         super().__init__()
@@ -109,6 +110,7 @@ class TTSMI(App):
         self.app_version = app_version
         self.backend = backend
         self.snapshot = snapshot
+        self.show_sidebar = show_sidebar
         self.result_filename = result_filename
         self.theme = create_tt_tools_theme()
 
@@ -173,6 +175,9 @@ class TTSMI(App):
 
         sw_ver_table = self.get_widget_by_id(id="sw_ver_menu")
         sw_ver_table.set_interval(0.1, callback=sw_ver_table.refresh)
+
+        left_sidebar = self.query_one("#left_col")
+        left_sidebar.display = self.show_sidebar
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""
@@ -687,7 +692,13 @@ def parse_args():
             "Update the generated file and use it as an input for the --reset option"
         ),
     )
-
+    parser.add_argument(
+        "-c",
+        "--compact",
+        default=False,
+        action="store_true",
+        help="Run in compact mode, hiding the sidebar and other static elements",
+    )
     parser.add_argument(
         "-r",
         "--reset",
@@ -745,7 +756,10 @@ def tt_smi_main(backend: TTSMIBackend, args):
         )
         sys.exit(0)
     tt_smi_app = TTSMI(
-        backend=backend, snapshot=args.snapshot, result_filename=args.filename
+        backend=backend,
+        snapshot=args.snapshot,
+        result_filename=args.filename,
+        show_sidebar=not args.compact,
     )
     tt_smi_app.run()
 
