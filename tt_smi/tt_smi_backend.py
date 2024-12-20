@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import datetime
+import pkg_resources
 from tt_smi import log
 from pathlib import Path
 from rich.text import Text
@@ -58,6 +59,7 @@ class TTSMIBackend:
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
             host_info=get_host_info(),
+            host_sw_vers=get_host_software_versions(),
             device_info=[
                 log.TTSMIDeviceLog(
                     smbus_telem=log.SmbusTelem(),
@@ -569,6 +571,13 @@ def dict_from_public_attrs(obj) -> dict:
     for attr in public:
         ret[attr] = getattr(obj, attr)
     return ret
+
+
+def get_host_software_versions() -> dict:
+    return {
+        "tt_smi": pkg_resources.get_distribution("tt_smi").version,
+        "pyluwen": pkg_resources.get_distribution("pyluwen").version,
+    }
 
 
 # Reset specific functions

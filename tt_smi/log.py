@@ -152,6 +152,11 @@ class HostInfo(ElasticModel):
     Driver: str
 
 
+class HostSWVersions(ElasticModel):
+    tt_smi: str
+    pyluwen: str
+
+
 @optional
 class SmbusTelem(ElasticModel):
     BOARD_ID: str
@@ -262,6 +267,7 @@ class TTSMIDeviceLog(ElasticModel):
 class TTSMILog(ElasticModel):
     time: datetime.datetime
     host_info: HostInfo
+    host_sw_vers: HostSWVersions
     device_info: List[TTSMIDeviceLog]
 
     def get_clean_json_string(self):
