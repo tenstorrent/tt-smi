@@ -44,14 +44,14 @@ from tt_tools_common.utils_common.tools_utils import (
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
     get_host_info,
-    system_compatibility,
+    get_host_compatibility_info,
     get_sw_ver_info,
 )
 from tt_tools_common.ui_common.widgets import (
     TTHeader,
     TTDataTable,
     TTMenu,
-    TTCompatibilityMenu,
+    TTHostCompatibilityMenu,
     TTHelperMenuBox,
 )
 
@@ -126,11 +126,10 @@ class TTSMI(App):
         yield TTHeader(self.app_name, self.app_version)
         with Container(id="app_grid"):
             with Vertical(id="left_col"):
-                yield TTMenu(id="host_info", title="Host Info", data=get_host_info())
-                yield TTCompatibilityMenu(
-                    id="compatibility_menu",
-                    title="Compatibility Check",
-                    data=system_compatibility(),
+                yield TTHostCompatibilityMenu(
+                    id="host_info",
+                    title="Host Info",
+                    data=get_host_compatibility_info(),
                 )
                 yield TTMenu(
                     id="sw_ver_menu",
