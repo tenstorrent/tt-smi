@@ -749,7 +749,7 @@ def tt_smi_main(backend: TTSMIBackend, args):
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
-    if args.snapshot:
+    if args.snapshot or args.filename == "-":  # If we pass '-s' or '-f -"
         backend.print_logs_to_stdout(pretty=backend.pretty_output)
         sys.exit(0)
     if args.filename is not False:  # The default is None, which is falsy
