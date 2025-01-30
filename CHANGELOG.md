@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The "Host Info" and "Compatibility" infoboxes have been merged into a more compact
 unified box. Any compatibility issues are displayed modally.
+- Calling `tt-smi -f -` now behaves like `tt-smi -s`, printing snapshot info to STDOUT
 
 ## 3.0.5 - 01/07/25
 
