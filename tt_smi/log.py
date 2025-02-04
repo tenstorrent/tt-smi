@@ -22,16 +22,13 @@ except:
     from pydantic.fields import Field
 
 
-class Long(int):
-    ...
+class Long(int): ...
 
 
-class Keyword(str):
-    ...
+class Keyword(str): ...
 
 
-class Text(str):
-    ...
+class Text(str): ...
 
 
 class Date(datetime.datetime):
@@ -137,8 +134,7 @@ class ElasticModel(BaseModel):
 T = TypeVar("T", bound=ElasticModel)
 
 
-class Nested(list, Generic[T]):
-    ...
+class Nested(list, Generic[T]): ...
 
 
 class HostInfo(ElasticModel):
