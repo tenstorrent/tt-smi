@@ -118,7 +118,11 @@ All app keyboard shortcuts can be found in the help menu that user can bring up 
 
 ## Resets
 
-Another feature of tt-smi is performing resets on WH and GS PCI cards, using the  ```-r/ --reset``` argument.
+Another feature of tt-smi is performing resets on Blackhole, Wormhole and Grayskull PCIe cards, using the  ```-r/ --reset``` argument. 
+
+**WARNING for ARM systems.**
+PCIe config is set up differently on those systems. Hence our current implementation of PCIe reset doesn't work as expected on them. It is recommended to reboot the system if you would like to perform a board reset on your ARM system.
+
 ```
 $ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
 
@@ -128,13 +132,18 @@ $ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
 To perform the reset, either provide a list of comma separated values of the PCI index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
 
 TT-SMI will perform different types of resets depending on the device:
-- GS devices have a Tensix level reset that will reset each Tensix cores.
-- WH nb150's and nb300's have a board level reset.
+- Grayskull
+  - Tensix level reset that will reset each Tensix cores.
+- Wormhole
+  - A board level reset will be perfomed. Power will be cut to the board and brought back up. 
+  - Post reset the ethernet connections will be re-trained.
+- Blackhole
+  - A board level reset will be perfomed. Power will be cut to the board and brought back up. 
 
 By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
 
 
-A successful reset on a system with both WH and GS should look something like the follows:
+A successful reset on a system with both Wormhole and Grayskull should look something like the follows:
 
 ```
 $ tt-smi -r 0,1
@@ -194,11 +203,23 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 │ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
 └────────────┴────────────┴───────────────┴──────────────────┘
 ```
+### Disabling SW version reporting
+
+To disable the reporting of software versions and reporting of serial numbers, you can update the following parameters in the reset config file. The reset file can be generated into  ```~/.config/tenstorrent/reset_config.json``` using ``` tt-smi -g``` and then updated as follows :
+
+```
+    "disable_serial_report": false,     // make this true
+    "disable_sw_version_report": false, // make this true
+```
+
+If the ```disable_sw_version_report``` is set to true, all the software versions in the ```Latest SW Versions``` block get reported as "N/A".
+
 
 ## Snapshots
 
 TT-SMI provides an easy way to get all the information that is displayed on the GUI in a json file, using the ```-s, --snapshot``` argument. By default the file is named and stored as
-``` ~/tt_smi/<timestamp>_snapshot.json```. User can also provide their own filename if desired, using the ```-f``` option
+``` ~/tt_smi/<timestamp>_snapshot.json```. User can also provide their own filename if desired, using the ```-f``` option. 
+If you don't want to pipe the output to a file, you can use ```tt-smi -f -```. It behaves like ```tt-smi -s```,printing snapshot info directly to STDOUT.
 
 Example usage:
 ```
@@ -206,6 +227,19 @@ $ tt-smi -s -f tt_smi_example.json
 
     Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
       Saved tt-smi log to: tt_smi_example.json
+```
+
+```
+$ tt-smi -f -
+
+    Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+    {
+        "time": "2025-02-04T13:04:50.313105",
+        "host_info": {
+            "OS": "Linux",
+            "Distro": "Ubuntu 20.04.6 LTS",
+            "Kernel": "5.15.0-130-generic",
+        .........
 ```
 
 ## License

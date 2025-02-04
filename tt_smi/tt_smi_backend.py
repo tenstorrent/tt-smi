@@ -346,9 +346,9 @@ class TTSMIBackend:
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
                 if self.devices[board_num].as_wh():
-                    dev_info[
-                        field
-                    ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
+                    dev_info[field] = (
+                        f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
+                    )
                 else:
                     dev_info[field] = "N/A"
             elif field == "dram_status":
