@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.8 - 06/03/25
+
+- Chore - bumped luwen version to include telemetry check during bh arc init
+
 ## 3.0.7 - 04/02/25
 
 - Updated tools common to 1.4.14 allowing users to disable the sw_version fetching via reset config
