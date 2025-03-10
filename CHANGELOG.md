@@ -5,9 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 3.0.10 - 07/03/25
+## 3.0.10 - 10/03/25
 
-- Chore - bumped luwen version to fail with an error if chip reinit fails 
+- Chore - bumped luwen version to include protoc lib detection check
+
+## 3.0.9 - 07/03/25
+
+- Chore - bumped luwen version to fail with an error if chip reinit fails
 
 ## 3.0.8 - 06/03/25
 
