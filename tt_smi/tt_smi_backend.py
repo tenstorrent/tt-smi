@@ -346,9 +346,9 @@ class TTSMIBackend:
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
                 if self.devices[board_num].as_wh():
-                    dev_info[field] = (
-                        f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
-                    )
+                    dev_info[
+                        field
+                    ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
                 else:
                     dev_info[field] = "N/A"
             elif field == "dram_status":
@@ -534,10 +534,23 @@ class TTSMIBackend:
                 val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
+                # See below- Galaxy systems manually get an N/A tt_flash_version
+                elif get_board_type(self.get_board_id(board_num)) == "GALAXY":
+                    fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
                 val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
+                if (
+                    get_board_type(self.get_board_id(board_num)) == "GALAXY"
+                    and val == "0xffffffff"
+                ):
+                    # WARNING: Dirty dirty hack!
+                    # See Issue #72 https://github.com/tenstorrent/tt-smi/issues/72
+                    # Due to a FW flashing bug, Galaxy systems do not have the FW_BUNDLE_VERSION
+                    # field set. The value ends up in TT_FLASH_VERSION, so we need to go get it.
+                    val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
+                    fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
