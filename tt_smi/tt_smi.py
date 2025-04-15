@@ -45,7 +45,6 @@ from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
     get_host_info,
     get_host_compatibility_info,
-    get_sw_ver_info,
 )
 from tt_tools_common.ui_common.widgets import (
     TTHeader,
@@ -92,9 +91,6 @@ class TTSMI(App):
 
     CSS_PATH = [f"{common_style_file_path}", "tt_smi_style.css"]
 
-    # Added sw_version as a reactive field for live updating on the GUI
-    get_latest_sw_vers = reactive(True)
-
     def __init__(
         self,
         result_filename: str = None,
@@ -130,11 +126,6 @@ class TTSMI(App):
                     id="host_info",
                     title="Host Info",
                     data=get_host_compatibility_info(),
-                )
-                yield TTMenu(
-                    id="sw_ver_menu",
-                    title="Latest SW Versions",
-                    data=get_sw_ver_info(self.get_latest_sw_vers, board_ids),
                 )
             with TabbedContent(
                 "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
@@ -172,9 +163,6 @@ class TTSMI(App):
         firmware_table = self.get_widget_by_id(id="tt_smi_firmware")
         firmware_table.dt.cursor_type = "none"
         firmware_table.dt.add_rows(self.format_firmware_rows())
-
-        sw_ver_table = self.get_widget_by_id(id="sw_ver_menu")
-        sw_ver_table.set_interval(0.1, callback=sw_ver_table.refresh)
 
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
