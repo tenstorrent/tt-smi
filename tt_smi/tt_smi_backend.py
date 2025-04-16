@@ -643,6 +643,9 @@ def mobo_reset_from_json(json_dict) -> dict:
 def pci_board_reset(list_of_boards: List[int], reinit=False):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
+    # Sanity... filter out repeats
+    list_of_boards = list(sorted(set(list_of_boards)))
+
     reset_wh_pci_idx = []
     reset_gs_devs = []
     reset_bh_pci_idx = []
