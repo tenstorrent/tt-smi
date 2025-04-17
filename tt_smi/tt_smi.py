@@ -35,6 +35,7 @@ from tt_smi.tt_smi_backend import (
     pci_board_reset,
     pci_indices_from_json,
     mobo_reset_from_json,
+    wh_ubb_reset
 )
 from tt_tools_common.utils_common.tools_utils import (
     hex_to_semver_m3_fw,
@@ -702,12 +703,17 @@ def parse_args():
         ),
         dest="reset",
     )
-
     parser.add_argument(
         "--snapshot_no_tty",
         default=False,
         action="store_true",
         help="Force no-tty behavior in the snapshot to stdout",
+    )
+    parser.add_argument(
+        "--ubb_reset",
+        default=False,
+        action="store_true",
+        help="ubb_reset",
     )
 
     args = parser.parse_args()
@@ -729,6 +735,9 @@ def tt_smi_main(backend: TTSMIBackend, args):
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
+    if args.ubb_reset:
+        wh_ubb_reset()
+        sys.exit(0)
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
