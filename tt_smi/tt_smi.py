@@ -110,7 +110,6 @@ class TTSMI(App):
         self.show_sidebar = show_sidebar
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
-        self.dark = False
 
         if key_bindings:
             self.BINDINGS += key_bindings
