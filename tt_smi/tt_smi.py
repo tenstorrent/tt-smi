@@ -109,7 +109,8 @@ class TTSMI(App):
         self.snapshot = snapshot
         self.show_sidebar = show_sidebar
         self.result_filename = result_filename
-        self.theme = create_tt_tools_theme()
+        self.text_theme = create_tt_tools_theme()
+        self.dark = False
 
         if key_bindings:
             self.BINDINGS += key_bindings
@@ -178,16 +179,16 @@ class TTSMI(App):
         """Format firmware rows"""
         all_rows = []
         for i, _ in enumerate(self.backend.devices):
-            rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
+            rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
                 if val == "N/A":
                     rows.append(
-                        Text(f"{val}", style=self.theme["gray"], justify="center")
+                        Text(f"{val}", style=self.text_theme["gray"], justify="center")
                     )
                 else:
                     rows.append(
-                        Text(f"{val}", style=self.theme["text_green"], justify="center")
+                        Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                     )
             all_rows.append(rows)
         return all_rows
@@ -195,19 +196,19 @@ class TTSMI(App):
     def format_bh_telemetry_rows(self, board_num: int) -> List[Text]:
         """BH spefic telemetry rows - subject to change post qual"""
         bh_row = [
-            Text(f"{board_num}", style=self.theme["yellow_bold"], justify="center")
+            Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
         ]
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
             bh_row.append(
                 Text(
                     f"{val}",
-                    style=self.theme["attention"],
+                    style=self.text_theme["attention"],
                     justify="center",
                 )
                 + Text(
                     f"/ --- ",
-                    style=self.theme["gray"],
+                    style=self.text_theme["gray"],
                     justify="center",
                 )
             )
@@ -220,7 +221,7 @@ class TTSMI(App):
             if chip.as_bh():
                 all_rows.append(self.format_bh_telemetry_rows(i))
                 continue
-            rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
+            rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for telem in constants.TELEM_LIST:
                 val = self.backend.device_telemetrys[i][telem]
                 if telem == "voltage":
@@ -229,12 +230,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {vdd_max}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -242,12 +243,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["attention"],
+                                style=self.text_theme["attention"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {vdd_max}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -257,12 +258,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_current}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -270,12 +271,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["attention"],
+                                style=self.text_theme["attention"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_current}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -285,12 +286,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_power}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -298,12 +299,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["attention"],
+                                style=self.text_theme["attention"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_power}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -313,12 +314,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {asic_fmax}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -326,12 +327,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["attention"],
+                                style=self.text_theme["attention"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {asic_fmax}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -341,12 +342,12 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_temp}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
@@ -354,18 +355,18 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["attention"],
+                                style=self.text_theme["attention"],
                                 justify="center",
                             )
                             + Text(
                                 f"/ {max_temp}",
-                                style=self.theme["yellow_bold"],
+                                style=self.text_theme["yellow_bold"],
                                 justify="center",
                             )
                         )
                 else:
                     rows.append(
-                        Text(f"{val}", style=self.theme["text_green"], justify="center")
+                        Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                     )
             all_rows.append(rows)
         return all_rows
@@ -374,7 +375,7 @@ class TTSMI(App):
         """Format device info rows"""
         all_rows = []
         for i, device in enumerate(self.backend.devices):
-            rows = [Text(f"{i}", style=self.theme["yellow_bold"], justify="center")]
+            rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
                 if info == "board_type":
@@ -383,12 +384,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"{val}",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                                 + Text(
                                     " R",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -396,12 +397,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"{val}",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" L",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -409,7 +410,7 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                         )
@@ -419,7 +420,7 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"N/A",
-                                style=self.theme["gray"],
+                                style=self.text_theme["gray"],
                                 justify="center",
                             )
                         )
@@ -428,12 +429,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"x{val}",
-                                    style=self.theme["attention"],
+                                    style=self.text_theme["attention"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / x{max_link_width}",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -441,12 +442,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"x{val}",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / x{max_link_width}",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -456,7 +457,7 @@ class TTSMI(App):
                         rows.append(
                             Text(
                                 f"N/A",
-                                style=self.theme["gray"],
+                                style=self.text_theme["gray"],
                                 justify="center",
                             )
                         )
@@ -465,12 +466,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"Gen{val}",
-                                    style=self.theme["attention"],
+                                    style=self.text_theme["attention"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / N/A",
-                                    style=self.theme["gray"],
+                                    style=self.text_theme["gray"],
                                     justify="center",
                                 )
                             )
@@ -478,12 +479,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"N/A",
-                                    style=self.theme["red_bold"],
+                                    style=self.text_theme["red_bold"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / Gen{max_link_speed}",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -491,12 +492,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"Gen{val}",
-                                    style=self.theme["attention"],
+                                    style=self.text_theme["attention"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / Gen{max_link_speed}",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -504,12 +505,12 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     f"Gen{val}",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                                 + Text(
                                     f" / Gen{max_link_speed}",
-                                    style=self.theme["yellow_bold"],
+                                    style=self.text_theme["yellow_bold"],
                                     justify="center",
                                 )
                             )
@@ -517,35 +518,35 @@ class TTSMI(App):
                     # TODO: Update once DRAM status becomes availible
                     if device.as_bh():
                         rows.append(
-                            Text("N/A", style=self.theme["gray"], justify="center")
+                            Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
                     else:
                         if val:
                             rows.append(
                                 Text(
                                     "Y",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                             )
                         else:
                             rows.append(
                                 Text(
-                                    "N", style=self.theme["attention"], justify="center"
+                                    "N", style=self.text_theme["attention"], justify="center"
                                 )
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
                     if device.as_bh():
                         rows.append(
-                            Text("N/A", style=self.theme["gray"], justify="center")
+                            Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
                     else:
                         if val:
                             rows.append(
                                 Text(
                                     f"{val}",
-                                    style=self.theme["text_green"],
+                                    style=self.text_theme["text_green"],
                                     justify="center",
                                 )
                             )
@@ -553,20 +554,20 @@ class TTSMI(App):
                             rows.append(
                                 Text(
                                     "N/A",
-                                    style=self.theme["red_bold"],
+                                    style=self.text_theme["red_bold"],
                                     justify="center",
                                 )
                             )
                 else:
                     if val == "N/A":
                         rows.append(
-                            Text(f"{val}", style=self.theme["gray"], justify="center")
+                            Text(f"{val}", style=self.text_theme["gray"], justify="center")
                         )
                     else:
                         rows.append(
                             Text(
                                 f"{val}",
-                                style=self.theme["text_green"],
+                                style=self.text_theme["text_green"],
                                 justify="center",
                             )
                         )
@@ -628,7 +629,7 @@ class TTSMI(App):
     def action_help(self) -> None:
         """Pop up the help menu"""
         tt_confirm_box = TTHelperMenuBox(
-            text=constants.HELP_MENU_MARKDOWN, theme=self.theme
+            text=constants.HELP_MENU_MARKDOWN, theme=self.text_theme
         )
         self.push_screen(tt_confirm_box)
 
