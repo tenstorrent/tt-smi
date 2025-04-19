@@ -73,7 +73,7 @@ class TTSMI(App):
     BINDINGS = [
         ("q, Q", "quit", "Quit"),
         ("h, H", "help", "Help"),
-        ("d, D", "toggle_dark", "Toggle dark mode"),
+        ("d, D", "app.toggle_dark", "Toggle dark mode"),
         ("c, C", "toggle_compact", "Toggle sidebar"),
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
@@ -573,10 +573,6 @@ class TTSMI(App):
                         )
             all_rows.append(rows)
         return all_rows
-
-    def action_toggle_dark(self) -> None:
-        """An action to toggle dark mode."""
-        self.dark = not self.dark
 
     def action_toggle_compact(self) -> None:
         """An action to toggle compact mode."""
