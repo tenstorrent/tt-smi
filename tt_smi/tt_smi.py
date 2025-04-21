@@ -20,7 +20,6 @@ import pkg_resources
 from rich.text import Text
 from tt_smi import constants
 from typing import List, Tuple
-from textual.reactive import reactive
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
@@ -43,13 +42,11 @@ from tt_tools_common.utils_common.tools_utils import (
 )
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
-    get_host_info,
     get_host_compatibility_info,
 )
 from tt_tools_common.ui_common.widgets import (
     TTHeader,
     TTDataTable,
-    TTMenu,
     TTHostCompatibilityMenu,
     TTHelperMenuBox,
 )
@@ -116,8 +113,6 @@ class TTSMI(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-
-        board_ids = [info["board_id"] for info in self.backend.device_infos]
 
         yield TTHeader(self.app_name, self.app_version)
         with Container(id="app_grid"):

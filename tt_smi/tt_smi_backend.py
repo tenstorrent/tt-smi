@@ -14,7 +14,6 @@ import datetime
 import pkg_resources
 from tt_smi import log
 from pathlib import Path
-from rich.text import Text
 from pyluwen import PciChip
 from rich.table import Table
 from tt_smi import constants
