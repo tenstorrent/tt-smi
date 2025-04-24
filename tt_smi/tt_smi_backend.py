@@ -774,7 +774,9 @@ def wh_ubb_reset(reinit=True):
         CMD_LINE_COLOR.ENDC,
     )
     try:
-        chips = detect_chips_with_callback()
+        # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
+        # discover local only to fix that
+        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
         print(
             CMD_LINE_COLOR.GREEN,
             f"Re-initialized {len(chips)} boards after reset. Exiting...",
