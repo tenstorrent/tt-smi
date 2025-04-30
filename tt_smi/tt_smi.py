@@ -808,6 +808,7 @@ def main():
         # We do not currently support mixing integer resets with config resets so check that we are doing one or the other
         looks_like_config = False
         looks_like_integer = False
+        looks_like_all = False
         invalid = False
         for i in args.reset:
             for ii in i:
@@ -815,6 +816,8 @@ def main():
                     looks_like_config = True
                 elif isinstance(ii, list):
                     looks_like_integer = True
+                elif isinstance(ii, str):
+                    looks_like_all = True
                 else:
                     invalid = True
         if invalid:
@@ -823,9 +826,10 @@ def main():
                     "\n".join(str(rr) for r in args.reset for rr in r)
                 )
             )
-        elif looks_like_config and looks_like_integer:
+        # If more than one of these is True, something is wrong
+        elif [looks_like_config, looks_like_integer, looks_like_all].count(True) > 1:
             raise AssertionError(
-                "It looks like you entered both a pcie index reset request and a reset config\n----\n{}\n----\nPlease enter one or the other.".format(
+                "It looks like you entered an invalid reset specification.\n----\n{}\n----\nPlease enter PCIe IDs, a reset config, or 'all'.".format(
                     "\n".join(str(rr) for r in args.reset for rr in r)
                 )
             )
@@ -835,8 +839,8 @@ def main():
             # args.reset is a list of lists... so combine them all
             reset_input = [z for i in args.reset for j in i for z in j]
 
-            if len(reset_input) == 0:
-                # Empty, reset options assume user wants all pci devices to be reset
+            if len(reset_input) == 0 or looks_like_all:
+                # Empty or all, reset options assume user wants all pci devices to be reset
                 reset_input = pci_scan()
 
             # Sanity... filter out repeats
