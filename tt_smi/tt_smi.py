@@ -13,16 +13,13 @@ In addition user can issue Grayskull and Wormhole board level resets.
 import os
 import sys
 import time
-import json
 import signal
 import argparse
 import threading
 import pkg_resources
 from rich.text import Text
 from tt_smi import constants
-from typing import List, Tuple, Optional, Dict, Union
-from enum import Enum
-from dataclasses import dataclass
+from typing import List, Tuple
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
