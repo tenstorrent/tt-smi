@@ -195,18 +195,27 @@ class TTSMI(App):
         ]
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
-            bh_row.append(
-                Text(
-                    f"{val}",
-                    style=self.text_theme["attention"],
-                    justify="center",
+            if telem == "heartbeat":
+                    bh_row.append(
+                        Text(
+                            f"{self.get_heartbeat_spinner(val)}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                    )
+            else:
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ --- ",
+                        style=self.text_theme["gray"],
+                        justify="center",
+                    )
                 )
-                + Text(
-                    f"/ --- ",
-                    style=self.text_theme["gray"],
-                    justify="center",
-                )
-            )
         return bh_row
 
     def format_telemetry_rows(self):
@@ -359,7 +368,7 @@ class TTSMI(App):
                                 justify="center",
                             )
                         )
-                elif telem == "arc3_heartbeat":
+                elif telem == "heartbeat":
                         rows.append(
                             Text(
                                 f"{self.get_heartbeat_spinner(val)}",

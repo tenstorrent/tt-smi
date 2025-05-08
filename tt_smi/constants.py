@@ -100,7 +100,7 @@ TELEM_LIST = [
     "aiclk",
     "power",
     "asic_temperature",
-    "arc3_heartbeat",
+    "heartbeat",
 ]
 
 LIMITS = [
