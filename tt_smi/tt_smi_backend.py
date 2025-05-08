@@ -400,6 +400,7 @@ class TTSMIBackend:
             if self.smbus_telem_info[board_num]["AICLK"] is not None
             else 0
         )
+        timer_heartbeat = int(self.smbus_telem_info[board_num]["TIMER_HEARTBEAT"], 16) // 6 # Watchdog heartbeat, ~2 per second
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -407,6 +408,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
+            "heartbeat": f"{timer_heartbeat}",
         }
         return chip_telemetry
 
@@ -422,6 +424,7 @@ class TTSMIBackend:
             int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
         ) / 16
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
+        arc3_heartbeat = int(self.smbus_telem_info[board_num]["ARC3_HEALTH"], 16) // 5 # Watchdog heartbeat, ~2 per second
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -429,6 +432,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
+            "heartbeat": f"{arc3_heartbeat}"
         }
 
         return chip_telemetry
