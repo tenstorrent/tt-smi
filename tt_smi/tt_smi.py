@@ -359,12 +359,34 @@ class TTSMI(App):
                                 justify="center",
                             )
                         )
+                elif telem == "arc3_heartbeat":
+                        rows.append(
+                            Text(
+                                f"{self.get_heartbeat_spinner(val)}",
+                                style=self.text_theme["text_green"],
+                                justify="center",
+                            )
+                        )
                 else:
                     rows.append(
                         Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                     )
             all_rows.append(rows)
         return all_rows
+
+    def get_heartbeat_spinner(self, input_secs: int) -> str:
+        """
+        Get one of | - / \ depending on the heartbeat input. One
+        new symbol every second. Approximates a spinner.
+        """
+        symbols = [
+            "●∙∙",
+            "∙●∙",
+            "∙∙●",
+            "∙●∙",
+        ]
+        cur_symbol = int(input_secs) % len(symbols)
+        return symbols[cur_symbol]
 
     def format_device_info_rows(self):
         """Format device info rows"""

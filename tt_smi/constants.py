@@ -100,6 +100,7 @@ TELEM_LIST = [
     "aiclk",
     "power",
     "asic_temperature",
+    "arc3_heartbeat",
 ]
 
 LIMITS = [
@@ -169,6 +170,7 @@ TELEMETRY_TABLE_HEADER = [
     "AICLK (MHz)",
     "Core Power (W)",
     "Core Temp (°C)",
+    "Heartbeat",
 ]
 
 FIRMWARES_TABLE_HEADER = [
