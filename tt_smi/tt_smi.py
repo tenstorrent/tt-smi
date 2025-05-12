@@ -19,7 +19,7 @@ import threading
 import pkg_resources
 from rich.text import Text
 from tt_smi import constants
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
@@ -392,10 +392,10 @@ class TTSMI(App):
 
         return all_rows
 
-    def get_heartbeat_spinner(self, input_secs: int) -> str:
+    def get_heartbeat_spinner(self, input_secs: Union[int, str]) -> str:
         """
-        Get one of | - / \ depending on the heartbeat input. One
-        new symbol every second. Approximates a spinner.
+        Get a symbol depending on the heartbeat input, which changes every ~.5 seconds,
+        so we expect two new symbols every second. Approximates a spinner.
         """
         symbols = [
             "●∙∙",
