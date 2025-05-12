@@ -830,24 +830,34 @@ def main():
                 )
             )
 
+        reinit = True
+        reset_config_json = None
+        reset_input = None
+
         # Check if we are doing a config.json reset
-        if looks_like_integer or not (looks_like_config or looks_like_integer):
+        if looks_like_integer or not looks_like_config:
             # args.reset is a list of lists... so combine them all
             reset_input = [z for i in args.reset for j in i for z in j]
 
+            # Empty, reset options assume user wants all devices to be reset
             if len(reset_input) == 0:
-                # Empty, reset options assume user wants all pci devices to be reset
-                reset_input = pci_scan()
+                default_config_path = os.path.expanduser("~/.config/tenstorrent/reset_config.json")
+                if os.path.exists(default_config_path):
+                    print(CMD_LINE_COLOR.PURPLE, f"Using default reset config from {default_config_path}", CMD_LINE_COLOR.ENDC)
+                    reset_config_json = default_config_path
+                else:
+                    reset_input = pci_scan()
 
-            # Sanity... filter out repeats
-            reset_input = list(sorted(set(reset_input)))
-            pci_board_reset(reset_input, reinit=True)
-        else:
+        if looks_like_config:
+            reset_config_json = args.reset[0][0]
+            
+        if reset_config_json:
             # If mobo reset, perform it first
-            parsed_dict = mobo_reset_from_json(args.reset[0][0])
-            pci_indices, reinit = pci_indices_from_json(parsed_dict)
-            if pci_indices:
-                pci_board_reset(pci_indices, reinit)
+            parsed_dict = mobo_reset_from_json(reset_config_json)
+            reset_input, reinit = pci_indices_from_json(parsed_dict)
+
+        if reset_input:
+            pci_board_reset(reset_input, reinit)
 
         # All went well - exit
         sys.exit(0)
