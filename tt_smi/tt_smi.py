@@ -19,7 +19,7 @@ import threading
 import pkg_resources
 from rich.text import Text
 from tt_smi import constants
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
@@ -196,176 +196,216 @@ class TTSMI(App):
         ]
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
-            bh_row.append(
-                Text(
-                    f"{val}",
-                    style=self.text_theme["attention"],
-                    justify="center",
+            if telem == "heartbeat":
+                    bh_row.append(
+                        Text(
+                            f"{self.get_heartbeat_spinner(val)}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                    )
+            else:
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ --- ",
+                        style=self.text_theme["gray"],
+                        justify="center",
+                    )
                 )
-                + Text(
-                    f"/ --- ",
-                    style=self.text_theme["gray"],
-                    justify="center",
-                )
-            )
         return bh_row
+
+    def format_wh_telemetry_rows(self, board_num: int) -> List[Text]:
+        """
+        WH Telemetry Rows
+        """
+        wh_row = [
+            Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
+        ]
+        for telem in constants.TELEM_LIST:
+            val = self.backend.device_telemetrys[board_num][telem]
+            if telem == "voltage":
+                vdd_max = self.backend.chip_limits[board_num]["vdd_max"]
+                if float(val) < float(vdd_max):
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {vdd_max}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+                else:
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {vdd_max}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+            elif telem == "current":
+                max_current = self.backend.chip_limits[board_num]["tdc_limit"]
+                if float(val) < float(max_current):
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_current}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+                else:
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_current}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+            elif telem == "power":
+                max_power = self.backend.chip_limits[board_num]["tdp_limit"]
+                if float(val) < float(max_power):
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_power}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+                else:
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_power}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+            elif telem == "aiclk":
+                asic_fmax = self.backend.chip_limits[board_num]["asic_fmax"]
+                if float(val) < float(asic_fmax):
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {asic_fmax}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+                else:
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {asic_fmax}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+            elif telem == "asic_temperature":
+                max_temp = self.backend.chip_limits[board_num]["thm_limit"]
+                if float(val) < float(max_temp):
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_temp}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+                else:
+                    wh_row.append(
+                        Text(
+                            f"{val}",
+                            style=self.text_theme["attention"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_temp}",
+                            style=self.text_theme["yellow_bold"],
+                            justify="center",
+                        )
+                    )
+            elif telem == "heartbeat":
+                    wh_row.append(
+                        Text(
+                            f"{self.get_heartbeat_spinner(val)}",
+                            style=self.text_theme["text_green"],
+                            justify="center",
+                        )
+                    )
+            else:
+                wh_row.append(
+                    Text(f"{val}", style=self.text_theme["text_green"], justify="center")
+                )
+        return wh_row
 
     def format_telemetry_rows(self):
         """Format telemetry rows"""
         all_rows = []
         for i, chip in enumerate(self.backend.devices):
-            if chip.as_bh():
+            if chip.as_bh(): # Blackhole
                 all_rows.append(self.format_bh_telemetry_rows(i))
-                continue
-            rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
-            for telem in constants.TELEM_LIST:
-                val = self.backend.device_telemetrys[i][telem]
-                if telem == "voltage":
-                    vdd_max = self.backend.chip_limits[i]["vdd_max"]
-                    if float(val) < float(vdd_max):
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["text_green"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {vdd_max}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {vdd_max}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                elif telem == "current":
-                    max_current = self.backend.chip_limits[i]["tdc_limit"]
-                    if float(val) < float(max_current):
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["text_green"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_current}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_current}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                elif telem == "power":
-                    max_power = self.backend.chip_limits[i]["tdp_limit"]
-                    if float(val) < float(max_power):
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["text_green"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_power}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_power}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                elif telem == "aiclk":
-                    asic_fmax = self.backend.chip_limits[i]["asic_fmax"]
-                    if float(val) < float(asic_fmax):
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["text_green"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {asic_fmax}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {asic_fmax}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                elif telem == "asic_temperature":
-                    max_temp = self.backend.chip_limits[i]["thm_limit"]
-                    if float(val) < float(max_temp):
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["text_green"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_temp}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                    else:
-                        rows.append(
-                            Text(
-                                f"{val}",
-                                style=self.text_theme["attention"],
-                                justify="center",
-                            )
-                            + Text(
-                                f"/ {max_temp}",
-                                style=self.text_theme["yellow_bold"],
-                                justify="center",
-                            )
-                        )
-                else:
-                    rows.append(
-                        Text(f"{val}", style=self.text_theme["text_green"], justify="center")
-                    )
-            all_rows.append(rows)
+            elif chip.as_wh() or chip.as_gs(): # Wormhole and legacy Grayskull
+                all_rows.append(self.format_wh_telemetry_rows(i))
+
         return all_rows
+
+    def get_heartbeat_spinner(self, input_secs: Union[int, str]) -> str:
+        """
+        Get a symbol depending on the heartbeat input, which changes every ~.5 seconds,
+        so we expect two new symbols every second. Approximates a spinner.
+        """
+        symbols = [
+            "●∙∙",
+            "∙●∙",
+            "∙∙●",
+            "∙●∙",
+        ]
+        cur_symbol = int(input_secs) % len(symbols)
+        return symbols[cur_symbol]
 
     def format_device_info_rows(self):
         """Format device info rows"""
