@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 3.0.16 - 12/05/25
 
+- Used new ResetTypes from tools-common to simplify reset code
 - Added a heartbeat spinner to the telemetry pane. We expect this spinner to update about twice per second. If the spinner is not moving, this indicates new telemetry is not being fetched.
 
 ## 3.0.15 - 24/04/25

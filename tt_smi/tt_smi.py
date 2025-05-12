@@ -28,6 +28,7 @@ from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_tools_common.reset_common.reset_utils import (
     generate_reset_logs,
+    ResetType,
     parse_reset_input,
 )
 from tt_smi.tt_smi_backend import (
@@ -727,11 +728,9 @@ def parse_args():
     parser.add_argument(
         "-r",
         "--reset",
-        type=parse_reset_input,
         metavar="0,1 ... or config.json",
         default=None,
         nargs="*",
-        action="append",
         help=(
             "Provide list of PCI index or a json file with reset configs. "
             "Find PCI index of board using the -ls option. "
@@ -821,7 +820,6 @@ def check_fw_version(pyluwen_chip, board_num):
             sys.exit(1)
     return
 
-
 def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
@@ -843,54 +841,30 @@ def main():
     # Detect non-tty stdout, but allow users to override
     is_tty = sys.stdout.isatty() and not args.snapshot_no_tty
 
-    # Handle reset first, without setting up backend or
+    # Handle reset first, without setting up backend
     if args.reset is not None:
-        # We do not currently support mixing integer resets with config resets so check that we are doing one or the other
-        looks_like_config = False
-        looks_like_integer = False
-        invalid = False
-        for i in args.reset:
-            for ii in i:
-                if isinstance(ii, dict):
-                    looks_like_config = True
-                elif isinstance(ii, list):
-                    looks_like_integer = True
-                else:
-                    invalid = True
-        if invalid:
-            raise AssertionError(
-                "Input reset selection \n----\n{}\n----\nDid not match any of the valid patterns ([<integer>] XOR <config>)".format(
-                    "\n".join(str(rr) for r in args.reset for rr in r)
-                )
-            )
-        elif looks_like_config and looks_like_integer:
-            raise AssertionError(
-                "It looks like you entered both a pcie index reset request and a reset config\n----\n{}\n----\nPlease enter one or the other.".format(
-                    "\n".join(str(rr) for r in args.reset for rr in r)
-                )
-            )
+        reset_input = parse_reset_input(args.reset)
+      
+        if reset_input.type == ResetType.ALL:
+            # Assume user wants all pci devices to be reset
+            reset_indices = pci_scan()
+            pci_board_reset(reset_indices, reinit=True)
 
-        # Check if we are doing a config.json reset
-        if looks_like_integer or not (looks_like_config or looks_like_integer):
-            # args.reset is a list of lists... so combine them all
-            reset_input = [z for i in args.reset for j in i for z in j]
+        elif reset_input.type == ResetType.ID_LIST:
+            reset_indices = reset_input.value
+            pci_board_reset(reset_indices, reinit=True)
 
-            if len(reset_input) == 0:
-                # Empty, reset options assume user wants all pci devices to be reset
-                reset_input = pci_scan()
-
-            # Sanity... filter out repeats
-            reset_input = list(sorted(set(reset_input)))
-            pci_board_reset(reset_input, reinit=True)
-        else:
+        elif reset_input.type == ResetType.CONFIG_JSON:
+            json_input = reset_input.value
             # If mobo reset, perform it first
-            parsed_dict = mobo_reset_from_json(args.reset[0][0])
+            parsed_dict = mobo_reset_from_json(json_input)
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
                 pci_board_reset(pci_indices, reinit)
 
         # All went well - exit
         sys.exit(0)
+
     if args.generate_reset_json:
         # Use filename if provided, else use default
         try:
