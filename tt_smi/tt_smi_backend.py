@@ -449,7 +449,7 @@ class TTSMIBackend:
             int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
         ) / 16
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
-        arc0_heartbeat = int(self.smbus_telem_info[board_num]["ARC0_HEALTH"], 16) // 500 # Watchdog heartbeat, ~2 per second
+        arc0_heartbeat = int(self.smbus_telem_info[board_num]["ARC0_HEALTH"], 16) // 1000 # Watchdog heartbeat, ~2 per second
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
