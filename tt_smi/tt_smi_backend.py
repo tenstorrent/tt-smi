@@ -412,8 +412,8 @@ class TTSMIBackend:
         }
         return chip_telemetry
 
-    def get_wh_gs_chip_telemetry(self, board_num) -> Dict:
-        """Get telemetry data for GS and WH chip. None if ARC FW not running"""
+    def get_wh_chip_telemetry(self, board_num) -> Dict:
+        """Get telemetry data for WH chip. None if ARC FW not running"""
         current = int(self.smbus_telem_info[board_num]["TDC"], 16) & 0xFFFF
         if self.smbus_telem_info[board_num]["VCORE"] is not None:
             voltage = int(self.smbus_telem_info[board_num]["VCORE"], 16) / 1000
@@ -437,12 +437,46 @@ class TTSMIBackend:
 
         return chip_telemetry
 
+    def get_gs_chip_telemetry(self, board_num) -> Dict:
+        """Get telemetry data for GS chip. None if ARC FW not running"""
+        current = int(self.smbus_telem_info[board_num]["TDC"], 16) & 0xFFFF
+        if self.smbus_telem_info[board_num]["VCORE"] is not None:
+            voltage = int(self.smbus_telem_info[board_num]["VCORE"], 16) / 1000
+        else:
+            voltage = 10000
+        power = int(self.smbus_telem_info[board_num]["TDP"], 16) & 0xFFFF
+        asic_temperature = (
+            int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
+        ) / 16
+        aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
+        arc0_heartbeat = int(self.smbus_telem_info[board_num]["ARC0_HEALTH"], 16) // 1000 # Watchdog heartbeat, ~2 per second
+
+        chip_telemetry = {
+            "voltage": f"{voltage:4.2f}",
+            "current": f"{current:5.1f}",
+            "power": f"{power:5.1f}",
+            "aiclk": f"{aiclk:4.0f}",
+            "asic_temperature": f"{asic_temperature:4.1f}",
+            "heartbeat": f"{arc0_heartbeat}"
+        }
+
+        return chip_telemetry
+
     def get_chip_telemetry(self, board_num) -> Dict:
         """Return the correct chip telemetry for a given board"""
         if self.devices[board_num].as_bh():
             return self.get_bh_chip_telemetry(board_num)
+        elif self.devices[board_num].as_gs():
+            return self.get_gs_chip_telemetry(board_num)
+        elif self.devices[board_num].as_wh():
+            return self.get_wh_chip_telemetry(board_num)
         else:
-            return self.get_wh_gs_chip_telemetry(board_num)
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Could not fetch telemetry for board {e}: Unrecognized board type!",
+                CMD_LINE_COLOR.ENDC,
+            )
+            return {}
 
     def get_chip_limits(self, board_num):
         """Get chip limits from the CSM. None if ARC FW not running"""
