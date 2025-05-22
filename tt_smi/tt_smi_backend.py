@@ -35,7 +35,6 @@ from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    get_board_type,
     hex_to_semver_m3_fw,
     hex_to_date,
     hex_to_semver_eth,
@@ -188,7 +187,7 @@ class TTSMIBackend:
         for i, device in enumerate(self.devices):
             if (
                 not device.is_remote()
-                and self.device_infos[i]["board_type"] != "GALAXY"
+                and self.device_infos[i]["board_type"] != "wh_4u"
             ):
                 board_id = self.device_infos[i]["board_id"]
                 board_type = self.device_infos[i]["board_type"]
@@ -341,9 +340,6 @@ class TTSMIBackend:
             elif field == "board_type":
                 if self.get_board_id(board_num) == "N/A":
                     dev_info[field] = "N/A"
-                # TODO: Update when we have BH type identifiers
-                elif self.devices[board_num].as_bh():
-                    dev_info[field] = "bh"
                 else:
                     dev_info[field] = get_board_type(self.get_board_id(board_num))
             elif field == "board_id":
@@ -577,14 +573,14 @@ class TTSMIBackend:
                 if val is None:
                     fw_versions[field] = "N/A"
                 # See below- Galaxy systems manually get an N/A tt_flash_version
-                elif get_board_type(self.get_board_id(board_num)) == "GALAXY":
+                elif get_board_type(self.get_board_id(board_num)) == "wh_4u":
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
                 val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
                 if (
-                    get_board_type(self.get_board_id(board_num)) == "GALAXY"
+                    get_board_type(self.get_board_id(board_num)) == "wh_4u"
                     and val == "0xffffffff"
                 ):
                     # WARNING: Dirty dirty hack!
@@ -616,6 +612,55 @@ class TTSMIBackend:
             CMD_LINE_COLOR.ENDC,
         )
 
+
+def get_board_type(board_id: str) -> str:
+    """
+    Get board type from board ID string.
+    Ex:
+        Board ID: AA-BBBBB-C-D-EE-FF-XXX
+                   ^     ^ ^ ^  ^  ^   ^
+                   |     | | |  |  |   +- XXX
+                   |     | | |  |  +----- FF
+                   |     | | |  +-------- EE
+                   |     | | +----------- D
+                   |     | +------------- C = Revision
+                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
+                   +--------------------- AA
+    """
+    serial_num = int(f"0x{board_id}", base=16)
+    upi = (serial_num >> 36) & 0xFFFFF
+
+    # Grayskull cards
+    if upi == 0x3:
+        return "e150"
+    elif upi == 0xA:
+        return "e300"
+    elif upi == 0x7:
+        return "e75"
+
+    # Wormhole cards
+    elif upi == 0x8:
+        return "nb_cb"
+    elif upi == 0xB:
+        return "wh_4u"
+    elif upi == 0x14:
+        return "n300"
+    elif upi == 0x18:
+        return "n150"
+    elif upi == 0x35:
+        return "tt-galaxy-wh"
+
+    # Blackhole cards
+    elif upi == 0x36:
+        return "bh-scrappy"
+    elif upi == 0x43:
+        return "p100a"
+    elif upi == 0x40:
+        return "p150a"
+    elif upi == 0x41:
+        return "p150b"
+    else:
+        return "N/A"
 
 def dict_from_public_attrs(obj) -> dict:
     """Parse an object's public attributes into a dictionary"""
