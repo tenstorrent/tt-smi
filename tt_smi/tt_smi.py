@@ -23,6 +23,7 @@ from typing import List, Tuple, Union
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
+from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
@@ -166,10 +167,15 @@ class TTSMI(App):
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""
-        telem_table = self.get_widget_by_id(id="tt_smi_telem")
-        self.backend.update_telem()
-        rows = self.format_telemetry_rows()
-        telem_table.update_data(rows)
+        try:
+            telem_table = self.get_widget_by_id(id="tt_smi_telem")
+            self.backend.update_telem()
+            rows = self.format_telemetry_rows()
+            telem_table.update_data(rows)
+        # When we bring up the help menu, the telem table is no longer visible,
+        # but the thread keeps running, so we need to ignore that exception.
+        except NoMatches as e:
+            pass
 
     def format_firmware_rows(self):
         """Format firmware rows"""
