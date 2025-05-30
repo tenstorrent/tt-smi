@@ -23,6 +23,7 @@ from typing import List, Tuple, Union
 from importlib_resources import files
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
+from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
@@ -166,10 +167,15 @@ class TTSMI(App):
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""
-        telem_table = self.get_widget_by_id(id="tt_smi_telem")
-        self.backend.update_telem()
-        rows = self.format_telemetry_rows()
-        telem_table.update_data(rows)
+        try:
+            telem_table = self.get_widget_by_id(id="tt_smi_telem")
+            self.backend.update_telem()
+            rows = self.format_telemetry_rows()
+            telem_table.update_data(rows)
+        # When we bring up the help menu, the telem table is no longer visible,
+        # but the thread keeps running, so we need to ignore that exception.
+        except NoMatches as e:
+            pass
 
     def format_firmware_rows(self):
         """Format firmware rows"""
@@ -633,11 +639,26 @@ class TTSMI(App):
         """Switch to read-write tab"""
         self.query_one(TabbedContent).active = "tab-1"
 
-    async def action_tab_two(self) -> None:
+    def action_tab_two(self) -> None:
         """Switch to read-only tab"""
-        global INTERRUPT_RECEIVED, TELEM_THREADS, RUNNING_TELEM_THREAD
+        # Note that this is set by Textual if we click 2,
+        # but not press 2; this function is necessary to synchronize behavior
+        # between those two ways of accessing the tab.
         self.query_one(TabbedContent).active = "tab-2"
 
+    def action_tab_three(self) -> None:
+        """Switch to read-only tab"""
+        self.query_one(TabbedContent).active = "tab-3"
+
+    def action_help(self) -> None:
+        """Pop up the help menu"""
+        tt_confirm_box = TTHelperMenuBox(
+            text=constants.HELP_MENU_MARKDOWN, theme=self.text_theme
+        )
+        self.push_screen(tt_confirm_box)
+
+    async def dispatch_telem_thread(self) -> None:
+        global INTERRUPT_RECEIVED, TELEM_THREADS, RUNNING_TELEM_THREAD
         if not RUNNING_TELEM_THREAD:
             signal.signal(signal.SIGTERM, interrupt_handler)
             signal.signal(signal.SIGINT, interrupt_handler)
@@ -654,17 +675,13 @@ class TTSMI(App):
             TELEM_THREADS.append(thread)
             RUNNING_TELEM_THREAD = True
 
-    def action_tab_three(self) -> None:
-        """Switch to read-only tab"""
-        self.query_one(TabbedContent).active = "tab-3"
+    async def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """This function runs every time a tab is activated"""
+        tab_id = self.query_one(TabbedContent).active
 
-    def action_help(self) -> None:
-        """Pop up the help menu"""
-        tt_confirm_box = TTHelperMenuBox(
-            text=constants.HELP_MENU_MARKDOWN, theme=self.text_theme
-        )
-        self.push_screen(tt_confirm_box)
-
+        if tab_id == "tab-2":  # Telemetry tab
+            # Dispatch the telemetry thread
+            await self.dispatch_telem_thread()
 
 def parse_args():
     """Parse user args"""
