@@ -162,6 +162,7 @@ class TTSMI(App):
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
+
     def update_telem_table(self) -> None:
         """Update telemetry table"""
         try:
@@ -277,6 +278,19 @@ class TTSMI(App):
                         + Text(
                             f"/ {max_temp}" if max_temp else "/ ---",
                             style=self.text_theme["yellow_bold"] if max_temp else self.text_theme["gray"],
+                            justify="center",
+                        )
+                    )
+                elif telem == "fan_speed":
+                    device_row.append(
+                        Text(
+                            f"{val}" if 0 < float(val) <= 100 else "N/A",
+                            style=self.text_theme["text_green"] if 0 < float(val) <= 100 else self.text_theme["gray"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ 100",
+                            style=self.text_theme["yellow_bold"],
                             justify="center",
                         )
                     )
