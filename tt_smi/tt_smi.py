@@ -110,6 +110,7 @@ class TTSMI(App):
         self.show_sidebar = show_sidebar
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
+        self.hide_fan_speed_col = all(device_info["board_type"] not in ["p100a", "p150a"] for device_info in self.backend.device_infos)
 
         if key_bindings:
             self.BINDINGS += key_bindings
@@ -137,7 +138,7 @@ class TTSMI(App):
                 yield TTDataTable(
                     title="Device Telemetry",
                     id="tt_smi_telem",
-                    header=constants.TELEMETRY_TABLE_HEADER,
+                    header=self.generate_telem_header(),
                     header_height=2,
                 )
                 yield TTDataTable(
@@ -164,6 +165,13 @@ class TTSMI(App):
 
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
+
+    def generate_telem_header(self) -> List[str]:
+        telem_header = constants.TELEMETRY_TABLE_HEADER
+        if self.hide_fan_speed_col:
+            telem_header.remove("Fan Speed (%)")
+        return telem_header
+
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""
@@ -201,6 +209,8 @@ class TTSMI(App):
             Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
         ]
         for telem in constants.TELEM_LIST:
+            if telem == "fan_speed" and self.hide_fan_speed_col:
+                continue
             val = self.backend.device_telemetrys[board_num][telem]
             if telem == "heartbeat":
                     bh_row.append(
@@ -233,6 +243,8 @@ class TTSMI(App):
             Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
         ]
         for telem in constants.TELEM_LIST:
+            if telem == "fan_speed" and self.hide_fan_speed_col:
+                continue
             val = self.backend.device_telemetrys[board_num][telem]
             if telem == "voltage":
                 vdd_max = self.backend.chip_limits[board_num]["vdd_max"]
