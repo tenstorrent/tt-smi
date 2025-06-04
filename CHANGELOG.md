@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.20 - 04/06/25
+
+- Chore - bumped tt-tools-common version to fix driver version check for compatability with tt-kmd 2.0.0
+
 ## 3.0.19 - 30/04/25
 
 - Fixed an issue preventing the telemetry thread from being dispatched when the user clicked tab 2
