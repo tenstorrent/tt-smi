@@ -792,9 +792,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    if args.ubb_reset:
-        wh_ubb_reset(reinit=not(args.no_reinit))
-        sys.exit(0)
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
@@ -886,7 +883,11 @@ def main():
 
         # All went well - exit
         sys.exit(0)
-
+    # Handle ubb reset without backend
+    if args.ubb_reset:
+        wh_ubb_reset(reinit=not(args.no_reinit))
+        # All went well - exit
+        sys.exit(0)
     if args.generate_reset_json:
         # Use filename if provided, else use default
         try:

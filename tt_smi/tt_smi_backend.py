@@ -804,41 +804,10 @@ def timed_wait(seconds):
 def wh_ubb_reset(reinit=True):
     """
     Reset the WH UBBs with the following steps:
-    1. Send A3 arc msg to all chips (else might have i2c vcore hangs)
-    2. Wait for 5s
-    3. Reset the UBBs with ipmi command
-    4. Wait for 30s
-    5. Reinit all chips
+    1. Reset the UBBs with ipmi command
+    2. Wait for 30s
+    3. Reinit all chips
     """
-    reset_wh_pci_idx = []
-    chip_list = []
-    for pci_idx in range(0,32):
-        try:
-            chip = PciChip(pci_interface=pci_idx)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error accessing WH chip at PCI index {pci_idx}!",
-                CMD_LINE_COLOR.ENDC,
-            )
-            # Exit the loop to go to the next chip
-            continue
-        if chip.as_wh():
-            reset_wh_pci_idx.append(pci_idx)
-            chip_list.append(chip)
-
-    for i, chip in enumerate(chip_list):
-        # Send A3 arc msg to all chips (else might have i2c vcore hangs)
-        chip.as_wh().arc_msg(0xA3, wait_for_done=False)
-        print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Putting WH chip at PCI index {i} into an A3 state",
-            CMD_LINE_COLOR.ENDC,
-        )
-
-    # Wait for 5s
-    timed_wait(5)
-
     ubb_num = "0xF"
     dev_num = "0xFF"
     op_mode = "0x0"
