@@ -856,6 +856,13 @@ def wh_ubb_reset(reinit=True):
         f"Re-initializing boards after reset....",
         CMD_LINE_COLOR.ENDC,
     )
+    if not reinit:
+        print(
+            CMD_LINE_COLOR.GREEN,
+            f"Exiting after WH UBB reset without re-initializing chips.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(0)
     try:
         # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
         # discover local only to fix that
@@ -865,6 +872,7 @@ def wh_ubb_reset(reinit=True):
             f"Re-initialized {len(chips)} boards after reset. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
+        sys.exit(0)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,

@@ -767,7 +767,12 @@ def parse_args():
         action="store_true",
         help="ubb_reset",
     )
-
+    parser.add_argument(
+        "--no_reinit",
+        default=False,
+        action="store_true",
+        help="Don't detect devices post reset",
+    )
     args = parser.parse_args()
     return args
 
@@ -788,7 +793,7 @@ def tt_smi_main(backend: TTSMIBackend, args):
     signal.signal(signal.SIGTERM, interrupt_handler)
 
     if args.ubb_reset:
-        wh_ubb_reset()
+        wh_ubb_reset(reinit=not(args.no_reinit))
         sys.exit(0)
     if args.list:
         backend.print_all_available_devices()
@@ -861,15 +866,15 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_reset_input(args.reset)
-      
+
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=True)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=True)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
 
         elif reset_input.type == ResetType.CONFIG_JSON:
             json_input = reset_input.value
