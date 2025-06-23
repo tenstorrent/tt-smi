@@ -801,6 +801,49 @@ def timed_wait(seconds):
         sys.stdout.flush()
     print()
 
+def check_wh_galaxy_eth_link_status(devices):
+    """
+    Check the WH Galaxy Ethernet link status.
+    Returns True if the link is up, False otherwise.
+    """
+    noc_id = 0
+    DEBUG_BUF_ADDR = 0x12c0 # For eth fw 5.0.0 and above
+    eth_locations_noc_0 = [ (9, 0), (1, 0), (8, 0), (2, 0), (7, 0), (3, 0), (6, 0), (4, 0),
+                        (9, 6), (1, 6), (8, 6), (2, 6), (7, 6), (3, 6), (6, 6), (4, 6) ]
+    LINK_INACTIVE_FAIL_DUMMY_PACKET = 10
+    # Check that we have 32 devices
+    if len(devices) != 32:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Error: Expected 32 devices for WH Galaxy Ethernet link status check, seeing f{len(devices)}, please try reset again or cold boot the system.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+
+    # Collect all the link errors in a dictionary
+    link_errors = {}
+    # Check all 16 eth links for all devices
+    for i, device in enumerate(devices):
+        for eth in range(16):
+            eth_x, eth_y = eth_locations_noc_0[eth]
+            link_error = device.noc_read32(noc_id, eth_x, eth_y, DEBUG_BUF_ADDR + 0x4*96)
+            if link_error == LINK_INACTIVE_FAIL_DUMMY_PACKET:
+                link_errors[i] = eth
+
+    if link_errors:
+        for board_idx, eth in link_errors.items():
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Board {board_idx} has link error on eth port {eth}",
+                CMD_LINE_COLOR.ENDC,
+            )
+        print(
+            CMD_LINE_COLOR.RED,
+            "Error: WH Galaxy Ethernet link errors detected! Please reset again, exiting with error code 1.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+
 def wh_ubb_reset(reinit=True):
     """
     Reset the WH UBBs with the following steps:
@@ -836,11 +879,14 @@ def wh_ubb_reset(reinit=True):
         # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
         # discover local only to fix that
         chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
+        # Check the eth link status for WH Galaxy
+        check_wh_galaxy_eth_link_status(chips)
         print(
             CMD_LINE_COLOR.GREEN,
             f"Re-initialized {len(chips)} boards after reset. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
+        # All went well - exit with success
         sys.exit(0)
     except Exception as e:
         print(
