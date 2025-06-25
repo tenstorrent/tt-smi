@@ -844,10 +844,10 @@ def check_wh_galaxy_eth_link_status(devices):
         )
         sys.exit(1)
 
-def wh_ubb_reset(reinit=True):
+def glx_6u_trays_reset(reinit=True):
     """
-    Reset the WH UBBs with the following steps:
-    1. Reset the UBBs with ipmi command
+    Reset the WH asics on the galaxy systems with the following steps:
+    1. Reset the trays with ipmi command
     2. Wait for 30s
     3. Reinit all chips
     """
@@ -857,7 +857,7 @@ def wh_ubb_reset(reinit=True):
     reset_time = "0xF"
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Resetting WH UBBs",
+        f"Resetting WH Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
     run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
@@ -871,7 +871,7 @@ def wh_ubb_reset(reinit=True):
     if not reinit:
         print(
             CMD_LINE_COLOR.GREEN,
-            f"Exiting after WH UBB reset without re-initializing chips.",
+            f"Exiting after galoaxy reset without re-initializing chips.",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)

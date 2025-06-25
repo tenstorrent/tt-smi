@@ -37,7 +37,7 @@ from tt_smi.tt_smi_backend import (
     pci_board_reset,
     pci_indices_from_json,
     mobo_reset_from_json,
-    wh_ubb_reset
+    glx_6u_trays_reset
 )
 from tt_tools_common.utils_common.tools_utils import (
     hex_to_semver_m3_fw,
@@ -762,10 +762,12 @@ def parse_args():
         help="Force no-tty behavior in the snapshot to stdout",
     )
     parser.add_argument(
-        "--ubb_reset",
+        "-glx_reset",
+        "--galaxy_6u_trays_reset",
         default=False,
         action="store_true",
-        help="ubb_reset",
+        help="Reset all the asics on the galaxy host.",
+        dest="glx_reset",
     )
     parser.add_argument(
         "--no_reinit",
@@ -884,8 +886,8 @@ def main():
         # All went well - exit
         sys.exit(0)
     # Handle ubb reset without backend
-    if args.ubb_reset:
-        wh_ubb_reset(reinit=not(args.no_reinit))
+    if args.glx_reset:
+        glx_6u_trays_reset(reinit=not(args.no_reinit))
         # All went well - exit
         sys.exit(0)
     if args.generate_reset_json:
