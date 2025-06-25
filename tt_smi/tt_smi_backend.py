@@ -839,10 +839,13 @@ def check_wh_galaxy_eth_link_status(devices):
             )
         print(
             CMD_LINE_COLOR.RED,
-            "Error: WH Galaxy Ethernet link errors detected! Please reset again, exiting with error code 1.",
+            "Error: WH Galaxy Ethernet link errors detected! Resetting again.",
             CMD_LINE_COLOR.ENDC,
         )
-        sys.exit(1)
+        raise Exception(
+            "WH Galaxy Ethernet link errors detected! Resetting again."
+        )
+        # sys.exit(1)
 
 def glx_6u_trays_reset(reinit=True):
     """

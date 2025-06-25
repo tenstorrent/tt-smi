@@ -887,7 +887,27 @@ def main():
         sys.exit(0)
     # Handle ubb reset without backend
     if args.glx_reset:
-        glx_6u_trays_reset(reinit=not(args.no_reinit))
+        reset_try_number = 0
+        max_reset_try = 3
+        while reset_try_number < max_reset_try:
+            try:
+                # Try to reset galaxy 6u trays
+                # reinit has to be enabled to detect devices post reset
+                glx_6u_trays_reset(reinit=True)
+                break  # If reset was successful, break the loop
+            except Exception as e:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    f"Error in resetting galaxy 6u trays: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                reset_try_number += 1
+                if reset_try_number < max_reset_try:
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        f"Retrying reset ({reset_try_number}/{max_reset_try})...",
+                        CMD_LINE_COLOR.ENDC,
+                    )
         # All went well - exit
         sys.exit(0)
     if args.generate_reset_json:
