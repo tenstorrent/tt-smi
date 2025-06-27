@@ -37,7 +37,7 @@ from tt_smi.tt_smi_backend import (
     pci_board_reset,
     pci_indices_from_json,
     mobo_reset_from_json,
-    wh_ubb_reset
+    glx_6u_trays_reset
 )
 from tt_tools_common.utils_common.tools_utils import (
     hex_to_semver_m3_fw,
@@ -762,12 +762,19 @@ def parse_args():
         help="Force no-tty behavior in the snapshot to stdout",
     )
     parser.add_argument(
-        "--ubb_reset",
+        "-glx_reset",
+        "--galaxy_6u_trays_reset",
         default=False,
         action="store_true",
-        help="ubb_reset",
+        help="Reset all the asics on the galaxy host.",
+        dest="glx_reset",
     )
-
+    parser.add_argument(
+        "--no_reinit",
+        default=False,
+        action="store_true",
+        help="Don't detect devices post reset",
+    )
     args = parser.parse_args()
     return args
 
@@ -787,9 +794,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
     signal.signal(signal.SIGINT, interrupt_handler)
     signal.signal(signal.SIGTERM, interrupt_handler)
 
-    if args.ubb_reset:
-        wh_ubb_reset()
-        sys.exit(0)
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
@@ -861,15 +865,15 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_reset_input(args.reset)
-      
+
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=True)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=True)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
 
         elif reset_input.type == ResetType.CONFIG_JSON:
             json_input = reset_input.value
@@ -881,7 +885,11 @@ def main():
 
         # All went well - exit
         sys.exit(0)
-
+    # Handle ubb reset without backend
+    if args.glx_reset:
+        glx_6u_trays_reset(reinit=not(args.no_reinit))
+        # All went well - exit
+        sys.exit(0)
     if args.generate_reset_json:
         # Use filename if provided, else use default
         try:

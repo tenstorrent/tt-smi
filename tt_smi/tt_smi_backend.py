@@ -801,51 +801,63 @@ def timed_wait(seconds):
         sys.stdout.flush()
     print()
 
-def wh_ubb_reset(reinit=True):
+def check_wh_galaxy_eth_link_status(devices):
     """
-    Reset the WH UBBs with the following steps:
-    1. Send A3 arc msg to all chips (else might have i2c vcore hangs)
-    2. Wait for 5s
-    3. Reset the UBBs with ipmi command
-    4. Wait for 30s
-    5. Reinit all chips
+    Check the WH Galaxy Ethernet link status.
+    Returns True if the link is up, False otherwise.
     """
-    reset_wh_pci_idx = []
-    chip_list = []
-    for pci_idx in range(0,32):
-        try:
-            chip = PciChip(pci_interface=pci_idx)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error accessing WH chip at PCI index {pci_idx}!",
-                CMD_LINE_COLOR.ENDC,
-            )
-            # Exit the loop to go to the next chip
-            continue
-        if chip.as_wh():
-            reset_wh_pci_idx.append(pci_idx)
-            chip_list.append(chip)
-
-    for i, chip in enumerate(chip_list):
-        # Send A3 arc msg to all chips (else might have i2c vcore hangs)
-        chip.as_wh().arc_msg(0xA3, wait_for_done=False)
+    noc_id = 0
+    DEBUG_BUF_ADDR = 0x12c0 # For eth fw 5.0.0 and above
+    eth_locations_noc_0 = [ (9, 0), (1, 0), (8, 0), (2, 0), (7, 0), (3, 0), (6, 0), (4, 0),
+                        (9, 6), (1, 6), (8, 6), (2, 6), (7, 6), (3, 6), (6, 6), (4, 6) ]
+    LINK_INACTIVE_FAIL_DUMMY_PACKET = 10
+    # Check that we have 32 devices
+    if len(devices) != 32:
         print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Putting WH chip at PCI index {i} into an A3 state",
+            CMD_LINE_COLOR.RED,
+            f"Error: Expected 32 devices for WH Galaxy Ethernet link status check, seeing f{len(devices)}, please try reset again or cold boot the system.",
             CMD_LINE_COLOR.ENDC,
         )
+        sys.exit(1)
 
-    # Wait for 5s
-    timed_wait(5)
+    # Collect all the link errors in a dictionary
+    link_errors = {}
+    # Check all 16 eth links for all devices
+    for i, device in enumerate(devices):
+        for eth in range(16):
+            eth_x, eth_y = eth_locations_noc_0[eth]
+            link_error = device.noc_read32(noc_id, eth_x, eth_y, DEBUG_BUF_ADDR + 0x4*96)
+            if link_error == LINK_INACTIVE_FAIL_DUMMY_PACKET:
+                link_errors[i] = eth
 
+    if link_errors:
+        for board_idx, eth in link_errors.items():
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Board {board_idx} has link error on eth port {eth}",
+                CMD_LINE_COLOR.ENDC,
+            )
+        print(
+            CMD_LINE_COLOR.RED,
+            "Error: WH Galaxy Ethernet link errors detected! Please reset again, exiting with error code 1.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+
+def glx_6u_trays_reset(reinit=True):
+    """
+    Reset the WH asics on the galaxy systems with the following steps:
+    1. Reset the trays with ipmi command
+    2. Wait for 30s
+    3. Reinit all chips
+    """
     ubb_num = "0xF"
     dev_num = "0xFF"
     op_mode = "0x0"
     reset_time = "0xF"
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Resetting WH UBBs",
+        f"Resetting WH Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
     run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
@@ -856,15 +868,26 @@ def wh_ubb_reset(reinit=True):
         f"Re-initializing boards after reset....",
         CMD_LINE_COLOR.ENDC,
     )
+    if not reinit:
+        print(
+            CMD_LINE_COLOR.GREEN,
+            f"Exiting after galoaxy reset without re-initializing chips.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(0)
     try:
         # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
         # discover local only to fix that
         chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
+        # Check the eth link status for WH Galaxy
+        check_wh_galaxy_eth_link_status(chips)
         print(
             CMD_LINE_COLOR.GREEN,
             f"Re-initialized {len(chips)} boards after reset. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
+        # All went well - exit with success
+        sys.exit(0)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,

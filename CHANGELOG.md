@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.21 - 26/06/25
+
+- Added option to not re-init chips after reset
+- Updated galaxy 6u reset option from --ubb_reset to -glx_reset
+- Removed the a3 arc message before doing a 6u reset, meaning we can reset even when chips are not pcie accessible
+- Added eth link check and return failure if any of the eth links have a LINK_INACTIVE_FAIL_DUMMY_PACKET failure
+
 ## 3.0.20 - 04/06/25
 
 - Chore - bumped tt-tools-common version to fix driver version check for compatability with tt-kmd 2.0.0
