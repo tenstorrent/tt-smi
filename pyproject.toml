@@ -24,15 +24,15 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-  'distro==1.8.0',
-  'elasticsearch==8.11.0',
+  'distro>=1.8.0',
+  'elasticsearch>=8.11.0',
   'pydantic>=1.2',
   'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.16',
   'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.6.5#subdirectory=crates/pyluwen',
-  'rich==13.7.0',
-  'textual==0.59.0',
-  'pre-commit==3.5.0',
-  'importlib_resources==6.1.1',
+  'rich>=13.7.0',
+  'textual>=0.59.0',
+  'pre-commit>=3.5.0',
+  'importlib_resources>=6.1.1',
   'setuptools',
 ]
 
