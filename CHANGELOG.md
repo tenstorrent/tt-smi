@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.24 - 04/07/25
+- Now users have 2 galay reset modes available
+  - glx_reset: resets the galaxy, informs users if there has been an eth failure
+  - glx_reset_auto: resets the galaxy upto 3 times if eth failures are detected
+
 ## 3.0.23 - 03/07/25
 - Bumped luwen 0.7.3 -> 0.7.5 to fix cargo lock compatibilty issue
 
