@@ -837,12 +837,10 @@ def check_wh_galaxy_eth_link_status(devices):
                 f"Board {board_idx} has link error on eth port {eth}",
                 CMD_LINE_COLOR.ENDC,
             )
-        print(
-            CMD_LINE_COLOR.RED,
-            "Error: WH Galaxy Ethernet link errors detected! Please reset again, exiting with error code 1.",
-            CMD_LINE_COLOR.ENDC,
+        raise Exception(
+            "WH Galaxy Ethernet link errors detected!"
         )
-        sys.exit(1)
+        # sys.exit(1)
 
 def glx_6u_trays_reset(reinit=True):
     """
@@ -880,20 +878,21 @@ def glx_6u_trays_reset(reinit=True):
         # discover local only to fix that
         chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
         # Check the eth link status for WH Galaxy
-        check_wh_galaxy_eth_link_status(chips)
-        print(
-            CMD_LINE_COLOR.GREEN,
-            f"Re-initialized {len(chips)} boards after reset. Exiting...",
-            CMD_LINE_COLOR.ENDC,
-        )
-        # All went well - exit with success
-        sys.exit(0)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
             f"Error when re-initializing chips!\n {e}",
             CMD_LINE_COLOR.ENDC,
         )
+        # Error out if chips don't initalize
         sys.exit(1)
 
-
+    # after re-init check eth status
+    check_wh_galaxy_eth_link_status(chips)
+    # All went well - exit with success
+    print(
+        CMD_LINE_COLOR.GREEN,
+        f"Re-initialized {len(chips)} boards after reset. Exiting...",
+        CMD_LINE_COLOR.ENDC,
+    )
+    sys.exit(0)
