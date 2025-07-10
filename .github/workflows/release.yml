@@ -6,16 +6,151 @@ on:
     tags: [ 'v*' ]
 
 jobs:
+  create-temp-branch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      temp_branch_ref: ${{ steps.temp_branch_ref.outputs.temp_branch_ref }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Figure out branch name
+        id: temp_branch_ref
+        run: |
+          export temp_branch_ref="temp_branch_ref=rc-temp-$( git rev-parse --short HEAD )-$( date +%Y.%m.%d-%H.%M.%S )"
+          echo "${temp_branch_ref}"
+          echo "${temp_branch_ref}" >> "$GITHUB_OUTPUT"
+      - name: Create the branch
+        run: git checkout -b "${{ steps.temp_branch_ref.outputs.temp_branch_ref }}"
+      - name: Push the branch to work from
+        run: git push --branches
+
+  versionchange:
+    needs:
+      - create-temp-branch 
+    # Runs on needs to be the oldest we can make it
+    # just to make sure that the python environment is the oldest
+    # we likely need to support
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      git_hash: ${{ steps.new-git-hash.outputs.git_hash }}
+      tt_smi_version: ${{ steps.python-ver.outputs.python_version }}
+      tt_smi_version_new: ${{ steps.new-python-version.outputs.python_version_new }}
+      version_major: ${{ steps.version.outputs.major }}
+      version_minor: ${{ steps.version.outputs.minor }}
+      version_patch: ${{ steps.version.outputs.patch }}
+      version_prerelease: ${{ steps.version.outputs.prerelease }}
+      version_build: ${{ steps.version.outputs.build }}
+      version_full: ${{ steps.version.outputs.full }}
+      number_of_commits_since_tag: ${{ steps.num-commits-since-tag.outputs.num_commits_since_tag }}
+    steps:
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+          ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
+      - name: Git e-mail
+        run: git config --global user.email "${EMAIL}"
+      - name: Git name
+        run: git config --global user.name "${NAME}"
+      - name: What version are we?
+        id: python-ver
+        run: |
+          # Extract version from pyproject.toml
+          export tt_smi_ver="$(grep -E '^version\s*=' pyproject.toml | sed 's/version\s*=\s*"\([^"]*\)".*/\1/')"
+          echo "python_version=${tt_smi_ver}"
+          echo "python_version=${tt_smi_ver}" >> "$GITHUB_OUTPUT"
+      - name: Dry run version bump to get new version
+        id: dry-run-version
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INITIAL_VERSION: ${{ steps.python-ver.outputs.python_version }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+          RELEASE_BRANCHES: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
+          DRY_RUN: true
+          TAG_CONTEXT: branch
+          PRERELEASE: false
+      - name: What NEW Version?
+        id: new-python-version
+        run: |
+          export python_version_new="${{ steps.dry-run-version.outputs.new_tag }}"
+          echo "python_version_new=${python_version_new}"
+          echo "python_version_new=${python_version_new}" >> "$GITHUB_OUTPUT"
+      - name: Parse version from string
+        id: version
+        uses: release-kit/semver@v2
+        with:
+          string: ${{ steps.new-python-version.outputs.python_version_new }}
+      - name: Find number of commits since last tag
+        id: num-commits-since-tag
+        run: |
+          export num_commits_since="num_commits_since_tag=$( git rev-list $(git describe --tags --abbrev=0)..HEAD --count )"
+          echo "${num_commits_since}"
+          echo "${num_commits_since}" >> "$GITHUB_OUTPUT"
+      - run: echo ${{ steps.python-ver.outputs.python_version }}
+      - name: Update version in project files
+        run: |
+          # Update version in pyproject.toml (strip the 'v' prefix for the file)
+          version_without_v="${{ steps.new-python-version.outputs.python_version_new }}"${{ needs.create-temp-branch.outputs.new-branch-ref }}
+          version_without_v="${version_without_v#v}"
+          sed -i "s/^version\s*=\s*['\"][^'\"]*['\"]/version = \"${version_without_v}\"/" pyproject.toml
+          
+          # Commit the version update
+          git add pyproject.toml
+          git commit -m "Version bump to ${{ steps.new-python-version.outputs.python_version_new }}"
+          git push
+      - name: Create the actual tag${{ needs.tempbranch.outputs.rc_ref }}
+        id: create-tag
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+          RELEASE_BRANCHES: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
+          DRY_RUN: false
+          TAG_CONTEXT: branch
+          PRERELEASE: false
+          VERBOSE: true
+      - name: Find New Git Hash
+        id: new-git-hash
+        run: |
+          export git_hash_env="git_hash=$( git log --format="%H" -n 1 )"
+          echo "${git_hash_env}"
+          echo "${git_hash_env}" >> "$GITHUB_OUTPUT"
+      - name: New Git Hash
+        run: echo "${git_hash_env}"
+    env:
+      EMAIL: releases@tenstorrent.com${{ needs.tempbranch.outputs.rc_ref }}
+      NAME: Tenstorrent Releases
+
   build-pypi:
+    needs:
+      - create-temp-branch 
+      - versionchange
     uses: ./.github/workflows/build-pypi.yml
     with:
-      ref: ${{ github.ref }}
+      ref: ${{ needs.create-temp-branch.outputs.new-branch-ref }}
     secrets: inherit
 
   build-debian:
+    needs:
+      - create-temp-branch 
+      - versionchange
     uses: ./.github/workflows/build-debian.yml
     with:
-      ref: ${{ github.ref }}
+      ref: ${{ needs.create-temp-branch.outputs.new-branch-ref }}
     secrets: inherit
 
   create-release:
@@ -68,6 +203,8 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python 🐍 distribution 📦 to PyPI
+    # Disable for now
+    if: false
     needs: [build-pypi, build-debian, create-release]
     runs-on: ubuntu-latest
     environment:
@@ -88,6 +225,8 @@ jobs:
 
   publish-to-testpypi:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
+    # Disable for now
+    if: false
     needs: [build-pypi, build-debian, create-release]
     runs-on: ubuntu-latest
     environment:
