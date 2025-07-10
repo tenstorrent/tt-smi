@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -43,7 +44,9 @@ jobs:
                 "title": "## 🔄 Changes",
                 "labels": []
               }
-            ]
+            ],
+            "pr_template": "- #{{TITLE}} (#{{NUMBER}}) by @#{{AUTHOR}}",
+            "commit_template": "- #{{TITLE}} (#{{MERGE_SHA}}) by @#{{AUTHOR}}"
           }
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
