@@ -25,8 +25,13 @@ jobs:
     - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential debhelper dh-python python3-setuptools python3-wheel python3-pip
+        sudo apt-get install -y git build-essential debhelper dh-python python3-setuptools python3-wheel python3-pip
+        sudo apt-get build-dep . -y
         python -m pip install build
+
+    - name: "TEMPORARY: Install tt-tools-common and pyluwen"
+        pip install --break-system-packages 'git+https://github.com/tenstorrent/tt-tools-common.git'
+        pip install --break-system-packages 'pyluwen @ git+https://github.com/tenstorrent/luwen.git#subdirectory=crates/pyluwen'
     
     - name: Build Python wheel
       run: |
