@@ -1,0 +1,6 @@
+tt-smi (3.0.24-1) unstable; urgency=medium
+
+  * Initial Debian packaging
+  * Version 3.0.24 release
+
+ -- Sam Bansal <sbansal@tenstorrent.com>  Thu, 10 Jul 2025 12:00:00 +0000

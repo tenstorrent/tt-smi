@@ -1,0 +1,68 @@
+name: Build Debian Package 📦
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  build-debian:
+    name: Build Debian Package
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-tags: true
+        fetch-depth: 0
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential debhelper dh-python python3-setuptools python3-wheel python3-pip
+        python -m pip install build
+    
+    - name: Build Python wheel
+      run: |
+        python -m build --wheel
+    
+    - name: Build Debian package
+      run: |
+        dpkg-buildpackage -us -uc -b
+    
+    - name: Upload Debian package
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-package
+        path: |
+          ../*.deb
+          ../*.changes
+          ../*.buildinfo
+
+  publish-debian:
+    name: Publish Debian Package to GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+    - build-debian
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Download Debian package
+      uses: actions/download-artifact@v4
+      with:
+        name: debian-package
+        path: debian/
+    
+    - name: Upload to GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        gh release upload '${{ github.ref_name }}' debian/*.deb --repo '${{ github.repository }}'

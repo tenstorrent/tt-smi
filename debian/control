@@ -1,0 +1,20 @@
+Source: tt-smi
+Section: utils
+Priority: optional
+Maintainer: Sam Bansal <sbansal@tenstorrent.com>
+Build-Depends: debhelper (>= 10), dh-python, python3-setuptools, python3-wheel, python3-all, python3-pip
+Standards-Version: 4.5.0
+Homepage: https://github.com/tenstorrent/tt-smi
+Vcs-Git: https://github.com/tenstorrent/tt-smi.git
+Vcs-Browser: https://github.com/tenstorrent/tt-smi
+
+Package: tt-smi
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-distro, python3-elasticsearch, python3-pydantic, python3-rich, python3-textual, python3-importlib-resources, python3-setuptools
+Description: ncurses based hardware monitoring for Tenstorrent silicon
+ tt-smi is a command-line tool that provides hardware monitoring capabilities
+ for Tenstorrent silicon devices. It offers an ncurses-based interface for
+ real-time monitoring of device status, performance metrics, and system health.
+ .
+ This package provides the main tt-smi command-line utility for monitoring
+ Tenstorrent hardware devices.
