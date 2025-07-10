@@ -1,19 +1,25 @@
-name: Build Debian Package 📦
+name: Build Ubuntu Packages 📦
 
 on:
   workflow_dispatch:
   workflow_call:
-  push:
-    tags: [ 'v*' ]
+    inputs:
+      ref:
+        description: 'Git ref to build from'
+        required: true
+        type: string
+    secrets:
+      inherit
 
 jobs:
-  build-debian:
-    name: Build Debian Package
+  build-ubuntu-24:
+    name: Build Ubuntu 24 Package
     runs-on: ubuntu-24.04
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
     
@@ -29,10 +35,6 @@ jobs:
         sudo apt-get build-dep . -y
         python -m pip install build
 
-    - name: "TEMPORARY: Install tt-tools-common and pyluwen"
-        pip install --break-system-packages 'git+https://github.com/tenstorrent/tt-tools-common.git'
-        pip install --break-system-packages 'pyluwen @ git+https://github.com/tenstorrent/luwen.git#subdirectory=crates/pyluwen'
-    
     - name: Build Python wheel
       run: |
         python -m build --wheel
@@ -44,30 +46,49 @@ jobs:
     - name: Upload Debian package
       uses: actions/upload-artifact@v4
       with:
-        name: debian-package
+        name: ubuntu-24-package
         path: |
           ../*.deb
           ../*.changes
           ../*.buildinfo
 
-  publish-debian:
-    name: Publish Debian Package to GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
-    needs:
-    - build-debian
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
+  build-ubuntu-22:
+    name: Build Ubuntu 22 Package
+    runs-on: ubuntu-22.04
     steps:
-    - name: Download Debian package
-      uses: actions/download-artifact@v4
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
-        name: debian-package
-        path: debian/
+        ref: ${{ inputs.ref }}
+        fetch-tags: true
+        fetch-depth: 0
     
-    - name: Upload to GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    
+    - name: Install build dependencies
       run: |
-        gh release upload '${{ github.ref_name }}' debian/*.deb --repo '${{ github.repository }}'
+        sudo apt-get update
+        sudo apt-get install -y git build-essential debhelper dh-python python3-setuptools python3-wheel python3-pip
+        sudo apt-get build-dep . -y
+        python -m pip install build
+
+    - name: Build Python wheel
+      run: |
+        python -m build --wheel
+    
+    - name: Build Debian package
+      run: |
+        dpkg-buildpackage -us -uc -b
+    
+    - name: Upload Debian package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubuntu-22-package
+        path: |
+          ../*.deb
+          ../*.changes
+          ../*.buildinfo
+

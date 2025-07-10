@@ -1,10 +1,13 @@
-name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+name: Build Python 🐍 distribution 
 
 on:
   workflow_dispatch:
   workflow_call:
-  push:
-    tags: [ 'v*' ]
+    inputs:
+      ref:
+        description: 'Git ref to build from'
+        required: true
+        type: string
 
 jobs:
   # Build wheel for Python
@@ -15,6 +18,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
     - name: Set up Python 3.10
@@ -35,7 +39,6 @@ jobs:
   publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
-    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
     needs:
     - build-wheel
     runs-on: ubuntu-latest
@@ -55,69 +58,6 @@ jobs:
     - name: Publish distribution 📦 to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
 
-  github-release:
-    name: >-
-      Sign the Python 🐍 distribution 📦 with Sigstore
-      and upload to GitHub Release
-    needs:
-      - publish-to-pypi
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-      id-token: write  # IMPORTANT: mandatory for sigstore
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Build Changelog
-      id: build_changelog
-      uses: mikepenz/release-changelog-builder-action@v4
-      with:
-        mode: "HYBRID" # Include both PRs and direct commits
-        configurationJSON: |
-          {
-            "categories": [
-              {
-                "title": "## 🔄 Changes",
-                "labels": []
-              }
-            ]
-          }
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        pattern: python-package-*
-        path: dist/
-        merge-multiple: true
-    - name: Sign the dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v3.0.0
-      with:
-        inputs: >-
-          ./dist/*.tar.gz
-          ./dist/*.whl
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release create
-        '${{ github.ref_name }}'
-        --repo '${{ github.repository }}'
-        --notes "${{ steps.build_changelog.outputs.changelog }}"
-    - name: Upload artifact signatures to GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      # Upload to GitHub Release using the `gh` CLI.
-      # `dist/` contains the built packages, and the
-      # sigstore-produced signatures and certificates.
-      run: >-
-        gh release upload
-        '${{ github.ref_name }}' dist/**
-        --repo '${{ github.repository }}'
 
   publish-to-testpypi:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
