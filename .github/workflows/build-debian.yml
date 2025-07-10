@@ -40,15 +40,14 @@ jobs:
     - name: Build Debian package
       run: |
         dpkg-buildpackage -us -uc -b
-    
+        ls /
+        mv "*.deb" /
+
     - name: Upload Debian package
       uses: actions/upload-artifact@v4
       with:
         name: ubuntu-24-package
-        path: |
-          ../*.deb
-          ../*.changes
-          ../*.buildinfo
+        path: "/*.deb"
 
   build-ubuntu-22:
     name: Build Ubuntu 22 Package
@@ -80,13 +79,10 @@ jobs:
     - name: Build Debian package
       run: |
         dpkg-buildpackage -us -uc -b
+        mv "*.deb" /
     
     - name: Upload Debian package
       uses: actions/upload-artifact@v4
       with:
         name: ubuntu-22-package
-        path: |
-          ../*.deb
-          ../*.changes
-          ../*.buildinfo
-
+        path: "/*.deb"
