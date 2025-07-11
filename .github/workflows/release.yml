@@ -217,6 +217,7 @@ jobs:
     needs:
       - create-temp-branch 
       - versionchange
+      - changelogs
     uses: ./.github/workflows/build-pypi.yml
     with:
       ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref}}
@@ -226,6 +227,7 @@ jobs:
     needs:
       - create-temp-branch 
       - versionchange
+      - changelogs
     uses: ./.github/workflows/build-debian.yml
     with:
       ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
