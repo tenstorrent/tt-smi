@@ -1,0 +1,38 @@
+name: Build Python 🐍 distribution 
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to build from'
+        required: true
+        type: string
+
+jobs:
+  # Build wheel for Python
+  build-wheel:
+    name: Build wheel for Python
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+        fetch-tags: true
+        fetch-depth: 0
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+    - name: Build release distributions
+      run: |
+        python -m pip install build
+        python -m build
+
+    - name: Upload distributions
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-dists
+        path: dist/
+
