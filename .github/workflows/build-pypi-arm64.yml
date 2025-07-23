@@ -13,13 +13,12 @@ on:
 #        type: string
 
 jobs:
-  # Build non-abi3 wheels for Python 3.8-3.10
   build-py-version-specific:
     name: Build version-specific wheels 📦
     runs-on: self-hosted
     strategy:
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -27,54 +26,15 @@ jobs:
         ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build wheel for Python ${{ matrix.python-version }}
-      uses: PyO3/maturin-action@v1
-      with:
-        target: aarch64
-        manylinux: 2014
-        args: --release --out dist --interpreter python${{ matrix.python-version }}
+    - name: Install build tools
+        run: |
+          python -m pip install --user --upgrade pip setuptools wheel build
+      - name: Build wheel
+        run: |
+          python -m build --wheel
     - name: Store the wheel
       uses: actions/upload-artifact@v4
       with:
         name: python-package-py${{ matrix.python-version }}
         path: dist
-
-  # Build abi3 wheel for Python 3.11+
-  build-py-abi3:
-    name: Build abi3 wheel for Python 3.11+ 📦
-    runs-on: self-hosted
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.ref }}
-        fetch-tags: true
-        fetch-depth: 0
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build abi3 wheel for ${{ matrix.python-version }}
-      uses: PyO3/maturin-action@v1
-      with:
-        target: aarch64
-        manylinux: 2014
-        args: --release --sdist --out dist --features abi3-py311
-    - name: Store the wheel
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-abi3-py${{ matrix.python-version }}
-        path: dist
-
 
