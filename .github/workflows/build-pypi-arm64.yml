@@ -2,15 +2,8 @@ name: Build 🐍 📦 wheels
 
 on:
   push:
-    branches:
-      - asahi
-#  workflow_dispatch:
-#  workflow_call:
-#    inputs:
-#      ref:
-#        default: ${{ github.ref }}
-#        required: false
-#        type: string
+    tags:
+      - 'v*'
 
 jobs:
   build-py-version-specific:
@@ -37,4 +30,17 @@ jobs:
       with:
         name: python-package-py${{ matrix.python-version }}
         path: dist
+  release:
+    needs: build-py-version-specific
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/artifacts/**/*.whl
 
