@@ -21,7 +21,11 @@ from rich.text import Text
 from tt_smi import constants
 from typing import List, Tuple, Union
 from importlib_resources import files
-from pyluwen import pci_scan
+from tt_umd import (
+    Cluster,
+    ARCH,
+    PCIDevice,
+)
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
@@ -180,7 +184,7 @@ class TTSMI(App):
     def format_firmware_rows(self):
         """Format firmware rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i in self.backend.umd_device_dict:
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
@@ -391,10 +395,10 @@ class TTSMI(App):
     def format_telemetry_rows(self):
         """Format telemetry rows"""
         all_rows = []
-        for i, chip in enumerate(self.backend.devices):
-            if chip.as_bh(): # Blackhole
-                all_rows.append(self.format_bh_telemetry_rows(i))
-            elif chip.as_wh() or chip.as_gs(): # Wormhole and legacy Grayskull
+        for i, chip in self.backend.umd_device_dict.items():
+            # if chip.as_bh(): # Blackhole
+            #     all_rows.append(self.format_bh_telemetry_rows(i))
+            if chip.get_arch() == ARCH.WORMHOLE_B0:
                 all_rows.append(self.format_wh_telemetry_rows(i))
 
         return all_rows
@@ -416,13 +420,13 @@ class TTSMI(App):
     def format_device_info_rows(self):
         """Format device info rows"""
         all_rows = []
-        for i, device in enumerate(self.backend.devices):
+        for i in self.backend.umd_device_dict:
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
                 if info == "board_type":
                     if val == "n300":
-                        if device.is_remote():
+                        if self.backend.umd_cluster_descriptor.is_chip_remote(i):
                             rows.append(
                                 Text(
                                     f"{val}",
@@ -458,7 +462,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
-                    if device.is_remote():
+                    if self.backend.umd_cluster_descriptor.is_chip_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -495,7 +499,7 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
-                    if device.is_remote():
+                    if self.backend.umd_cluster_descriptor.is_chip_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -558,10 +562,12 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
-                        rows.append(
-                            Text("N/A", style=self.text_theme["gray"], justify="center")
-                        )
+                    if False:
+                        pass
+                    # if device.as_bh():
+                    #     rows.append(
+                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
+                    #     )
                     else:
                         if val:
                             rows.append(
@@ -579,10 +585,12 @@ class TTSMI(App):
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
-                        rows.append(
-                            Text("N/A", style=self.text_theme["gray"], justify="center")
-                        )
+                    if False:
+                        pass
+                    # if device.as_bh():
+                    #     rows.append(
+                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
+                    #     )
                     else:
                         if val:
                             rows.append(
@@ -825,30 +833,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
     tt_smi_app.run()
 
 
-def check_fw_version(pyluwen_chip, board_num):
-    """
-    Check firmware version before running tt_smi and exit gracefully if not supported
-    For Grayskull, we only support fw version >= 1.3.0.0
-    """
-    if pyluwen_chip.as_gs():
-        fw_version, exit_code = pyluwen_chip.arc_msg(
-            constants.MSG_TYPE_FW_VERSION, arg0=0, arg1=0
-        )
-        if fw_version < constants.MAGIC_FW_VERSION:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on Grayskull device {board_num}.",
-                f"\n Require FW version >= {hex_to_semver_m3_fw(constants.MAGIC_FW_VERSION)} to run tt-smi",
-                CMD_LINE_COLOR.ENDC,
-            )
-            print(
-                CMD_LINE_COLOR.PURPLE,
-                "Please update FW on device using tt-flash: https://github.com/tenstorrent/tt-flash",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-    return
-
 def main():
     """
     First entry point for TT-SMI. Detects devices and instantiates backend.
@@ -876,7 +860,7 @@ def main():
 
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
-            reset_indices = pci_scan()
+            reset_indices = PCIDevice.enumerate_devices()
             pci_board_reset(reset_indices, reinit=not(args.no_reinit))
 
         elif reset_input.type == ResetType.ID_LIST:
@@ -975,9 +959,8 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(
-            local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-        )
+        # print("Detecting devices!")
+        umd_cluster_descriptor = Cluster.create_cluster_descriptor("", {})
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -985,17 +968,14 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    if not devices:
+    if not umd_cluster_descriptor:
         print(
             CMD_LINE_COLOR.RED,
             "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    backend = TTSMIBackend(devices, pretty_output=is_tty)
-    # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(backend.devices):
-        check_fw_version(device, i)
+    backend = TTSMIBackend(umd_cluster_descriptor, pretty_output=is_tty)
 
     tt_smi_main(backend, args)
 
