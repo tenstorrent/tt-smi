@@ -663,7 +663,7 @@ def dict_from_public_attrs(obj) -> dict:
 def get_host_software_versions() -> dict:
     return {
         "tt_smi": pkg_resources.get_distribution("tt_smi").version,
-        "pyluwen": pkg_resources.get_distribution("pyluwen").version,
+        "tt_umd": pkg_resources.get_distribution("tt_umd").version,
     }
 
 
