@@ -396,8 +396,8 @@ class TTSMI(App):
         """Format telemetry rows"""
         all_rows = []
         for i, chip in self.backend.umd_device_dict.items():
-            # if chip.as_bh(): # Blackhole
-            #     all_rows.append(self.format_bh_telemetry_rows(i))
+            if chip.get_arch() == ARCH.BLACKHOLE:
+                all_rows.append(self.format_bh_telemetry_rows(i))
             if chip.get_arch() == ARCH.WORMHOLE_B0:
                 all_rows.append(self.format_wh_telemetry_rows(i))
 
