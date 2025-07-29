@@ -90,7 +90,7 @@ class TTSMIBackend:
 
         if fully_init:
             for i, _ in track(
-                self.umd_device_dict.items(),
+                sorted(self.umd_device_dict.items()),
                 total=len(self.umd_device_dict),
                 description="Gathering Information",
                 update_period=0.01,
@@ -104,8 +104,8 @@ class TTSMIBackend:
                 self.chip_limits.append(self.get_chip_limits(i))
 
     def construct_umd_devices(self, umd_cluster_descriptor):
-        
-        chips_to_construct = umd_cluster_descriptor.get_chips_local_first(umd_cluster_descriptor.get_all_chips())
+        # Note that mmio chips will always be first since they will have lower logical chip id.
+        chips_to_construct = sorted(umd_cluster_descriptor.get_all_chips())
         self.umd_device_dict = {}
         # We need to keep these because the remote devices won't take ownership
         self.umd_local_chips = {}
@@ -222,20 +222,21 @@ class TTSMIBackend:
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
         smbus_telem_dict = {}
+        # print("get_smbus_board_info for board_num: ", board_num)
         if self.umd_device_dict[board_num].get_arch() == ARCH.BLACKHOLE:
             telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
             for telem_key in blackhole.TelemetryTag:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
                     
-            print ("Got bh smbus telem from umd: ", smbus_telem_dict)
+            # print ("Got bh smbus telem from umd: ", smbus_telem_dict)
         elif self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
             telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
             for telem_key in wormhole.TelemetryTag:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
                     
-            print ("Got wh smbus telem from umd: ", smbus_telem_dict)
+            # print ("Got wh smbus telem from umd: ", smbus_telem_dict)
         return smbus_telem_dict
 
     def update_telem(self):
@@ -576,6 +577,8 @@ class TTSMIBackend:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
                 # The tag has different value for WH and BH
+                # print("looking for fw_bundle_version for board_num: ", board_num)
+                # print("smbus_telem info keys: ", len(self.smbus_telem_info))
                 if "FW_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
                     val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
                 elif "FLASH_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:

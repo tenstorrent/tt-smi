@@ -562,10 +562,12 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if   device.as_bh():
-                        rows.append(
-                            Text("N/A", style=self.text_theme["gray"], justify="center")
-                        )
+                    if False:
+                        pass
+                    # if   device.as_bh():
+                    #     rows.append(
+                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
+                    #     )
                     else:
                         if val:
                             rows.append(
