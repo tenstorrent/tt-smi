@@ -221,35 +221,22 @@ class TTSMIBackend:
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
-        # pyluwen_chip = self.devices[board_num]
-        # if pyluwen_chip.as_bh():
-        #     telem_struct = pyluwen_chip.as_bh().get_telemetry()
+        smbus_telem_dict = {}
         if self.umd_device_dict[board_num].get_arch() == ARCH.BLACKHOLE:
-            smbus_telem_dict = {}
             telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
             for telem_key in blackhole.TelemetryTag:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
                     
             print ("Got bh smbus telem from umd: ", smbus_telem_dict)
-            return smbus_telem_dict
-        if self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
-            # TODO UMD: Special case for now, use UMD driver.
-            smbus_telem_dict = {}
+        elif self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
             telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
             for telem_key in wormhole.TelemetryTag:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
                     
             print ("Got wh smbus telem from umd: ", smbus_telem_dict)
-            return smbus_telem_dict
-        # json_map = dict_from_public_attrs(telem_struct)
-        # smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
-
-        # for key, value in json_map.items():
-        #     if value:
-        #         smbus_telem_dict[key.upper()] = hex(value)
-        # return smbus_telem_dict
+        return smbus_telem_dict
 
     def update_telem(self):
         """Update telemetry in a given interval"""
@@ -274,6 +261,8 @@ class TTSMIBackend:
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
+        # TODO: double check this one.
+        # Seems like DDR_STATUS for WH gives speed, but for bh there's DDR_STATUS and DDR_SPEED ??
         if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
             dram_speed_raw = (
                 int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
@@ -298,7 +287,6 @@ class TTSMIBackend:
             return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
 
         try:
-            # pcie_bdf = self.devices[board_num].get_pci_bdf()
             pcie_bdf = self.umd_device_dict[board_num].get_pci_device().get_device_info().get_pci_bdf()
             pci_bus_path = os.path.realpath(f"/sys/bus/pci/devices/{pcie_bdf}")
         except:
@@ -335,6 +323,8 @@ class TTSMIBackend:
     def get_dram_training_status(self, board_num) -> bool:
         """Get DRAM Training Status
         True means it passed training, False means it failed or did not train at all"""
+        
+        # TODO: Were just adding this interface to ttdevice, so add it both for WH and BH
         if self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
             num_channels = 8
             for i in range(num_channels):
@@ -428,7 +418,6 @@ class TTSMIBackend:
             "asic_temperature": f"{asic_temperature:4.1f}",
             "heartbeat": f"{timer_heartbeat}",
         }
-        print("bh chip telemetry ", chip_telemetry)
         return chip_telemetry
 
     def get_wh_chip_telemetry(self, board_num) -> Dict:

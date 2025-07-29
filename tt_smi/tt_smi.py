@@ -398,7 +398,7 @@ class TTSMI(App):
         for i, chip in self.backend.umd_device_dict.items():
             if chip.get_arch() == ARCH.BLACKHOLE:
                 all_rows.append(self.format_bh_telemetry_rows(i))
-            if chip.get_arch() == ARCH.WORMHOLE_B0:
+            elif chip.get_arch() == ARCH.WORMHOLE_B0:
                 all_rows.append(self.format_wh_telemetry_rows(i))
 
         return all_rows
@@ -562,12 +562,10 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if False:
-                        pass
-                    # if device.as_bh():
-                    #     rows.append(
-                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
-                    #     )
+                    if   device.as_bh():
+                        rows.append(
+                            Text("N/A", style=self.text_theme["gray"], justify="center")
+                        )
                     else:
                         if val:
                             rows.append(
@@ -959,7 +957,6 @@ def main():
         sys.exit(0)
 
     try:
-        # print("Detecting devices!")
         umd_cluster_descriptor = Cluster.create_cluster_descriptor("", {})
     except Exception as e:
         print(
