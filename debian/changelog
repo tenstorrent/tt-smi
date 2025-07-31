@@ -1,3 +1,16 @@
+tt-smi (3.0.26) noble; urgency=medium
+
+  [ Samridhi ]
+  * Added single tray reset option
+  * Update README with new galaxy reset option
+  * Chore: Bumped smi and luwen versions
+  * Downgraded pyproject.toml to use automated release feature to bump it again
+
+  [ Tenstorrent Releases ]
+  * Version bump to v3.0.26
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 31 Jul 2025 17:46:47 +0000
+
 tt-smi (3.0.25) noble; urgency=medium
 
   * Version bump to v3.0.25
