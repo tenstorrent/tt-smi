@@ -64,7 +64,9 @@ pre-commit install
 
 Command line arguments
 ```
-tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [filename]] [-g] [-r 0,1 ... or config.json]
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-g [GENERATE_RESET_JSON]] [-c]
+              [-r [0,1 ... or config.json ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
+              [-glx_reset_tray {1,2,3,4}] [--no_reinit]
 ```
 ## Getting Help!
 
@@ -73,10 +75,13 @@ Running tt-smi with the ```-h, --help``` flag should bring up something that loo
 ```
 $ tt-smi --help
 
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-g [GENERATE_RESET_JSON]] [-c] [-r [0,1 ... or config.json ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [--no_reinit]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-g [GENERATE_RESET_JSON]] [-c]
+              [-r [0,1 ... or config.json ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
+              [-glx_reset_tray {1,2,3,4}] [--no_reinit]
 
-Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. Main objective of TT-SMI is to provide a simple and easy to use
-interface to collect and display device, telemetry and firmware information. In addition user can issue Grayskull and Wormhole board level resets.
+Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices
+on host. Main objective of TT-SMI is to provide a simple and easy to use interface to collect and display device,
+telemetry and firmware information. In addition user can issue Grayskull and Wormhole board level resets.
 
 options:
   -h, --help            show this help message and exit
@@ -87,17 +92,21 @@ options:
   -f [snapshot filename], --filename [snapshot filename]
                         Write snapshot to a file. Default: ~/tt_smi/<timestamp>_snapshot.json
   -g [GENERATE_RESET_JSON], --generate_reset_json [GENERATE_RESET_JSON]
-                        Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an input for the
-                        --reset option
+                        Generate default reset json file that reset consumes. Default stored at
+                        ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an input
+                        for the --reset option
   -c, --compact         Run in compact mode, hiding the sidebar and other static elements
   -r [0,1 ... or config.json ...], --reset [0,1 ... or config.json ...]
-                        Provide list of PCI index or a json file with reset configs. Find PCI index of board using the -ls option. Generate a default reset json file with the -g option.
+                        Provide list of PCI index or a json file with reset configs. Find PCI index of board using
+                        the -ls option. Generate a default reset json file with the -g option.
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
   -glx_reset, --galaxy_6u_trays_reset
                         Reset all the asics on the galaxy host.
   -glx_reset_auto, --galaxy_6u_trays_reset_auto
                         Reset all the asics on the galaxy host, but do auto retries upto 3 times if reset fails.
-  --no_reinit           Don't detect devices post reset. This doesn't work on galaxy 6u trays reset.
+  -glx_reset_tray {1,2,3,4}
+                        Reset a specific tray on the galaxy.
+  --no_reinit           Don't detect devices post reset.
   ```
 
 Some of these flags will be discussed in more detail in the following sections.
@@ -226,8 +235,9 @@ If the ```disable_sw_version_report``` is set to true, all the software versions
 There are two options available for resetting WH galaxy 6u trays.
   - glx_reset: resets the galaxy, informs users if there has been an eth failure
   - glx_reset_auto: resets the galaxy upto 3 times if eth failures are detected
-Fundamentally they are the same kind of reset and errors can be captured via command line and sys exit codes.
+  - glx_reset_tray <tray_num>: performs reset on one galaxy tray. Tray number has to be between 1-4
 
+Full galaxy reset -
 ```
 tt-smi -glx_reset
  Resetting WH Galaxy trays with reset command...
@@ -237,6 +247,16 @@ Driver loaded
  Re-initializing boards after reset....
  Detected Chips: 32
  Re-initialized 32 boards after reset. Exiting...
+```
+Tray reset -
+```
+tt-smi -glx_reset_tray 3 --no_reinit
+ Resetting WH Galaxy trays with reset command...
+Executing command: sudo ipmitool raw 0x30 0x8B 0x4 0xFF 0x0 0xF
+Waiting for 30 seconds: 30
+Driver loaded
+ Re-initializing boards after reset....
+ Exiting after galaxy reset without re-initializing chips.
 ```
 
 ## Snapshots

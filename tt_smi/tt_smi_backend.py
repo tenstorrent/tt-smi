@@ -842,17 +842,23 @@ def check_wh_galaxy_eth_link_status(devices):
         )
         # sys.exit(1)
 
-def glx_6u_trays_reset(reinit=True):
+def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0", reset_time="0xF"):
     """
     Reset the WH asics on the galaxy systems with the following steps:
     1. Reset the trays with ipmi command
     2. Wait for 30s
     3. Reinit all chips
+
+    Args:
+        reinit (bool): Whether to reinitialize the chips after reset.
+        ubb_num (str): The UBB number to reset. 0x0~0xF (bit map)
+        dev_num (str): The device number to reset. 0x0~0xFF(bit map)
+        op_mode (str): The operation mode to use.
+                        0x0 - Asserted/Deassert reset with a reset period (reset_time)
+                        0x1 - Asserted reset
+                        0x2 - Deasserted reset
+        reset_time (str): The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
     """
-    ubb_num = "0xF"
-    dev_num = "0xFF"
-    op_mode = "0x0"
-    reset_time = "0xF"
     print(
         CMD_LINE_COLOR.PURPLE,
         f"Resetting WH Galaxy trays with reset command...",
@@ -869,7 +875,7 @@ def glx_6u_trays_reset(reinit=True):
     if not reinit:
         print(
             CMD_LINE_COLOR.GREEN,
-            f"Exiting after galoaxy reset without re-initializing chips.",
+            f"Exiting after galaxy reset without re-initializing chips.",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)
@@ -887,8 +893,10 @@ def glx_6u_trays_reset(reinit=True):
         # Error out if chips don't initalize
         sys.exit(1)
 
-    # after re-init check eth status
-    check_wh_galaxy_eth_link_status(chips)
+    # after re-init check eth status - only if doing a full galaxy reset.
+    # If doing a partial reset, eth connections will be broken because eth training will go out of sync
+    if ubb_num == 0xF:
+        check_wh_galaxy_eth_link_status(chips)
     # All went well - exit with success
     print(
         CMD_LINE_COLOR.GREEN,
