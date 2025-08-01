@@ -28,7 +28,7 @@ dependencies = [
   'elasticsearch==8.11.0',
   'pydantic>=1.2',
   'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.17',
-  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.7.10#subdirectory=crates/pyluwen',
+  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.7.11#subdirectory=crates/pyluwen',
   'rich==13.7.0',
   'textual==0.59.0',
   'pre-commit==3.5.0',
