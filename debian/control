@@ -2,14 +2,15 @@ Source: tt-smi
 Section: utils
 Priority: optional
 Maintainer: Sam Bansal <sbansal@tenstorrent.com>
-Build-Depends:
+Build-depends:
  debhelper (>= 10),
  dh-python,
  pybuild-plugin-pyproject,
- python3-all,
- python3-pip,
+ python3,
  python3-setuptools,
- python3-wheel
+ python3-wheel,
+ python3-all,
+ python3-pip
 Standards-Version: 4.5.0
 Homepage: https://github.com/tenstorrent/tt-smi
 Vcs-Git: https://github.com/tenstorrent/tt-smi.git
@@ -18,8 +19,8 @@ Vcs-Browser: https://github.com/tenstorrent/tt-smi
 Package: tt-smi
 Architecture: all
 Depends:
- ${python3:Depends},
  ${misc:Depends},
+ ${python3:Depends},
  python3-distro,
  python3-elasticsearch,
  python3-pydantic,

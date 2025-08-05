@@ -1,7 +1,12 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@ \
+		--parallel \
+		--with=python3
+#		--buildsystem=pybuild
+	echo "Done Stage 1"
 
 override_dh_auto_test:
 	# Skip tests during package build
+
