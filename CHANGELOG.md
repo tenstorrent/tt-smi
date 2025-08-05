@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.26 - 29/07/25
+- Added single tray galaxy reset option
+- Bumped luwen from 0.7.5 -> 0.7.10
+  - Chip detect now doesn't wait for eth to train for the 6U galaxy's, allowing multi tray resets to happen independently
+- Updated readme with the new reset option
+
+## 3.0.25 - 29/07/25
+- Added packaging
+
 ## 3.0.24 - 04/07/25
 - Now users have 2 galay reset modes available
   - glx_reset: resets the galaxy, informs users if there has been an eth failure

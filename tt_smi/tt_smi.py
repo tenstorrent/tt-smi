@@ -778,10 +778,17 @@ def parse_args():
         dest="glx_reset_auto",
     )
     parser.add_argument(
+        "-glx_reset_tray",
+        choices=["1", "2", "3", "4",],
+        default=None,
+        help="Reset a specific tray on the galaxy.",
+        dest="glx_reset_tray",
+    )
+    parser.add_argument(
         "--no_reinit",
         default=False,
         action="store_true",
-        help="Don't detect devices post reset. This doesn't work on galaxy 6u trays reset.",
+        help="Don't detect devices post reset.",
     )
     args = parser.parse_args()
     return args
@@ -944,6 +951,18 @@ def main():
 
         # All went well - exit
         sys.exit(0)
+    if args.glx_reset_tray is not None:
+        # Reset a specific tray on the galaxy
+        try:
+            tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
+            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF")
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error in resetting galaxy 6u tray {args.glx_reset_tray}!\n{e}\n Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
 
     if args.generate_reset_json:
         # Use filename if provided, else use default

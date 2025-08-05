@@ -6,59 +6,158 @@ on:
     inputs:
       ref:
         description: 'Git ref to build from'
+        default: ${{ github.ref }}
         required: true
+        type: string
+      MAJOR:
+        required: false
+        type: string
+      MINOR:
+        required: false
+        type: string
+      PATCH:
+        required: false
+        type: string
+      NUMBER_OF_COMMITS_SINCE_TAG:
+        required: false
         type: string
 
 jobs:
-  build-ubuntu:
-    name: Build Ubuntu ${{ matrix.ubuntu-version }} Package
-    runs-on: ubuntu-${{ matrix.ubuntu-version }}.04
+  build-deb:
+    name: Build ${{ matrix.os }} Package
     strategy:
+      fail-fast: false
       matrix:
-        ubuntu-version: [22, 24]
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.ref }}
-        fetch-tags: true
-        fetch-depth: 0
-    
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-    
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git build-essential debhelper dh-python python3-setuptools python3-wheel python3-pip
-        sudo apt-get build-dep . -y
-        python -m pip install build
-
-    - name: Build Python wheel
-      run: |
-        python -m build --wheel
-    
-    - name: Build Debian package
-      run: |
-        dpkg-buildpackage -us -uc -b
-        # Move non-deb relevant files
-        mv ../*.changes ~
-        mv ../*.buildinfo ~
-        # Move and rename deb file to include Ubuntu version
-        for file in ../*.deb; do
-          if [ -f "$file" ]; then
-            base=$(basename "$file" .deb)
-            mv "$file" "${HOME}/${base}-ubuntu${{ matrix.ubuntu-version }}.deb"
+      - run: |
+          echo "What started this ref: ${{ github.ref }}"
+          echo "What started this ref: ${{ github.ref_name }}"
+          echo "What started this sha: ${{ github.sha }}"
+          echo "Did we get a ref pass in? ${{ inputs.ref }}"
+      - name: Figure out branch name
+        id: ref_name
+        run: |
+          echo "ref_name=${{ github.ref_name }}"
+          echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
+          if [[ -n "${{ inputs.ref }}" ]]
+          then
+            echo "ref_name=${{ inputs.ref }}"
+            echo "ref_name=${{ inputs.ref }}" >> $GITHUB_ENV
           fi
-        done
-    
-    - name: Upload Debian package
-      uses: actions/upload-artifact@v4
-      with:
-        name: ubuntu-${{ matrix.ubuntu-version }}-package
-        path: |
-          ~/*-ubuntu${{ matrix.ubuntu-version }}.deb
-          ~/*.changes
-          ~/*.buildinfo
+      - run: sudo apt update
+      - name: Install build dependencies
+        run: |
+          sudo apt install -y \
+            build-essential \
+            debhelper \
+            dh-python \
+            dh-sequence-python3 \
+            git-buildpackage \
+            gnupg \
+            libpython3-all-dev \
+            pybuild-plugin-pyproject \
+            python3-all \
+            python3-pip
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
+      - run: gpg --list-keys
+      - run: gpg --list-secret-keys
+      - uses: actions/checkout@v4
+        name: Checkout
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Extract version from tag
+        uses: damienaicheh/extract-version-from-tag-action@v1.3.0
+      - run: git tag
+      - name: Ok Figure out version
+        run: |
+          if [[ -n "${{ inputs.MAJOR }}" ]]
+          then
+            echo "MAJOR=${{ inputs.MAJOR }}" >> $GITHUB_ENV
+            echo "MAJOR=${{ inputs.MAJOR }}"
+          fi
+
+          if [[ -n "${{ inputs.MINOR }}" ]]
+          then
+            echo "MINOR=${{ inputs.MINOR }}" >> $GITHUB_ENV
+            echo "MINOR=${{ inputs.MINOR }}"
+          fi
+
+          if [[ -n "${{ inputs.PATCH }}" ]]
+          then
+            echo "PATCH=${{ inputs.PATCH }}" >> $GITHUB_ENV
+            echo "PATCH=${{ inputs.PATCH }}"
+          fi
+
+          if [[ -n "${{ inputs.MAJOR }}" ]]
+          then
+            echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}" >> $GITHUB_ENV
+            echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}"
+          fi
+
+          if [[ -n "${{ inputs.ref }}" ]]
+          then
+            echo "REF=${{ inputs.ref }}" >> $GITHUB_ENV
+            echo "REF=${{ inputs.ref }}"
+          else
+            echo "REF=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "REF=${{ github.ref_name }}"
+          fi
+      # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
+      - run: ls -lah
+      - run: |
+          gbp dch \
+            --debian-branch ${ref_name} \
+            -R \
+            -N ${MAJOR}.${MINOR}.${PATCH} \
+            --spawn-editor=never
+        env:
+          EMAIL: releases@tenstorrent.com
+          NAME: Tenstorrent Releases
+      - run: |
+          gbp buildpackage \
+            --git-ignore-new
+        continue-on-error: true
+
+      - name: Move Debian packages
+        run: mkdir -p artifacts && mv ../*.deb artifacts/
+      - name: Copy Changelog to artifacts
+        run: cp debian/changelog artifacts/changelog
+      - name: Set environment variable for distro
+        id: distro_ident
+        run: |
+          source /etc/os-release && \
+          #echo "DISTRO_IDENT=$( echo \"${NAME}\" | sed 's/"//g' | tr '[:upper:]' '[:lower:]' )-${VERSION_ID}" \
+          #      >> $GITHUB_ENV
+          echo "DISTRO_IDENT=${{ matrix.os }}" >> $GITHUB_ENV
+      - name: Set environment variable for deb filename
+        id: deb_filename
+        run: echo "DEB_FILENAME=$(basename artifacts/*.deb)" >> $GITHUB_ENV
+      - name: Set environment variable for deb filename
+        id: deb_filename_distro
+        run: echo DEB_FILENAME_DISTRO=$(basename artifacts/*.deb | sed "s/_all/_all-${{ env.DISTRO_IDENT }}/" ) >> $GITHUB_ENV
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEB_FILENAME_DISTRO }}
+          path: artifacts/${{ env.DEB_FILENAME }}
+      - name: Upload Changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-changelog-${{ env.DISTRO_IDENT }}
+          path: debian/changelog
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ env.DISTRO_IDENT }}.zip
+          path: artifacts/
+

@@ -1,3 +1,32 @@
+tt-smi (3.0.27) noble; urgency=medium
+
+  [ John 'Warthog9' Hawley ]
+  * Remove, un-needed setup.py
+  * Set a minimal pyluwen version in pyproject.toml
+  * Fix missing Deb Build-Depend
+  * Git Ignores: fix Debian ignores
+  * py3dist-overrides: Cleaning up warning messages
+  * Bringing release workflows inlinte with tt-tools-common
+  * Debian Packaging: fixing errant build issues causing 22.04 to not build correctly
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.27
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 05 Aug 2025 18:20:11 +0000
+
+tt-smi (3.0.26) noble; urgency=medium
+
+  [ Samridhi ]
+  * Added single tray reset option
+  * Update README with new galaxy reset option
+  * Chore: Bumped smi and luwen versions
+  * Downgraded pyproject.toml to use automated release feature to bump it again
+
+  [ Tenstorrent Releases ]
+  * Version bump to v3.0.26
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 31 Jul 2025 17:46:47 +0000
+
 tt-smi (3.0.25) noble; urgency=medium
 
   * Version bump to v3.0.25
