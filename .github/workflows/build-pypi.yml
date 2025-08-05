@@ -13,7 +13,7 @@ jobs:
   # Build wheel for Python
   build-wheel:
     name: Build wheel for Python
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4

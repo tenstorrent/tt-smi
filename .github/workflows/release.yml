@@ -1,11 +1,33 @@
 name: Create Release
+run-name: Create Release
 
 on:
   workflow_dispatch:
-  push:
-    tags: [ 'v*' ]
+  workflow_call:
+
+env:
+  project_name: tt-smi
 
 jobs:
+  # what this should do is properly do a release of everything here
+  # that has a new version in it.  We aren't there yet.  So in the
+  # interim assume the main core, c++ bindings, and python bindings
+  # are all part of a release now, and they will be using the same version
+  # going forward.
+
+  ###
+  # Repo Updates
+  #   So, fun fact, the way actions/checkout@v4 works it pulls / works based on what triggered it
+  #   this leads to a problem because I don't want to progress till various things have completed
+  #   in a roughly specific order, but I also need to know what/where things came from - which ok
+  #   fair enough.
+  #
+  #   This means that repo changes, so version changes, changelogs, etc I guess all need to happen
+  #   not only at once but somehow need to wait on things down the line outside this triggering to
+  #   come back and allow other things to happen.  Or I suppose I snag the sha from versionchange
+  #   and pass it along as "latest" in the series, could work too and bypass some of this?
+  ###
+
   create-temp-branch:
     runs-on: ubuntu-latest
     permissions:
@@ -31,7 +53,7 @@ jobs:
 
   versionchange:
     needs:
-      - create-temp-branch 
+      - create-temp-branch
     # Runs on needs to be the oldest we can make it
     # just to make sure that the python environment is the oldest
     # we likely need to support
@@ -40,8 +62,9 @@ jobs:
       contents: write
     outputs:
       git_hash: ${{ steps.new-git-hash.outputs.git_hash }}
-      tt_smi_version: ${{ steps.python-ver.outputs.python_version }}
-      tt_smi_version_new: ${{ steps.new-python-version.outputs.python_version_new }}
+      package_name: ${{ steps.packagename.outputs.package_name }}
+      package_version: ${{ steps.packagever.outputs.package_version }}
+      package_version_new: ${{ steps.new-package-version.outputs.package_version_new }}
       version_major: ${{ steps.version.outputs.major }}
       version_minor: ${{ steps.version.outputs.minor }}
       version_patch: ${{ steps.version.outputs.patch }}
@@ -50,10 +73,6 @@ jobs:
       version_full: ${{ steps.version.outputs.full }}
       number_of_commits_since_tag: ${{ steps.num-commits-since-tag.outputs.num_commits_since_tag }}
     steps:
-      - name: Install Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
       - uses: actions/checkout@v4
         with:
           fetch-tags: true
@@ -63,53 +82,58 @@ jobs:
         run: git config --global user.email "${EMAIL}"
       - name: Git name
         run: git config --global user.name "${NAME}"
+      - name: Install toml-cli
+        run: |
+          python3 -m venv venv
+          . ./venv/bin/activate
+          pip install --upgrade pip
+          pip install toml-cli
       - name: What version are we?
-        id: python-ver
+        id: packagever
         run: |
-          # Extract version from pyproject.toml
-          export tt_smi_ver="$(grep -E '^version\s*=' pyproject.toml | sed 's/version\s*=\s*"\([^"]*\)".*/\1/')"
-          echo "python_version=${tt_smi_ver}"
-          echo "python_version=${tt_smi_ver}" >> "$GITHUB_OUTPUT"
-      - name: Dry run version bump to get new version
-        id: dry-run-version
-        uses: anothrNick/github-tag-action@1.67.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INITIAL_VERSION: ${{ steps.python-ver.outputs.python_version }}
-          WITH_V: true
-          DEFAULT_BUMP: patch
-          RELEASE_BRANCHES: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
-          DRY_RUN: true
-          TAG_CONTEXT: repo
-          PRERELEASE: false
+          . ./venv/bin/activate
+          export package_version="$( toml get project.version --toml-path pyproject.toml )"
+          echo "package_version=${package_version}"
+          echo "package_version=${package_version}" >> "$GITHUB_OUTPUT"
+      - name: What package are we?
+        id: packagename
+        run: |
+          . ./venv/bin/activate
+          export package_name="$( toml get project.name --toml-path pyproject.toml )"
+          echo "package_name=${package_name}"
+          echo "package_name=${package_name}" >> "$GITHUB_OUTPUT"
+      - name: Bump the version
+        run: |
+          . ./venv/bin/activate
+          pip install bump2version
+          bump2version --current-version ${{ steps.packagever.outputs.package_version }} patch pyproject.toml
       - name: What NEW Version?
-        id: new-python-version
+        id: new-package-version
         run: |
-          export python_version_new="${{ steps.dry-run-version.outputs.new_tag }}"
-          echo "python_version_new=${python_version_new}"
-          echo "python_version_new=${python_version_new}" >> "$GITHUB_OUTPUT"
+          python3 -m venv venv
+          . ./venv/bin/activate
+          pip install --upgrade pip
+          pip install toml-cli
+          export package_version_new="$( toml get project.version --toml-path pyproject.toml )"
+          echo "package_version_new=${package_version_new}"
+          echo "package_version_new=${package_version_new}" >> "$GITHUB_OUTPUT"
       - name: Parse version from string
         id: version
         uses: release-kit/semver@v2
         with:
-          string: ${{ steps.new-python-version.outputs.python_version_new }}
+          string: ${{ steps.new-package-version.outputs.package_version_new }}
       - name: Find number of commits since last tag
         id: num-commits-since-tag
         run: |
-          export num_commits_since="num_commits_since_tag=$( git rev-list $(git describe --tags --abbrev=0)..HEAD --count )"
-          echo "${num_commits_since}"
-          echo "${num_commits_since}" >> "$GITHUB_OUTPUT"
-      - run: echo ${{ steps.python-ver.outputs.python_version }}
-      - name: Update version in project files
+          export num_commits_since="$( git rev-list $(git describe --tags --abbrev=0)..HEAD --count )"
+          echo "num_commits_since_tag=${num_commits_since}"
+          echo "num_commits_since_tag=${num_commits_since}" >> "$GITHUB_OUTPUT"
+      - run: echo ${{ steps.packagever.outputs.package_version }}
+      - name: Update Version - git push
         run: |
-          # Update version in pyproject.toml (strip the 'v' prefix for the file)
-          version_without_v="${{ steps.new-python-version.outputs.python_version_new }}"${{ needs.create-temp-branch.outputs.new-branch-ref }}
-          version_without_v="${version_without_v#v}"
-          sed -i "s/^version\s*=\s*['\"][^'\"]*['\"]/version = \"${version_without_v}\"/" pyproject.toml
-          
-          # Commit the version update
-          git add pyproject.toml
-          git commit -m "Version bump to ${{ steps.new-python-version.outputs.python_version_new }}"
+          git commit \
+            pyproject.toml \
+            -m "pyproject.toml- updating version to ${{ steps.new-package-version.outputs.package_version_new }}"
           git push
       - name: Find New Git Hash
         id: new-git-hash
@@ -120,7 +144,7 @@ jobs:
       - name: New Git Hash
         run: echo "${git_hash_env}"
     env:
-      EMAIL: releases@tenstorrent.com${{ needs.create-temp-branch.outputs.temp_branch_ref }}
+      EMAIL: releases@tenstorrent.com
       NAME: Tenstorrent Releases
 
   ###
@@ -164,9 +188,7 @@ jobs:
       - run: git tag
       # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
       - run: ls -lah
-      - name: Link the Ubuntu build stuff in as 'debian/'
-        run: ln -s debian.ubuntu debian
-      - name: Generate Ubuntu Changelog
+      - name: Generate Ubuntu / Debian Changelog
         run: |
           echo "Major: ${MAJOR}"
           echo "Minor: ${MINOR}"
@@ -176,18 +198,6 @@ jobs:
             --debian-branch ${{ needs.create-temp-branch.outputs.temp_branch_ref }} \
             -R \
             -N ${MAJOR}.${MINOR}.${PATCH} \
-            --spawn-editor=never
-        env:
-          EMAIL: releases@tenstorrent.com
-          NAME: Tenstorrent Releases
-      - name: Link the Debian build stuff in as 'debian/'
-        run:  ln -s debian.debian debian
-      - name: Generate Debian Changelog
-        run: |
-          gbp dch \
-            --debian-branch ${{ needs.create-temp-branch.outputs.temp_branch_ref }} \
-            -R \
-            N ${MAJOR}.${MINOR}.${PATCH} \
             --spawn-editor=never
         env:
           EMAIL: releases@tenstorrent.com
@@ -213,34 +223,31 @@ jobs:
           echo "${git_hash_env}"
           echo "${git_hash_env}" >> "$GITHUB_OUTPUT"
 
-  build-pypi:
+  ###
+  # Trigger Building Everything
+  ###
+  build_all_depends:
     needs:
-      - create-temp-branch 
+      - create-temp-branch
       - versionchange
       - changelogs
-    uses: ./.github/workflows/build-pypi.yml
-    with:
-      ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref}}
-    secrets: inherit
-
-  build-debian:
-    needs:
-      - create-temp-branch 
-      - versionchange
-      - changelogs
-    uses: ./.github/workflows/build-debian.yml
+    uses: ./.github/workflows/build-all.yml
     with:
       ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
+      MAJOR: ${{ needs.versionchange.outputs.version_major }}
+      MINOR: ${{ needs.versionchange.outputs.version_minor }}
+      PATCH: ${{ needs.versionchange.outputs.version_patch }}
+      NUMBER_OF_COMMITS_SINCE_TAG: ${{ needs.versionchange.outputs.number_of_commits_since_tag }}
     secrets: inherit
 
-    # Tag the Release
+  # Tag the Release
   ###
   tagrelease:
+    name: Tag the Release
     needs:
       - versionchange
       - changelogs
-      - build-pypi
-      - build-debian
+      - build_all_depends
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -257,67 +264,93 @@ jobs:
           fetch-depth: 0
       - run: git log --format="%H" -n 1
       - run: |
-          echo ${{ needs.versionchange.outputs.tt_smi_version_new }}
+          echo ${{ needs.versionchange.outputs.package_version_new }}
           echo ${{ needs.versionchange.outputs.git_hash }}
-          git tag ${{ needs.versionchange.outputs.tt_smi_version_new }}
+          git tag v${{ needs.versionchange.outputs.package_version_new }}
           git tag
           git push --tags
 
-  create-release:
+  ###
+  # Generate Release
+  ###
+  generate-release:
     name: Create GitHub Release
-    needs: [build-pypi, build-debian, tagrelease, versionchange]
+    needs:
+      - create-temp-branch
+      - versionchange
+      - changelogs
+      - build_all_depends
+      - tagrelease
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
+      id-token: write
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-        fetch-depth: 0
-    
-    - name: Build Changelog
-      id: build_changelog
-      uses: mikepenz/release-changelog-builder-action@v4
-      with:
-        mode: "HYBRID"
-        configurationJSON: |
-          {
-            "categories": [
-              {
-                "title": "## 🔄 Changes",
-                "labels": []
-              }
-            ],
-            "pr_template": "- #{{TITLE}} (#{{NUMBER}}) by @#{{AUTHOR}}",
-            "commit_template": "- #{{TITLE}} (#{{MERGE_SHA}}) by @#{{AUTHOR}}"
-          }
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: release-artifacts/
-        merge-multiple: true
-    
-    - name: Create GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: |
-        gh release create '${{ needs.versionchange.outputs.tt_smi_version_new }}' \
-          --repo '${{ github.repository }}' \
-          --notes "${{ steps.build_changelog.outputs.changelog }}" \
-          release-artifacts/*
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Build Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: "HYBRID" # Include both PRs and direct commits
+          configurationJSON: |
+            {
+              "template": "#{{CHANGELOG}}\n\n## Contributors\n#{{CONTRIBUTORS}}",
+              "categories": [
+                {
+                  "title": "## 🔄 Changes",
+                  "labels": []
+                }
+              ],
+              "pr_template": "- #{{TITLE}} (#{{NUMBER}}) by @#{{AUTHOR}}",
+              "commit_template": "- #{{TITLE}} (#{{MERGE_SHA}}) by @#{{AUTHOR}}"
+            }
+
+      - name: Find the deb & whl files
+        run: |
+          find ${GITHUB_WORKSPACE} -type f -iname \*.deb -o -iname \*.whl -exec ls -lah {} \;
+          find /home/runner/work/${{ env.project_name }}/${{ env.project_name }}/ -exec ls -lah {} \;
+
+      - name: Deb file renames so they don't overlap
+        run: |
+          for x in $( \
+            find ${GITHUB_WORKSPACE} -type f -iname \*.deb | \
+            grep -v "artifacts-ubuntu" \
+          )
+          do
+            want="$( \
+              echo "${x}" | \
+              xargs dirname | \
+              tr "/" "\n" | \
+              tail -n 1 \
+              )"
+            mv -v \
+              "${x}" \
+              "$( echo "${x}" | xargs dirname )/${want}"
+          done
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.versionchange.outputs.package_version_new }}
+          files: |
+            ${{ github.workspace }}/${{ env.project_name }}*/*.deb
+            ${{ github.workspace }}/[!artifacts-]*/*.deb
+            ${{ github.workspace }}/*/*.whl
+          body: ${{ steps.build_changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
 
   ###
   # Merge back
   ###
   mergeback:
     needs:
-      - create-temp-branch 
-      - create-release
+      - create-temp-branch
+      - generate-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -340,48 +373,69 @@ jobs:
           git push
           git push origin --delete ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
 
-  publish-to-pypi:
-    name: Publish Python 🐍 distribution 📦 to PyPI
-    # Disable for now
-    if: false
-    needs: [create-release]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/tt-smi
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-    steps:
-    - name: Download Python distributions
-      uses: actions/download-artifact@v4
-      with:
-        name: release-dists
-        path: dist/
-
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-
+  ###
+  # Publish TEST PyPi
+  ###
   publish-to-testpypi:
-    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    name: >-
+      Publish Python 🐍 distribution 📦 to TestPyPI
     # Disable for now
-    if: false
-    needs: [create-release]
+    #if: false
+    needs:
+      - build_all_depends
+      - generate-release
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/tt-smi
+      url: https://test.pypi.org/p/${{ env.project_name }}
+
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
     steps:
-    - name: Download Python distributions
-      uses: actions/download-artifact@v4
-      with:
-        name: release-dists
-        path: dist/
-    - name: Publish distribution 📦 to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        verbose: true
+      - name: Download Python distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.project_name }}*.whl
+          name: release-dists
+          path: dist/
+      - name: Publish distribution 📦 to TestPyPI
+        #run: echo "Hi!"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
+  ###
+  # Publish PyPi
+  ###
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    # Disable for now
+    #if: false
+    needs:
+      - build_all_depends
+      - generate-release
+      - publish-to-testpypi
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ env.project_name }}
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download Python distributions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.project_name }}*.whl
+          name: release-dists
+          path: dist/
+      - name: Publish distribution 📦 to PyPI
+        #run: echo "Hi!"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+
