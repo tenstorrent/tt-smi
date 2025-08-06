@@ -28,7 +28,7 @@ dependencies = [
   'elasticsearch==8.11.0',
   'pydantic>=1.2',
   'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.17',
-  'tt_umd @ git+https://github.com/tenstorrent/tt-umd.git@brosko/more_apis',
+  'tt_umd @ git+https://github.com/tenstorrent/tt-umd.git@brosko/more_apis_without_chips',
   'rich==13.7.0',
   'textual==0.59.0',
   'pre-commit==3.5.0',

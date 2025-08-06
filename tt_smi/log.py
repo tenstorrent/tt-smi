@@ -150,7 +150,7 @@ class HostInfo(ElasticModel):
 
 class HostSWVersions(ElasticModel):
     tt_smi: str
-    pyluwen: str
+    tt_umd: str
 
 
 @optional

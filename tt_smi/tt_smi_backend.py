@@ -29,7 +29,7 @@ from tt_umd import (
     TTDevice,
     wormhole,
     blackhole,
-    LocalChip,
+    create_remote_wormhole_tt_device,
     RemoteWormholeTTDevice,
     ClusterDescriptor,
     ARCH,
@@ -114,14 +114,9 @@ class TTSMIBackend:
         for chip in chips_to_construct:
             if umd_cluster_descriptor.is_chip_mmio_capable(chip):
                 self.umd_device_dict[chip] = TTDevice.create(chip_to_mmio_map[chip])
-                # For some reason when we give out a TTDevice to LocalChip and get it back it doesn't work.
-                # So just create a separate one for LocalChip
-                tt_dev = TTDevice.create(chip_to_mmio_map[chip])
-                self.umd_local_chips[chip] = LocalChip(tt_dev)
-                self.umd_local_chips[chip].set_remote_transfer_ethernet_cores(umd_cluster_descriptor.get_active_eth_channels(chip))
             else:
                 closest_mmio = umd_cluster_descriptor.get_closest_mmio_capable_chip(chip)
-                self.umd_device_dict[chip] = RemoteWormholeTTDevice(self.umd_local_chips[closest_mmio], chip_eth_coords[chip])     
+                self.umd_device_dict[chip] = create_remote_wormhole_tt_device(self.umd_device_dict[closest_mmio], umd_cluster_descriptor, chip)
 
     def save_logs_to_file(self, result_filename: str = ""):
         """Save log for smi snapshots"""
