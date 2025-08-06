@@ -421,6 +421,7 @@ class TTSMI(App):
         """Format device info rows"""
         all_rows = []
         for i in self.backend.umd_device_dict:
+            arch = self.backend.umd_device_dict[i].get_arch()
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
@@ -562,12 +563,10 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if False:
-                        pass
-                    # if   device.as_bh():
-                    #     rows.append(
-                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
-                    #     )
+                    if arch == ARCH.BLACKHOLE:
+                        rows.append(
+                            Text("N/A", style=self.text_theme["gray"], justify="center")
+                        )
                     else:
                         if val:
                             rows.append(
@@ -585,12 +584,10 @@ class TTSMI(App):
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
-                    if False:
-                        pass
-                    # if device.as_bh():
-                    #     rows.append(
-                    #         Text("N/A", style=self.text_theme["gray"], justify="center")
-                    #     )
+                    if arch == ARCH.BLACKHOLE:
+                        rows.append(
+                            Text("N/A", style=self.text_theme["gray"], justify="center")
+                        )
                     else:
                         if val:
                             rows.append(

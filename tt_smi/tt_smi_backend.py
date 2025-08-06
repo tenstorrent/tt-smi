@@ -80,7 +80,6 @@ class TTSMIBackend:
                 for device in self.umd_device_dict
             ],
         )
-        # print("device info ", self.log.device_info)
         self.smbus_telem_info = []
         self.firmware_infos = []
         self.device_infos = []
@@ -105,12 +104,10 @@ class TTSMIBackend:
 
     def construct_umd_devices(self, umd_cluster_descriptor):
         # Note that mmio chips will always be first since they will have lower logical chip id.
+        # So if we're going in the sorted order, the chips will be created properly.
         chips_to_construct = sorted(umd_cluster_descriptor.get_all_chips())
         self.umd_device_dict = {}
-        # We need to keep these because the remote devices won't take ownership
-        self.umd_local_chips = {}
         chip_to_mmio_map = umd_cluster_descriptor.get_chips_with_mmio()
-        chip_eth_coords = umd_cluster_descriptor.get_chip_locations()
         for chip in chips_to_construct:
             if umd_cluster_descriptor.is_chip_mmio_capable(chip):
                 self.umd_device_dict[chip] = TTDevice.create(chip_to_mmio_map[chip])
@@ -217,21 +214,16 @@ class TTSMIBackend:
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
         smbus_telem_dict = {}
-        # print("get_smbus_board_info for board_num: ", board_num)
-        if self.umd_device_dict[board_num].get_arch() == ARCH.BLACKHOLE:
-            telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
-            for telem_key in blackhole.TelemetryTag:
-                telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
-                smbus_telem_dict[telem_key.name] = telem_value
+        tag_collection = {
+            ARCH.BLACKHOLE: blackhole.TelemetryTag,
+            ARCH.WORMHOLE_B0: wormhole.TelemetryTag,
+        }.get(self.umd_device_dict[board_num].get_arch())
+
+        telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
+        for telem_key in tag_collection:
+            telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
+            smbus_telem_dict[telem_key.name] = telem_value
                     
-            # print ("Got bh smbus telem from umd: ", smbus_telem_dict)
-        elif self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
-            telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
-            for telem_key in wormhole.TelemetryTag:
-                telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
-                smbus_telem_dict[telem_key.name] = telem_value
-                    
-            # print ("Got wh smbus telem from umd: ", smbus_telem_dict)
         return smbus_telem_dict
 
     def update_telem(self):
@@ -257,8 +249,6 @@ class TTSMIBackend:
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
-        # TODO: double check this one.
-        # Seems like DDR_STATUS for WH gives speed, but for bh there's DDR_STATUS and DDR_SPEED ??
         if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
             dram_speed_raw = (
                 int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
@@ -319,8 +309,6 @@ class TTSMIBackend:
     def get_dram_training_status(self, board_num) -> bool:
         """Get DRAM Training Status
         True means it passed training, False means it failed or did not train at all"""
-        
-        # TODO: Were just adding this interface to ttdevice, so add it both for WH and BH
         if self.umd_device_dict[board_num].get_arch() == ARCH.WORMHOLE_B0:
             num_channels = 8
             for i in range(num_channels):
@@ -337,12 +325,9 @@ class TTSMIBackend:
         dev_info = {}
         for field in constants.DEV_INFO_LIST:
             if field == "bus_id":
-                try:
-                    if self.umd_cluster_descriptor.is_chip_mmio_capable(board_num):
-                        dev_info[field] = self.umd_device_dict[board_num].get_pci_device().get_device_info().get_pci_bdf()
-                    else:
-                        dev_info[field] = "N/A"
-                except:
+                if self.umd_cluster_descriptor.is_chip_mmio_capable(board_num):
+                    dev_info[field] = self.umd_device_dict[board_num].get_pci_device().get_device_info().get_pci_bdf()
+                else:
                     dev_info[field] = "N/A"
             elif field == "board_type":
                 if self.get_board_id(board_num) == "N/A":
@@ -572,8 +557,6 @@ class TTSMIBackend:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
                 # The tag has different value for WH and BH
-                # print("looking for fw_bundle_version for board_num: ", board_num)
-                # print("smbus_telem info keys: ", len(self.smbus_telem_info))
                 if "FW_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
                     val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
                 elif "FLASH_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
@@ -714,7 +697,16 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
     reset_bh_pci_idx = []
     device_infos = PCIDevice.enumerate_devices_info()
     for pci_idx in list_of_boards:
-        arch = device_infos[pci_idx].get_arch()
+        try:
+            arch = device_infos[pci_idx].get_arch()
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error accessing board at PCI index {pci_idx}! Use -ls to see all devices available to reset",
+                CMD_LINE_COLOR.ENDC,
+            )
+            # Exit the loop to go to the next chip
+            continue
         if arch == ARCH.WORMHOLE_B0:
             reset_wh_pci_idx.append(pci_idx)
         elif arch == ARCH.BLACKHOLE:
