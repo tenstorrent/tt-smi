@@ -64,6 +64,7 @@ jobs:
             python3-all \
             python3-pip
       - name: Import GPG key
+        id: gpg_key_import
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
@@ -126,7 +127,9 @@ jobs:
       - run: |
           gbp buildpackage \
             --git-ignore-new
-        continue-on-error: true
+        #continue-on-error: true
+        env:
+          DEBSIGN_KEYID: ${{ steps.gpg_key_import.outputs.fingerprint }}
 
       - name: Move Debian packages
         run: mkdir -p artifacts && mv ../*.deb artifacts/
