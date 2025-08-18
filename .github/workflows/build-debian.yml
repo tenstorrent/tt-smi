@@ -99,7 +99,7 @@ jobs:
             echo "PATCH=${{ inputs.PATCH }}"
           fi
 
-          if [[ -n "${{ inputs.MAJOR }}" ]]
+          if [[ -n "${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}" ]]
           then
             echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}" >> $GITHUB_ENV
             echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}"
