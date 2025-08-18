@@ -1,3 +1,22 @@
+tt-smi (3.0.28) noble; urgency=medium
+
+  [ Tristan Ross ]
+  * chore: loosen dependency requirements
+
+  [ Samridhi ]
+  * Bump required python version from 3.7 -> 3.10
+
+  [ John 'Warthog9' Hawley ]
+  * pyproject.toml: Minor typo fix
+  * Fixing build process
+  * Chasing down that signing problem
+  * build-debian: Fixing number of commits counter
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.28
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 18 Aug 2025 23:07:09 +0000
+
 tt-smi (3.0.27) noble; urgency=medium
 
   [ John 'Warthog9' Hawley ]
