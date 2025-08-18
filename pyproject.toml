@@ -61,7 +61,7 @@ include-package-data = true
   "data/*/*/*.yaml",
 ]
 
-[tools.setuptools.exclude-package-data]
+[tool.setuptools.exclude-package-data]
 "*" = [
   'build',
 ]
