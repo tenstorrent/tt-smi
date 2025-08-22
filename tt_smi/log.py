@@ -205,6 +205,9 @@ class SmbusTelem(ElasticModel):
     ETH_DEBUG_STATUS0: str
     ETH_DEBUG_STATUS1: str
     TT_FLASH_VERSION: str
+    THERM_TRIP_COUNT: str
+    INPUT_POWER: str
+    BOARD_POWER_LIMIT: str
 
 
 @optional
@@ -248,6 +251,7 @@ class Limits(ElasticModel):
     therm_trip_l1_limit: str
     thm_limit: str
     bus_peak_limit: str
+    board_power_limit: str
 
 
 @optional
