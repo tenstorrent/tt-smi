@@ -16,7 +16,7 @@ Homepage: https://github.com/tenstorrent/tt-smi
 Vcs-Git: https://github.com/tenstorrent/tt-smi.git
 Vcs-Browser: https://github.com/tenstorrent/tt-smi
 
-Package: tt-smi
+Package: python3-tt-smi
 Architecture: all
 Depends:
  ${misc:Depends},
