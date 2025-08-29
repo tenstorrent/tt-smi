@@ -134,8 +134,12 @@ jobs:
 
       - name: Move Debian packages
         run: mkdir -p artifacts && mv ../*.deb artifacts/
-      - name: Copy Changelog to artifacts
-        run: cp debian/changelog artifacts/changelog
+      - name: Copy Changelog & changes to artifacts
+        run: |
+          cp \
+            debian/changelog \
+            ../*.changes \
+            artifacts/
       - name: Set environment variable for distro
         id: distro_ident
         run: |
@@ -149,6 +153,9 @@ jobs:
       - name: Set environment variable for deb filename
         id: deb_filename_distro
         run: echo DEB_FILENAME_DISTRO=$(basename artifacts/*.deb | sed "s/_all/_all-${{ env.DISTRO_IDENT }}/" ) >> $GITHUB_ENV
+      - name: Set environment variable for deb changes file
+        id: deb_filename_changes_distro
+        run: echo DEB_FILENAME_CHANGES_DISTRO=$(basename artifacts/*.changes | sed "s/_amd64/_amd64-${{ env.DISTRO_IDENT }}/" ) >> $GITHUB_ENV
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
@@ -164,4 +171,8 @@ jobs:
         with:
           name: artifacts-${{ env.DISTRO_IDENT }}.zip
           path: artifacts/
-
+      - name: Upload Changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEB_FILENAME_CHANGES_DISTRO }}
+          path: artifacts/*.changes
