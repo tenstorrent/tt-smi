@@ -62,7 +62,8 @@ jobs:
             libpython3-all-dev \
             pybuild-plugin-pyproject \
             python3-all \
-            python3-pip
+            python3-pip \
+            python3-tomli
       - name: Import GPG key
         id: gpg_key_import
         uses: crazy-max/ghaction-import-gpg@v6
