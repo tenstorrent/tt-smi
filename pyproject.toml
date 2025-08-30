@@ -34,6 +34,7 @@ dependencies = [
   'pre-commit>=3.5.0',
   'importlib_resources>=6.1.1',
   'setuptools',
+  'tomli',
 ]
 
 optional-dependencies.dev = [
@@ -64,6 +65,8 @@ include-package-data = true
 [tool.setuptools.exclude-package-data]
 "*" = [
   'build',
+  'debian',
+  'images',
 ]
 
 [tool.setuptools.packages.find]
