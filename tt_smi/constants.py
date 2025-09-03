@@ -32,6 +32,7 @@ SMBUS_TELEMETRY_LIST = [
     "ARC2_HEALTH",
     "ARC3_HEALTH",
     "FAN_SPEED",
+    "FAN_RPM",
     "AICLK",
     "AXICLK",
     "ARCCLK",
@@ -93,6 +94,7 @@ BH_TELEMETRY_LIST = [
     "TAG_CM_FW_VERSION",
     "TAG_L2CPU_FW_VERSION",
     "TAG_FAN_SPEED",
+    "TAG_FAN_RPM",
     "TAG_TIMER_HEARTBEAT",
     "TAG_TELEM_ENUM_COUNT",
 ]
@@ -103,6 +105,7 @@ TELEM_LIST = [
     "aiclk",
     "power",
     "asic_temperature",
+    "fan_speed",
     "heartbeat",
 ]
 
@@ -173,6 +176,7 @@ TELEMETRY_TABLE_HEADER = [
     "AICLK (MHz)",
     "Core Power (W)",
     "Core Temp (°C)",
+    "Fan Speed (%)",
     "Heartbeat",
 ]
 
