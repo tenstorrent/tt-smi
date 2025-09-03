@@ -5,12 +5,21 @@ Uses setuptools_scm for dynamic versioning from git tags.
 """
 from setuptools import setup, find_packages
 
+import tomli
+
 if __name__ == "__main__":
+    with open("pyproject.toml", "rb") as f:
+        toml_data = tomli.load(f)
+
     setup(
         # Fallback for older setuptools versions
         name="tt-smi",
-        use_scm_version=True,
+        version=toml_data['project']['version'],
         packages=find_packages(),
         python_requires=">=3.10",
-        setup_requires=['setuptools_scm'],
+        entry_points={
+            'console_scripts': [
+                'tt-smi = tt_smi:main',
+            ]
+        },
     )
