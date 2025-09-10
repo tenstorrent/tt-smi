@@ -905,7 +905,8 @@ def main():
         # Galaxy reset, without auto retries
         try:
             # reinit has to be enabled to detect devices post reset
-            glx_6u_trays_reset(reinit=True)
+
+            glx_6u_trays_reset(reinit=not(args.no_reinit))
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
