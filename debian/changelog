@@ -1,3 +1,16 @@
+tt-smi (3.0.30) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Enable no_reinit for galaxy reset
+
+  [ Petra Alexson ]
+  * Add Blackhole Galaxy and missing BH PCIe card board types
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.30
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 16 Sep 2025 13:43:38 +0000
+
 tt-smi (3.0.29) noble; urgency=medium
 
   [ Sherry Li ]
