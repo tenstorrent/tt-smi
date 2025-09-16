@@ -1,3 +1,21 @@
+tt-smi (3.0.29) noble; urgency=medium
+
+  [ Sherry Li ]
+  * Add therm_trip_count, input_power, and board_power_limit to SmbusTelem
+  * Bump pyluwen version to 0.7.10 to export therm_trip_count
+
+  [ John 'Warthog9' Hawley ]
+  * Fixing older setuptools again
+  * Workflows - Debian Builds: include changes files in artifacts
+
+  [ Petra Alexson ]
+  * Strictly require latest version of tt-tools-common and pyluwen
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.29
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 10 Sep 2025 16:09:04 +0000
+
 tt-smi (3.0.28) noble; urgency=medium
 
   [ Tristan Ross ]
