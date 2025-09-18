@@ -737,7 +737,7 @@ def mobo_reset_from_json(json_dict) -> dict:
     return json_dict
 
 
-def pci_board_reset(list_of_boards: List[int], reinit=False):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -770,7 +770,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
-        reset_devices = WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
+        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
     # reset gs devices by creating a partially init backend
     if reset_gs_devs:
@@ -791,7 +791,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False):
             CMD_LINE_COLOR.ENDC,
         )
         try:
-            chips = detect_chips_with_callback()
+            detect_chips_with_callback(print_status=print_status)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -852,7 +852,13 @@ def check_wh_galaxy_eth_link_status(devices):
         )
         # sys.exit(1)
 
-def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0", reset_time="0xF"):
+def glx_6u_trays_reset(
+        reinit: bool = True,
+        ubb_num: str = "0xF",
+        dev_num: str = "0xFF",
+        op_mode: str = "0x0",
+        reset_time: str = "0xF",
+        print_status: bool = True):
     """
     Reset the WH asics on the galaxy systems with the following steps:
     1. Reset the trays with ipmi command
@@ -868,6 +874,7 @@ def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0"
                         0x1 - Asserted reset
                         0x2 - Deasserted reset
         reset_time (str): The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
+        print_status (bool): Whether to print out animations while detecting chips.
     """
     print(
         CMD_LINE_COLOR.PURPLE,
@@ -892,7 +899,7 @@ def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0"
     try:
         # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
         # discover local only to fix that
-        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
+        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True, print_status=print_status)
         # Check the eth link status for WH Galaxy
     except Exception as e:
         print(
