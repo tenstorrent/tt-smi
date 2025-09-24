@@ -1,3 +1,15 @@
+tt-smi (3.0.31) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Suppress animated output from reset if there is no tty
+  * Add animation suppressed output to Galaxy 6U reset
+  * Bump tt-tools-common version to 1.4.29
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.31
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 24 Sep 2025 15:35:41 +0000
+
 tt-smi (3.0.30) noble; urgency=medium
 
   [ Samridhi Bansal ]
