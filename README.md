@@ -107,6 +107,7 @@ options:
   -glx_reset_tray {1,2,3,4}
                         Reset a specific tray on the galaxy.
   --no_reinit           Don't detect devices post reset.
+  --xen_file XEN_FILE   Path to the xenstore file to inform host of the reset.
   ```
 
 Some of these flags will be discussed in more detail in the following sections.
@@ -156,7 +157,7 @@ TT-SMI will perform different types of resets depending on the device:
 - Blackhole
   - A board level reset will be perfomed. Power will be cut to the board and brought back up.
 
-By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
+By default, the reset command will re-initialize the boards after reset. To disable this. use the `--no_reinit` flag.
 
 
 A successful reset on a system with both Wormhole and Grayskull should look something like the follows:
@@ -219,6 +220,28 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 │ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
 └────────────┴────────────┴───────────────┴──────────────────┘
 ```
+
+### Reset in a Xen guest system
+
+When resetting in the Xen VM there are a few extra steps that tt-smi performs.
+**There is an expectation that the Host side will be running a monitoring script on the xenstore to watch for communication from the Xen guest.**
+Find a sample of our version of the monitoring script in `tt-smi/support_scripts/xenstore_watch.sh`
+On the guest side re-initializing the chips is skipped, since the host will have to do a pci-detach and re-attach and without that the re-init would fail.
+Using the `--xen_file` command line arg the user can specify the xenstore file to read and monitor.
+
+Example tt-smi reset from the guest side -
+```
+(.venv) tt-xen-guest@vm:~/tt-smi$ tt-smi -r 0 --xen_file test_key
+ Starting reset on devices at PCI indices: 0
+ Xen HVM system detected, writing 1 to Xenstore file test_key to indicate reset start.
+ User needs sudo privileges to write to xenstore. You may be prompted for your password.
+ Warning: Secondary bus reset not completed for device at PCI index 0. Continuing with reset.
+ Writing to xenstore to notify host of the reset. Will not attempt to re-init chips post reset.
+ User needs sudo privileges to write to xenstore. You may be prompted for your password.
+ Successfully wrote 0 to xenstore file test_key to notify host of the reset. Exiting...
+
+```
+
 ### Disabling SW version reporting
 
 To disable the reporting of software versions and reporting of serial numbers, you can update the following parameters in the reset config file. The reset file can be generated into  ```~/.config/tenstorrent/reset_config.json``` using ``` tt-smi -g``` and then updated as follows :
