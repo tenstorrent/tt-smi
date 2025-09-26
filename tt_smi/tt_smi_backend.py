@@ -397,6 +397,11 @@ class TTSMIBackend:
             else 0
         )
         timer_heartbeat = int(self.smbus_telem_info[board_num]["TIMER_HEARTBEAT"], 16) // 6 # Watchdog heartbeat, ~2 per second
+        fan_speed = (
+            min(int(self.smbus_telem_info[board_num]["FAN_RPM"], 16), 5000) / 50 # RPM to percent conversion
+            if self.smbus_telem_info[board_num]["FAN_RPM"] is not None
+            else 0
+        )
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -404,6 +409,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
+            "fan_speed": f"{fan_speed:3.0f}",
             "heartbeat": f"{timer_heartbeat}",
         }
         return chip_telemetry
@@ -421,6 +427,10 @@ class TTSMIBackend:
         ) / 16
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
         arc3_heartbeat = int(self.smbus_telem_info[board_num]["ARC3_HEALTH"], 16) // 5 # Watchdog heartbeat, ~2 per second
+        if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
+            fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16)
+        else:
+            fan_speed = 0
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -428,6 +438,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
+            "fan_speed": f"{fan_speed:3.0f}",
             "heartbeat": f"{arc3_heartbeat}"
         }
 
@@ -446,6 +457,10 @@ class TTSMIBackend:
         ) / 16
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
         arc0_heartbeat = int(self.smbus_telem_info[board_num]["ARC0_HEALTH"], 16) // 1000 # Watchdog heartbeat, ~2 per second
+        if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
+            fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16)
+        else:
+            fan_speed = 0
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -453,6 +468,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
+            "fan_speed": f"{fan_speed:3.0f}",
             "heartbeat": f"{arc0_heartbeat}"
         }
 
