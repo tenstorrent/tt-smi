@@ -790,6 +790,14 @@ def parse_args():
         action="store_true",
         help="Don't detect devices post reset.",
     )
+    parser.add_argument(
+        "-glx_list_tray_to_device",
+        "--galaxy_6u_list_tray_to_device",
+        default=False,
+        action="store_true",
+        help="List the mapping of devices to trays on the galaxy.",
+        dest="glx_list_tray_to_device",
+    )
     args = parser.parse_args()
     return args
 
@@ -811,6 +819,10 @@ def tt_smi_main(backend: TTSMIBackend, args):
 
     if args.list:
         backend.print_all_available_devices()
+        sys.exit(0)
+    if args.glx_list_tray_to_device:
+        check_is_galaxy(backend, "-glx_list_tray_to_device")
+        backend.print_tray_and_device_mapping()
         sys.exit(0)
     if args.snapshot or args.filename == "-":  # If we pass '-s' or '-f -"
         backend.print_logs_to_stdout(pretty=backend.pretty_output)
@@ -855,6 +867,27 @@ def check_fw_version(pyluwen_chip, board_num):
             )
             sys.exit(1)
     return
+
+
+def check_is_galaxy(backend: TTSMIBackend, user_arg: str):
+    """Check if the board is a Galaxy board"""
+    if len(backend.device_infos) < 1:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"No devices detected.",
+            CMD_LINE_COLOR.ENDC
+        )
+        sys.exit(1)
+
+    if backend.device_infos[0]["board_type"] not in constants.GLX_BOARD_TYPES:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"This is not a Galaxy board, `{user_arg}` is only supported on Galaxy.",
+            CMD_LINE_COLOR.ENDC
+        )
+        sys.exit(1)
+    return
+
 
 def main():
     """
