@@ -474,7 +474,7 @@ class TTSMIBackend:
             )
             return {}
 
-    def get_chip_limits(self, board_num) -> Dict:
+    def get_chip_limits(self, board_num: int) -> Dict[str, str]:
         if self.devices[board_num].as_bh():
             return self.get_bh_chip_limits(board_num)
         elif self.devices[board_num].as_wh() or self.devices[board_num].as_gs():
@@ -487,120 +487,64 @@ class TTSMIBackend:
             )
             return {}
 
-    def get_wh_gs_chip_limits(self, board_num) -> Dict:
+    def get_wh_gs_chip_limits(self, board_num: int) -> Dict[str, str]:
         """Get chip limits from the CSM. None if ARC FW not running"""
 
         chip_limits = {}
         for field in constants.LIMITS:
             if field == "vdd_min":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) & 0xFFFF
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) & 0xFFFF) / 1000:4.2f}" if vdd_limits else 0
             elif field == "vdd_max":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) >> 16) / 1000:4.2f}" if vdd_limits else 0
             elif field == "tdp_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDP"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["TDP"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdp = self.smbus_telem_info[board_num].get("TDP")
+                chip_limits[field] = f"{int(tdp, 16) >> 16:3.0f}" if tdp else 0
             elif field == "tdc_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDC"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["TDC"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdc = self.smbus_telem_info[board_num].get("TDC")
+                chip_limits[field] = f"{int(tdc, 16) >> 16:3.0f}" if tdc else 0
             elif field == "asic_fmax":
-                value = (
-                    int(self.smbus_telem_info[board_num]["AICLK"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["AICLK"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:4.0f}" if value is not None else None
+                aiclk = self.smbus_telem_info[board_num].get("AICLK")
+                chip_limits[field] = f"{int(aiclk, 16) >> 16:4.0f}" if aiclk else 0
             elif field == "therm_trip_l1_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else None
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16) >> 16:2.0f}" if thm_limits else 0
             elif field == "thm_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) & 0xFFFF
-                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else 0
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16) & 0xFFFF:2.0f}" if thm_limits else 0
             else:
-                chip_limits[field] = None
+                chip_limits[field] = 0
         return chip_limits
 
-    def get_bh_chip_limits(self, board_num):
-        """Get chip limits from telemetry. None if ARC FW not running"""
+    def get_bh_chip_limits(self, board_num: int) -> Dict[str, str]:
+        """Get chip limits from BH telemetry. None if ARC FW not running"""
 
         chip_limits = {}
         for field in constants.LIMITS:
             if field == "vdd_min":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) & 0xFFFF
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) & 0xFFFF) / 1000:4.2f}" if vdd_limits else 0
             elif field == "vdd_max":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) >> 16) / 1000:4.2f}" if vdd_limits else 0
             elif field == "tdp_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDP_LIMIT_MAX"], 16)
-                    if self.smbus_telem_info[board_num]["TDP_LIMIT_MAX"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdp_limit = self.smbus_telem_info[board_num].get("TDP_LIMIT_MAX")
+                chip_limits[field] = f"{int(tdp_limit, 16):3.0f}" if tdp_limit else 0
             elif field == "tdc_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDC_LIMIT_MAX"], 16)
-                    if self.smbus_telem_info[board_num]["TDC_LIMIT_MAX"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdc_limit = self.smbus_telem_info[board_num].get("TDC_LIMIT_MAX")
+                chip_limits[field] = f"{int(tdc_limit, 16):3.0f}" if tdc_limit else 0
             elif field == "asic_fmax":
-                value = (
-                    int(self.smbus_telem_info[board_num]["AICLK_LIMIT_MAX"], 16)
-                    if self.smbus_telem_info[board_num]["AICLK_LIMIT_MAX"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:4.0f}" if value is not None else None
+                asic_fmax = self.smbus_telem_info[board_num].get("AICLK_LIMIT_MAX")
+                chip_limits[field] = f"{int(asic_fmax, 16):4.0f}" if asic_fmax else 0
             elif field == "therm_trip_l1_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMIT_THROTTLE"], 16)
-                    if self.smbus_telem_info[board_num]["THM_LIMIT_THROTTLE"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else None
+                therm_trip_l1_limit = self.smbus_telem_info[board_num].get("THM_LIMIT_THROTTLE")
+                chip_limits[field] = f"{int(therm_trip_l1_limit, 16):2.0f}" if therm_trip_l1_limit else 0
             elif field == "thm_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16)
-                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else 0
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16):2.0f}" if thm_limits else 0
             else:
-                chip_limits[field] = None
+                chip_limits[field] = 0
         return chip_limits
 
     def get_firmware_versions(self, board_num):
