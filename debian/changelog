@@ -1,3 +1,16 @@
+tt-smi (3.0.32) noble; urgency=medium
+
+  [ Jonathan Baker ]
+  * Added automatic community issue tagging script v2
+
+  [ Samridhi Bansal ]
+  * Added proper close of the device for docker reset
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.32
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 09 Oct 2025 14:43:27 +0000
+
 tt-smi (3.0.31) noble; urgency=medium
 
   [ Petra Alexson ]
