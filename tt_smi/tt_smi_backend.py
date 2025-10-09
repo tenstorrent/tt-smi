@@ -766,7 +766,11 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
                 "Unkown chip!!",
                 CMD_LINE_COLOR.ENDC,
             )
+            # Close the chip  before exiting- needed for docker resets to work
+            del chip
             sys.exit(1)
+        # Close the chip - needed for docker resets to work
+        del chip
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
