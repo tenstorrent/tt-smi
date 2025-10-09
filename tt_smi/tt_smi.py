@@ -203,25 +203,86 @@ class TTSMI(App):
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
             if telem == "heartbeat":
-                    bh_row.append(
-                        Text(
-                            f"{self.get_heartbeat_spinner(val)}",
-                            style=self.text_theme["attention"],
-                            justify="center",
-                        )
-                    )
-            else:
                 bh_row.append(
                     Text(
-                        f"{val}",
+                        f"{self.get_heartbeat_spinner(val)}",
                         style=self.text_theme["attention"],
                         justify="center",
                     )
-                    + Text(
-                        f"/ --- ",
-                        style=self.text_theme["gray"],
+                )
+            elif telem == "voltage":
+                vdd_max = self.backend.chip_limits[board_num]["vdd_max"]
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["text_green"] if float(val) < float(vdd_max) else self.text_theme["attention"],
                         justify="center",
                     )
+                    + Text(
+                        f"/ {vdd_max}",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            elif telem == "current":
+                max_current = self.backend.chip_limits[board_num]["tdc_limit"]
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["text_green"] if float(val) < float(max_current) else self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ {max_current}",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            elif telem == "power":
+                max_power = self.backend.chip_limits[board_num]["tdp_limit"]
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["text_green"] if float(val) < float(max_power) else self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ {max_power}",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            elif telem == "aiclk":
+                asic_fmax = self.backend.chip_limits[board_num]["asic_fmax"]
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["text_green"] if float(val) < float(asic_fmax) else self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ {asic_fmax}",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            elif telem == "asic_temperature":
+                max_temp = self.backend.chip_limits[board_num]["thm_limit"]
+                bh_row.append(
+                    Text(
+                        f"{val}",
+                        style=self.text_theme["text_green"] if float(val) < float(max_temp) else self.text_theme["attention"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ {max_temp}",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            else:
+                bh_row.append(
+                    Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                 )
         return bh_row
 
