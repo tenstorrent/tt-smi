@@ -779,6 +779,7 @@ def parse_args():
     )
     parser.add_argument(
         "-glx_reset_tray",
+        "--galaxy_6u_reset_tray",
         choices=["1", "2", "3", "4",],
         default=None,
         help="Reset a specific tray on the galaxy.",
