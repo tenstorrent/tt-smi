@@ -725,7 +725,7 @@ def parse_args():
         dest="filename",
     )
     parser.add_argument(
-        "-g",
+        "-grj",
         "--generate_reset_json",
         nargs="?",
         const=True,
