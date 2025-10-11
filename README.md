@@ -258,8 +258,7 @@ Driver loaded
  Re-initializing boards after reset....
  Exiting after galaxy reset without re-initializing chips.
 ```
-
-To identify the correct tray number for resetting specific devices, users can run either `tt-smi -glx_list_tray_to_device` or `tt-smi --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations.
+To identify the correct tray number for resetting specific devices, users can run either `tt-smi -glx_list_tray_to_device` or `tt-smi --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
 
 ```
 $ tt-sml -glx_list_tray_to_device
