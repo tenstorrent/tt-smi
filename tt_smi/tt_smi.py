@@ -165,6 +165,7 @@ class TTSMI(App):
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
+
     def update_telem_table(self) -> None:
         """Update telemetry table"""
         try:
@@ -210,6 +211,19 @@ class TTSMI(App):
                             justify="center",
                         )
                     )
+            elif telem == "fan_speed":
+                bh_row.append(
+                    Text(
+                        f"{val}" if 0 < float(val) <= 100 else "N/A",
+                        style=self.text_theme["text_green"] if 0 < float(val) <= 100 else self.text_theme["gray"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ 100",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
             else:
                 bh_row.append(
                     Text(
@@ -234,7 +248,20 @@ class TTSMI(App):
         ]
         for telem in constants.TELEM_LIST:
             val = self.backend.device_telemetrys[board_num][telem]
-            if telem == "voltage":
+            if telem == "fan_speed":
+                wh_row.append(
+                    Text(
+                        f"{val}" if 0 < float(val) <= 100 else "N/A",
+                        style=self.text_theme["text_green"] if 0 < float(val) <= 100 else self.text_theme["gray"],
+                        justify="center",
+                    )
+                    + Text(
+                        f"/ 100",
+                        style=self.text_theme["yellow_bold"],
+                        justify="center",
+                    )
+                )
+            elif telem == "voltage":
                 vdd_max = self.backend.chip_limits[board_num]["vdd_max"]
                 if float(val) < float(vdd_max):
                     wh_row.append(
