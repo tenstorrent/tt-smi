@@ -229,17 +229,15 @@ class TTSMIBackend:
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
         if self.smbus_telem_info[board_num]["BOARD_ID"]:
-            board_id = self.smbus_telem_info[board_num]["BOARD_ID"]
-            return (f"{board_id}").replace("0x", "")
+            board_id = int(self.smbus_telem_info[board_num]["BOARD_ID"], base=16)
+            return f"{board_id:016x}"
         else:
-            board_info_0 = self.smbus_telem_info[board_num]["BOARD_ID_LOW"]
-            board_info_1 = self.smbus_telem_info[board_num]["BOARD_ID_HIGH"]
+            board_info_0 = int(self.smbus_telem_info[board_num]["BOARD_ID_LOW"], base=16)
+            board_info_1 = int(self.smbus_telem_info[board_num]["BOARD_ID_HIGH"], base=16)
 
             if board_info_0 is None or board_info_1 is None:
                 return "N/A"
-            board_info_0 = (f"{board_info_0}").replace("0x", "")
-            board_info_1 = (f"{board_info_1}").replace("x", "")
-            return f"{board_info_1}{board_info_0}"
+            return f"{board_info_1:08x}{board_info_0:08x}"
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
@@ -627,6 +625,8 @@ def get_board_type(board_id: str) -> str:
                    |     +--------------- BBBBB = Unique Part Identifier (UPI)
                    +--------------------- AA
     """
+    if board_id == "N/A":
+        return "N/A"
     serial_num = int(f"0x{board_id}", base=16)
     upi = (serial_num >> 36) & 0xFFFFF
 
