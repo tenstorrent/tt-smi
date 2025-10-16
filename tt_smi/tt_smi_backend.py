@@ -266,14 +266,8 @@ class TTSMIBackend:
         """Update board info by reading SMBUS_TELEMETRY"""
         if self.use_umd:
             smbus_telem_dict = {}
-            tag_collection = {
-                # Yeah this is to be refactored
-                ARCH.BLACKHOLE: TelemetryTag,
-                ARCH.WORMHOLE_B0: wormhole.TelemetryTag,
-            }.get(self.umd_device_dict[board_num].get_arch())
-
             telem_reader = self.umd_device_dict[board_num].get_arc_telemetry_reader()
-            for telem_key in tag_collection:
+            for telem_key in TelemetryTag:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
             return smbus_telem_dict
@@ -544,7 +538,9 @@ class TTSMIBackend:
         elif self.is_grayskull(board_num):
             return self.get_gs_chip_telemetry(board_num)
         elif self.is_wormhole(board_num):
-            return self.get_wh_chip_telemetry(board_num)
+            # TODO fix this properly, wh switched to new telemetry from one point on.
+            return self.get_bh_chip_telemetry(board_num)
+            # return self.get_wh_chip_telemetry(board_num)
         else:
             print(
                 CMD_LINE_COLOR.RED,
