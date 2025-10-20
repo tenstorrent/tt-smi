@@ -16,11 +16,11 @@ import time
 import signal
 import argparse
 import threading
-import pkg_resources
 from rich.text import Text
 from tt_smi import constants
 from typing import List, Tuple, Union
-from importlib_resources import files
+from importlib.resources import files
+from importlib.metadata import version
 from pyluwen import pci_scan
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
@@ -95,7 +95,7 @@ class TTSMI(App):
         self,
         result_filename: str = None,
         app_name: str = "TT-SMI",
-        app_version: str = pkg_resources.get_distribution("tt_smi").version,
+        app_version: str = version("tt_smi"),
         key_bindings: TextualKeyBindings = [],
         backend: TTSMIBackend = None,
         snapshot: bool = False,
@@ -698,7 +698,7 @@ def parse_args():
         "-v",
         "--version",
         action="version",
-        version=pkg_resources.get_distribution("tt_smi").version,
+        version=version("tt_smi"),
     )
     parser.add_argument(
         "-s",
