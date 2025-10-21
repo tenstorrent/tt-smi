@@ -915,7 +915,7 @@ def main():
         try:
             # reinit has to be enabled to detect devices post reset
 
-            glx_6u_trays_reset(reinit=not(args.no_reinit))
+            glx_6u_trays_reset(reinit=not(args.no_reinit), use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -941,7 +941,7 @@ def main():
             try:
                 # Try to reset galaxy 6u trays
                 # reinit has to be enabled to detect devices post reset
-                glx_6u_trays_reset(reinit=True)
+                glx_6u_trays_reset(reinit=True, use_umd=args.use_umd)
                 break  # If reset was successful, break the loop
             except Exception as e:
                 reset_try_number += 1
@@ -965,7 +965,7 @@ def main():
         # Reset a specific tray on the galaxy
         try:
             tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
-            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF")
+            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
