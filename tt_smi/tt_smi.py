@@ -893,11 +893,11 @@ def main():
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit))
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.CONFIG_JSON:
             json_input = reset_input.value
@@ -905,7 +905,7 @@ def main():
             parsed_dict = mobo_reset_from_json(json_input)
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
-                pci_board_reset(pci_indices, reinit)
+                pci_board_reset(pci_indices, reinit, use_umd=args.use_umd)
 
         # All went well - exit
         sys.exit(0)
