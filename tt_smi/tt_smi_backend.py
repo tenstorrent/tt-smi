@@ -790,7 +790,7 @@ def mobo_reset_from_json(json_dict) -> dict:
     return json_dict
 
 
-def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, xen_filename: str = ""):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -827,7 +827,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
-        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx, xenstore_filename=xen_filename)
+        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
     # reset gs devices by creating a partially init backend
     if reset_gs_devs:
@@ -836,7 +836,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             backend.gs_tensix_reset(i)
 
     if reset_bh_pci_idx:
-        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx, xenstore_filename=xen_filename)
+        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
 
     if reinit:
         # Enable backtrace for debugging
