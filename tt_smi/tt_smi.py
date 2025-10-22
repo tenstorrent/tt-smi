@@ -22,6 +22,9 @@ from tt_smi import constants
 from typing import List, Tuple, Union
 from importlib_resources import files
 from pyluwen import pci_scan
+from tt_umd import (
+    TopologyDiscovery,
+)
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
@@ -180,7 +183,7 @@ class TTSMI(App):
     def format_firmware_rows(self):
         """Format firmware rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i in self.backend.get_devices():
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
@@ -198,7 +201,7 @@ class TTSMI(App):
     def format_telemetry_rows(self) -> List[List[Text]]:
         """Format telemetry rows"""
         all_rows = []
-        for board_num, _ in enumerate(self.backend.devices):
+        for board_num, _ in enumerate(self.backend.get_devices()):
             device_row = [
                 Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
             ]
@@ -307,13 +310,13 @@ class TTSMI(App):
     def format_device_info_rows(self):
         """Format device info rows"""
         all_rows = []
-        for i, device in enumerate(self.backend.devices):
+        for i in self.backend.get_devices():
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
                 if info == "board_type":
                     if val == "n300":
-                        if device.is_remote():
+                        if self.backend.is_remote(i):
                             rows.append(
                                 Text(
                                     f"{val}",
@@ -349,7 +352,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
-                    if device.is_remote():
+                    if self.backend.is_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -386,7 +389,7 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
-                    if device.is_remote():
+                    if self.backend.is_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -449,7 +452,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
@@ -470,7 +473,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
@@ -681,6 +684,12 @@ def parse_args():
         action="store_true",
         help="Don't detect devices post reset.",
     )
+    parser.add_argument(
+        "--use_umd",
+        default=False,
+        action="store_true",
+        help="Use UMD instead of Luwen driver.",
+    )
     args = parser.parse_args()
     return args
 
@@ -775,11 +784,11 @@ def main():
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.CONFIG_JSON:
             json_input = reset_input.value
@@ -787,7 +796,7 @@ def main():
             parsed_dict = mobo_reset_from_json(json_input)
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
-                pci_board_reset(pci_indices, reinit, print_status=is_tty)
+                pci_board_reset(pci_indices, reinit, print_status=is_tty, use_umd=args.use_umd)
 
         # All went well - exit
         sys.exit(0)
@@ -797,7 +806,7 @@ def main():
         try:
             # reinit has to be enabled to detect devices post reset
 
-            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty)
+            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -823,7 +832,7 @@ def main():
             try:
                 # Try to reset galaxy 6u trays
                 # reinit has to be enabled to detect devices post reset
-                glx_6u_trays_reset(reinit=True, print_status=is_tty)
+                glx_6u_trays_reset(reinit=True, print_status=is_tty, use_umd=args.use_umd)
                 break  # If reset was successful, break the loop
             except Exception as e:
                 reset_try_number += 1
@@ -847,7 +856,7 @@ def main():
         # Reset a specific tray on the galaxy
         try:
             tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
-            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty)
+            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty, use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -886,9 +895,12 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(
-            local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-        )
+        if args.use_umd:
+            devices = TopologyDiscovery.create_cluster_descriptor()
+        else:
+            devices = detect_chips_with_callback(
+                local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
+            )
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -903,10 +915,14 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    backend = TTSMIBackend(devices, pretty_output=is_tty)
-    # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(backend.devices):
-        check_fw_version(device, i)
+    if args.use_umd:
+        backend = TTSMIBackend(umd_cluster_descriptor=devices, pretty_output=is_tty)
+    else:
+        backend = TTSMIBackend(devices=devices, pretty_output=is_tty)
+        # Check firmware version before running tt_smi to avoid crashes.
+        # This is done only for grayskull devices.
+        for i, device in enumerate(backend.devices):
+            check_fw_version(device, i)
 
     tt_smi_main(backend, args)
 
