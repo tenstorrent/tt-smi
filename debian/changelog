@@ -1,3 +1,41 @@
+tt-smi (3.0.32) noble; urgency=medium
+
+  [ Jonathan Baker ]
+  * Added automatic community issue tagging script v2
+
+  [ Samridhi Bansal ]
+  * Added proper close of the device for docker reset
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.32
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 09 Oct 2025 14:43:27 +0000
+
+tt-smi (3.0.31) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Suppress animated output from reset if there is no tty
+  * Add animation suppressed output to Galaxy 6U reset
+  * Bump tt-tools-common version to 1.4.29
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.31
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 24 Sep 2025 15:35:41 +0000
+
+tt-smi (3.0.30) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Enable no_reinit for galaxy reset
+
+  [ Petra Alexson ]
+  * Add Blackhole Galaxy and missing BH PCIe card board types
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.30
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 16 Sep 2025 13:43:38 +0000
+
 tt-smi (3.0.29) noble; urgency=medium
 
   [ Sherry Li ]

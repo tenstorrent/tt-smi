@@ -311,17 +311,15 @@ class TTSMIBackend:
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
         if "BOARD_ID" in self.smbus_telem_info[board_num] and self.smbus_telem_info[board_num]["BOARD_ID"]:
-            board_id = self.smbus_telem_info[board_num]["BOARD_ID"]
-            return (f"{board_id}").replace("0x", "")
+            board_id = int(self.smbus_telem_info[board_num]["BOARD_ID"], base=16)
+            return f"{board_id:016x}"
         else:
-            board_info_0 = self.smbus_telem_info[board_num]["BOARD_ID_LOW"]
-            board_info_1 = self.smbus_telem_info[board_num]["BOARD_ID_HIGH"]
+            board_info_0 = int(self.smbus_telem_info[board_num]["BOARD_ID_LOW"], base=16)
+            board_info_1 = int(self.smbus_telem_info[board_num]["BOARD_ID_HIGH"], base=16)
 
             if board_info_0 is None or board_info_1 is None:
                 return "N/A"
-            board_info_0 = (f"{board_info_0}").replace("0x", "")
-            board_info_1 = (f"{board_info_1}").replace("x", "")
-            return f"{board_info_1}{board_info_0}"
+            return f"{board_info_1:08x}{board_info_0:08x}"
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
@@ -562,62 +560,77 @@ class TTSMIBackend:
             )
             return {}
 
-    def get_chip_limits(self, board_num):
+    def get_chip_limits(self, board_num: int) -> Dict[str, str]:
+        if self.devices[board_num].as_bh():
+            return self.get_bh_chip_limits(board_num)
+        elif self.devices[board_num].as_wh() or self.devices[board_num].as_gs():
+            return self.get_wh_gs_chip_limits(board_num)
+        else:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Could not fetch chip limits for board {board_num}: Unrecognized board type!",
+                CMD_LINE_COLOR.ENDC,
+            )
+            return {}
+
+    def get_wh_gs_chip_limits(self, board_num: int) -> Dict[str, str]:
         """Get chip limits from the CSM. None if ARC FW not running"""
 
         chip_limits = {}
         for field in constants.LIMITS:
             if field == "vdd_min":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) & 0xFFFF
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) & 0xFFFF) / 1000:4.2f}" if vdd_limits else 0
             elif field == "vdd_max":
-                value = (
-                    int(self.smbus_telem_info[board_num]["VDD_LIMITS"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["VDD_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value/1000:4.2f}" if value is not None else None
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) >> 16) / 1000:4.2f}" if vdd_limits else 0
             elif field == "tdp_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDP"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["TDP"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdp = self.smbus_telem_info[board_num].get("TDP")
+                chip_limits[field] = f"{int(tdp, 16) >> 16:3.0f}" if tdp else 0
             elif field == "tdc_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["TDC"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["TDC"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:3.0f}" if value is not None else None
+                tdc = self.smbus_telem_info[board_num].get("TDC")
+                chip_limits[field] = f"{int(tdc, 16) >> 16:3.0f}" if tdc else 0
             elif field == "asic_fmax":
-                value = (
-                    int(self.smbus_telem_info[board_num]["AICLK"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["AICLK"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:4.0f}" if value is not None else None
+                aiclk = self.smbus_telem_info[board_num].get("AICLK")
+                chip_limits[field] = f"{int(aiclk, 16) >> 16:4.0f}" if aiclk else 0
             elif field == "therm_trip_l1_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) >> 16
-                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else None
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16) >> 16:2.0f}" if thm_limits else 0
             elif field == "thm_limit":
-                value = (
-                    int(self.smbus_telem_info[board_num]["THM_LIMITS"], 16) & 0xFFFF
-                    if self.smbus_telem_info[board_num]["THM_LIMITS"] is not None
-                    else 0
-                )
-                chip_limits[field] = f"{value:2.0f}" if value is not None else 0
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16) & 0xFFFF:2.0f}" if thm_limits else 0
             else:
-                chip_limits[field] = None
+                chip_limits[field] = 0
+        return chip_limits
+
+    def get_bh_chip_limits(self, board_num: int) -> Dict[str, str]:
+        """Get chip limits from BH telemetry. None if ARC FW not running"""
+
+        chip_limits = {}
+        for field in constants.LIMITS:
+            if field == "vdd_min":
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) & 0xFFFF) / 1000:4.2f}" if vdd_limits else 0
+            elif field == "vdd_max":
+                vdd_limits = self.smbus_telem_info[board_num].get("VDD_LIMITS")
+                chip_limits[field] = f"{(int(vdd_limits, 16) >> 16) / 1000:4.2f}" if vdd_limits else 0
+            elif field == "tdp_limit":
+                tdp_limit = self.smbus_telem_info[board_num].get("TDP_LIMIT_MAX")
+                chip_limits[field] = f"{int(tdp_limit, 16):3.0f}" if tdp_limit else 0
+            elif field == "tdc_limit":
+                tdc_limit = self.smbus_telem_info[board_num].get("TDC_LIMIT_MAX")
+                chip_limits[field] = f"{int(tdc_limit, 16):3.0f}" if tdc_limit else 0
+            elif field == "asic_fmax":
+                asic_fmax = self.smbus_telem_info[board_num].get("AICLK_LIMIT_MAX")
+                chip_limits[field] = f"{int(asic_fmax, 16):4.0f}" if asic_fmax else 0
+            elif field == "therm_trip_l1_limit":
+                therm_trip_l1_limit = self.smbus_telem_info[board_num].get("THM_LIMIT_THROTTLE")
+                chip_limits[field] = f"{int(therm_trip_l1_limit, 16):2.0f}" if therm_trip_l1_limit else 0
+            elif field == "thm_limit":
+                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                chip_limits[field] = f"{int(thm_limits, 16):2.0f}" if thm_limits else 0
+            else:
+                chip_limits[field] = 0
         return chip_limits
 
     def get_firmware_versions(self, board_num):
@@ -739,6 +752,8 @@ def get_board_type(board_id: str) -> str:
                    |     +--------------- BBBBB = Unique Part Identifier (UPI)
                    +--------------------- AA
     """
+    if board_id == "N/A":
+        return "N/A"
     serial_num = int(f"0x{board_id}", base=16)
     upi = (serial_num >> 36) & 0xFFFFF
 
@@ -850,7 +865,7 @@ def mobo_reset_from_json(json_dict) -> dict:
     return json_dict
 
 
-def pci_board_reset(list_of_boards: List[int], reinit=False, use_umd=False):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd=False):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -885,14 +900,18 @@ def pci_board_reset(list_of_boards: List[int], reinit=False, use_umd=False):
                     "Unkown chip!!",
                     CMD_LINE_COLOR.ENDC,
                 )
+                # Close the chip  before exiting- needed for docker resets to work
+                del chip
                 sys.exit(1)
+            # Close the chip - needed for docker resets to work
+            del chip
 
     if use_umd:
         WarmReset.warm_reset(list_of_boards)
     else:
         # reset wh devices with pci indices
         if reset_wh_pci_idx:
-            reset_devices = WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
+            WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
         # reset gs devices by creating a partially init backend
         if reset_gs_devs:
@@ -917,7 +936,7 @@ def pci_board_reset(list_of_boards: List[int], reinit=False, use_umd=False):
                 cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
                 num_devices = len(cluster_descriptor.get_all_chips())
             else:
-                chips = detect_chips_with_callback()
+                detect_chips_with_callback(print_status=print_status)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -1006,7 +1025,14 @@ def umd_ubb_wait_for_driver_load():
     # If we reach here, the driver was not loaded
     raise Exception(f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up")
 
-def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0", reset_time="0xF", use_umd=False):
+def glx_6u_trays_reset(
+        reinit: bool = True,
+        ubb_num: str = "0xF",
+        dev_num: str = "0xFF",
+        op_mode: str = "0x0",
+        reset_time: str = "0xF",
+        print_status: bool = True, 
+        use_umd: bool = False):
     """
     Reset the WH asics on the galaxy systems with the following steps:
     1. Reset the trays with ipmi command (or UMD warm reset)
@@ -1022,6 +1048,7 @@ def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0"
                         0x1 - Asserted reset
                         0x2 - Deasserted reset
         reset_time (str): The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
+        print_status (bool): Whether to print out animations while detecting chips.
         use_umd (bool): Whether to use UMD (WarmReset.ubb_warm_reset) or pyluwen (run_wh_ubb_ipmi_reset)
     """
     print(
@@ -1061,7 +1088,7 @@ def glx_6u_trays_reset(reinit=True, ubb_num="0xF", dev_num="0xFF", op_mode="0x0"
     try:
         # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
         # discover local only to fix that
-        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True)
+        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True, print_status=print_status)
         # Check the eth link status for WH Galaxy
     except Exception as e:
         print(
