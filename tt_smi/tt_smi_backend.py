@@ -277,7 +277,6 @@ class TTSMIBackend:
                 ARCH.WORMHOLE_B0: SmBusArcTelemetryReader(self.umd_device_dict[board_num]),
             }.get(arch)
             tag_collection = {
-                # Yeah this is to be refactored
                 ARCH.BLACKHOLE: TelemetryTag,
                 ARCH.WORMHOLE_B0: wormhole.TelemetryTag,
             }.get(arch)
