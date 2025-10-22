@@ -561,9 +561,9 @@ class TTSMIBackend:
             return {}
 
     def get_chip_limits(self, board_num: int) -> Dict[str, str]:
-        if self.devices[board_num].as_bh():
+        if self.is_blackhole(board_num):
             return self.get_bh_chip_limits(board_num)
-        elif self.devices[board_num].as_wh() or self.devices[board_num].as_gs():
+        elif self.is_wormhole(board_num) or self.is_grayskull(board_num):
             return self.get_wh_gs_chip_limits(board_num)
         else:
             print(

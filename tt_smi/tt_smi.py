@@ -201,7 +201,7 @@ class TTSMI(App):
     def format_telemetry_rows(self) -> List[List[Text]]:
         """Format telemetry rows"""
         all_rows = []
-        for board_num, _ in enumerate(self.backend.devices):
+        for board_num, _ in enumerate(self.backend.get_devices()):
             device_row = [
                 Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
             ]
