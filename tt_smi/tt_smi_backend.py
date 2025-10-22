@@ -12,7 +12,6 @@ import re
 import sys
 import time
 import datetime
-import pkg_resources
 from tt_smi import log
 from pathlib import Path
 from rich.table import Table
@@ -21,6 +20,7 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Dict, List
 from rich.progress import track
+from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
@@ -700,8 +700,8 @@ def dict_from_public_attrs(obj) -> dict:
 
 def get_host_software_versions() -> dict:
     return {
-        "tt_smi": pkg_resources.get_distribution("tt_smi").version,
-        "pyluwen": pkg_resources.get_distribution("pyluwen").version,
+        "tt_smi": version("tt_smi"),
+        "pyluwen": version("pyluwen"),
     }
 
 
