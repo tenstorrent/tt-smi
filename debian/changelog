@@ -1,3 +1,30 @@
+tt-smi (3.0.33) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Format board ID with leading 0s
+
+  [ Kohei Yamaguchi ]
+  * Add -glx_list_tray_to_device option to map Tray to Device ID list
+  * Add description of -glx_list_tray_to_device
+
+  [ Petra Alexson ]
+  * Add BH chip limits and display them in telemetry tab
+
+  [ Kohei Yamaguchi ]
+  * checking vm or not
+  * Add 2ne argument name
+  * Add a note that it shouldn't run in VM
+
+  [ Petra Alexson ]
+  * Unify format_bh_telemetry_rows and format_wh_telemetry_rows
+  * bump tt-tools-common to 1.4.31 and pyluwen to 0.7.12
+  * Use importlib instead of deprecated setuptools
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.33
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 27 Oct 2025 20:17:51 +0000
+
 tt-smi (3.0.32) noble; urgency=medium
 
   [ Jonathan Baker ]
