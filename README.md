@@ -258,6 +258,22 @@ Driver loaded
  Re-initializing boards after reset....
  Exiting after galaxy reset without re-initializing chips.
 ```
+To identify the correct tray number for resetting specific devices, users can run either `tt-smi -glx_list_tray_to_device` or `tt-smi --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
+
+```
+$ tt-sml -glx_list_tray_to_device
+
+Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+      Mapping of trays to devices on the galaxy:       
+┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Tray Number ┃ Tray Bus ID ┃ PCI Dev ID              ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1           │ 0xc0        │ 0,1,2,3,4,5,6,7         │
+│ 2           │ 0x80        │ 8,9,10,11,12,13,14,15   │
+│ 3           │ 0x00        │ 16,17,18,19,20,21,22,23 │
+│ 4           │ 0x40        │ 24,25,26,27,28,29,30,31 │
+└─────────────┴─────────────┴─────────────────────────┘
+```
 
 ## Snapshots
 

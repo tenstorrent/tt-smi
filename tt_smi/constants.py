@@ -145,6 +145,12 @@ PCI_PROPERTIES = [
     "max_link_width",
 ]
 
+GLX_BOARD_TYPES = ["tt-galaxy-wh", "tt-galaxy-bh"]
+
+# Galaxy tray number and UBB bus IDs
+WH_UBB_BUS_IDS = {1: 0xC0, 2: 0x80, 3: 0x00, 4: 0x40}
+BH_UBB_BUS_IDS = {1: 0x00, 2: 0x40, 3: 0xC0, 4: 0x80}
+
 MAX_PCIE_WIDTH = 16
 MAX_PCIE_SPEED = 4
 GUI_INTERVAL_TIME = 0.1

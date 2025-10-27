@@ -203,6 +203,44 @@ class TTSMIBackend:
                 )
         console.print(table_2)
 
+    def print_tray_and_device_mapping(self):
+        """Print the mapping of trays to devices on the galaxy"""
+
+        ubb_bus_ids = (
+            constants.BH_UBB_BUS_IDS
+            if self.devices[0].as_bh()
+            else constants.WH_UBB_BUS_IDS
+        )
+
+        def _get_mapping_tray_to_device():
+            bus_id_to_tray = {
+                bus_id: tray_num for tray_num, bus_id in ubb_bus_ids.items()
+            }
+            tray_to_devices = {}
+            for i, device_info in enumerate(self.device_infos):
+                # Extract bus id from "domain:bus:device.function" format
+                bus_id = int(device_info["bus_id"].split(":")[1], 16)
+                tray_bus_id = bus_id & 0xF0
+                if tray_bus_id in bus_id_to_tray:
+                    tray_num = bus_id_to_tray[tray_bus_id]
+                    tray_to_devices.setdefault(tray_num, []).append(i)
+            return tray_to_devices
+        
+        tray_to_devices = _get_mapping_tray_to_device()
+
+        console = get_console()
+        table = Table(title="Mapping of trays to devices on the galaxy:")
+        table.add_column("Tray Number")
+        table.add_column("Tray Bus ID")
+        table.add_column("PCI Dev ID")
+        for tray_num in sorted(tray_to_devices):
+            table.add_row(
+                f"{tray_num}",
+                f"0x{ubb_bus_ids[tray_num]:02x}",
+                f"{','.join(map(str, tray_to_devices[tray_num]))}",
+            )
+        console.print(table)
+
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
         pyluwen_chip = self.devices[board_num]
