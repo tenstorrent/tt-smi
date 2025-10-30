@@ -156,7 +156,7 @@ TT-SMI will perform different types of resets depending on the device:
 - Blackhole
   - A board level reset will be perfomed. Power will be cut to the board and brought back up.
 
-By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
+By default, the reset command will re-initialize the boards after reset. To disable this. use the `--no_reinit` flag.
 
 
 A successful reset on a system with both Wormhole and Grayskull should look something like the follows:
@@ -219,6 +219,12 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 │ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
 └────────────┴────────────┴───────────────┴──────────────────┘
 ```
+
+### Reset in a Xen guest system
+
+When resetting in the Xen VM there are a few extra steps that tt-smi performs.
+In the backend it writes to a xenstore file indicating that reset has begun and then monitors for the disapearance of that file to make sure host side has pciked up that the reset was done and does the appropriate hot plug actions so the chips come back on the pcie bus.
+
 ### Disabling SW version reporting
 
 To disable the reporting of software versions and reporting of serial numbers, you can update the following parameters in the reset config file. The reset file can be generated into  ```~/.config/tenstorrent/reset_config.json``` using ``` tt-smi -g``` and then updated as follows :

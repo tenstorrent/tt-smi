@@ -27,7 +27,7 @@ dependencies = [
   'distro>=1.8.0',
   'elasticsearch>=8.11.0',
   'pydantic>=1.2',
-  'tt_tools_common==1.4.31',
+  'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@sbansal/xen_reset_updates',
   'pyluwen==0.7.12',
   'rich>=13.7.0',
   'textual>=0.59.0',
