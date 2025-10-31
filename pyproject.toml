@@ -1,6 +1,6 @@
 [project]
 name = "tt-smi"
-version = "3.0.33"
+version = "3.0.34"
 description = "ncurses based hardware monitoring for Tenstorrent silicon"
 readme = "README.md"
 requires-python = ">=3.10"
