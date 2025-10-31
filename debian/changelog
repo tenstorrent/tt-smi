@@ -1,3 +1,13 @@
+tt-smi (3.0.34) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Bumped tools common version to enable xen resets
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.34
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 31 Oct 2025 15:46:32 +0000
+
 tt-smi (3.0.33) noble; urgency=medium
 
   [ Petra Alexson ]
