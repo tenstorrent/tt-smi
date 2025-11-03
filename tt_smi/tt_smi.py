@@ -837,11 +837,11 @@ def main():
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
 
         elif reset_input.type == ResetType.CONFIG_JSON:
             json_input = reset_input.value
@@ -849,7 +849,7 @@ def main():
             parsed_dict = mobo_reset_from_json(json_input)
             pci_indices, reinit = pci_indices_from_json(parsed_dict)
             if pci_indices:
-                pci_board_reset(pci_indices, reinit, print_status=is_tty)
+                pci_board_reset(pci_indices, reinit, print_status=is_tty, use_umd=args.use_umd)
 
         # All went well - exit
         sys.exit(0)
@@ -859,7 +859,7 @@ def main():
         try:
             # reinit has to be enabled to detect devices post reset
 
-            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty)
+            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -885,7 +885,7 @@ def main():
             try:
                 # Try to reset galaxy 6u trays
                 # reinit has to be enabled to detect devices post reset
-                glx_6u_trays_reset(reinit=True, print_status=is_tty)
+                glx_6u_trays_reset(reinit=True, print_status=is_tty, use_umd=args.use_umd)
                 break  # If reset was successful, break the loop
             except Exception as e:
                 reset_try_number += 1
@@ -909,7 +909,7 @@ def main():
         # Reset a specific tray on the galaxy
         try:
             tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
-            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty)
+            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty, use_umd=args.use_umd)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
