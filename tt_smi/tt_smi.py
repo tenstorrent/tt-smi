@@ -180,7 +180,7 @@ class TTSMI(App):
     def format_firmware_rows(self):
         """Format firmware rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i in self.backend.get_devices():
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
@@ -198,7 +198,7 @@ class TTSMI(App):
     def format_telemetry_rows(self) -> List[List[Text]]:
         """Format telemetry rows"""
         all_rows = []
-        for board_num, _ in enumerate(self.backend.devices):
+        for board_num, _ in enumerate(self.backend.get_devices()):
             device_row = [
                 Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
             ]
@@ -307,13 +307,13 @@ class TTSMI(App):
     def format_device_info_rows(self):
         """Format device info rows"""
         all_rows = []
-        for i, device in enumerate(self.backend.devices):
+        for i in self.backend.get_devices():
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
                 if info == "board_type":
                     if val == "n300":
-                        if device.is_remote():
+                        if self.backend.is_remote(i):
                             rows.append(
                                 Text(
                                     f"{val}",
@@ -349,7 +349,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
-                    if device.is_remote():
+                    if self.backend.is_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -386,7 +386,7 @@ class TTSMI(App):
                             )
                 elif info == "pcie_speed":
                     max_link_speed = self.backend.pci_properties[i]["max_link_speed"]
-                    if device.is_remote():
+                    if self.backend.is_remote(i):
                         rows.append(
                             Text(
                                 f"N/A",
@@ -449,7 +449,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
@@ -470,7 +470,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
