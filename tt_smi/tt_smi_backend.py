@@ -31,6 +31,11 @@ from pyluwen import (
     run_wh_ubb_ipmi_reset,
     run_ubb_wait_for_driver_load
 )
+from tt_umd import (
+    TTDevice,
+    WarmReset,
+    TopologyDiscovery,
+)
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
@@ -816,7 +821,7 @@ def mobo_reset_from_json(json_dict) -> dict:
     return json_dict
 
 
-def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -824,8 +829,12 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
     reset_bh_pci_idx = []
     for pci_idx in list_of_boards:
         try:
-            chip = PciChip(pci_interface=pci_idx)
+            if use_umd:
+                chip = TTDevice.create(pci_idx)
+            else:
+                chip = PciChip(pci_interface=pci_idx)
         except Exception as e:
+            print(e)
             print(
                 CMD_LINE_COLOR.RED,
                 f"Error accessing board at PCI index {pci_idx}! Use -ls to see all devices available to reset",
@@ -833,36 +842,41 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             )
             # Exit the loop to go to the next chip
             continue
-        if chip.as_wh():
-            reset_wh_pci_idx.append(pci_idx)
-        elif chip.as_gs():
-            reset_gs_devs.append(chip)
-        elif chip.as_bh():
-            reset_bh_pci_idx.append(pci_idx)
-        else:
-            print(
-                CMD_LINE_COLOR.RED,
-                "Unkown chip!!",
-                CMD_LINE_COLOR.ENDC,
-            )
-            # Close the chip  before exiting- needed for docker resets to work
+        
+        if not use_umd:
+            if chip.as_wh():
+                reset_wh_pci_idx.append(pci_idx)
+            elif chip.as_gs():
+                reset_gs_devs.append(chip)
+            elif chip.as_bh():
+                reset_bh_pci_idx.append(pci_idx)
+            else:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "Unkown chip!!",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                # Close the chip  before exiting- needed for docker resets to work
+                del chip
+                sys.exit(1)
+            # Close the chip - needed for docker resets to work
             del chip
-            sys.exit(1)
-        # Close the chip - needed for docker resets to work
-        del chip
 
-    # reset wh devices with pci indices
-    if reset_wh_pci_idx:
-        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
+    if use_umd:
+        WarmReset.warm_reset(list_of_boards)
+    else:
+        # reset wh devices with pci indices
+        if reset_wh_pci_idx:
+            WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
 
-    # reset gs devices by creating a partially init backend
-    if reset_gs_devs:
-        backend = TTSMIBackend(devices=reset_gs_devs, fully_init=False)
-        for i, _ in enumerate(reset_gs_devs):
-            backend.gs_tensix_reset(i)
+        # reset gs devices by creating a partially init backend
+        if reset_gs_devs:
+            backend = TTSMIBackend(devices=reset_gs_devs, fully_init=False)
+            for i, _ in enumerate(reset_gs_devs):
+                backend.gs_tensix_reset(i)
 
-    if reset_bh_pci_idx:
-        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
+        if reset_bh_pci_idx:
+            BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
 
     if reinit:
         # Enable backtrace for debugging
@@ -874,7 +888,10 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             CMD_LINE_COLOR.ENDC,
         )
         try:
-            detect_chips_with_callback(print_status=print_status)
+            if use_umd:
+                cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
+            else:
+                detect_chips_with_callback()
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -935,16 +952,45 @@ def check_wh_galaxy_eth_link_status(devices):
         )
         # sys.exit(1)
 
+def umd_ubb_wait_for_driver_load():
+    """
+    Wait for the driver to reload for UMD, try 100 times.
+    Similar to luwen's ubb_wait_for_driver_load but uses PCIDevice.enumerate_devices.
+    """
+    attempts = 0
+    expected_chip_count = 32
+    
+    while attempts < 100:
+        device_count = 0
+        try:
+            devices = PCIDevice.enumerate_devices()
+            device_count = len(devices)
+            
+            if device_count == expected_chip_count:
+                print(f"Driver loaded with {device_count} devices")
+                return
+        except Exception as e:
+            # If enumerate_devices fails, continue waiting
+            pass
+        
+        print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
+        time.sleep(1)
+        attempts += 1
+    
+    # If we reach here, the driver was not loaded
+    raise Exception(f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up")
+
 def glx_6u_trays_reset(
         reinit: bool = True,
         ubb_num: str = "0xF",
         dev_num: str = "0xFF",
         op_mode: str = "0x0",
         reset_time: str = "0xF",
-        print_status: bool = True):
+        print_status: bool = True,
+        use_umd=False):
     """
     Reset the WH asics on the galaxy systems with the following steps:
-    1. Reset the trays with ipmi command
+    1. Reset the trays with ipmi command (or UMD warm reset)
     2. Wait for 30s
     3. Reinit all chips
 
@@ -958,15 +1004,30 @@ def glx_6u_trays_reset(
                         0x2 - Deasserted reset
         reset_time (str): The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
         print_status (bool): Whether to print out animations while detecting chips.
+        use_umd (bool): Whether to use UMD (WarmReset.ubb_warm_reset) or pyluwen (run_wh_ubb_ipmi_reset)
     """
     print(
         CMD_LINE_COLOR.PURPLE,
         f"Resetting WH Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
-    run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
-    timed_wait(30)
-    run_ubb_wait_for_driver_load()
+    
+    if use_umd:
+        if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error: UMD warm reset only supports full galaxy reset (ubb_num=0xF, dev_num=0xFF, op_mode=0x0, reset_time=0xF)",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        WarmReset.ubb_warm_reset()
+        timed_wait(30)
+        umd_ubb_wait_for_driver_load()
+    else:
+        run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
+        timed_wait(30)
+        run_ubb_wait_for_driver_load()
+    
     print(
         CMD_LINE_COLOR.PURPLE,
         f"Re-initializing boards after reset....",
