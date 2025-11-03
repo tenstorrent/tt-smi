@@ -18,7 +18,7 @@ from rich.table import Table
 from tt_smi import constants
 from rich import get_console
 from rich.syntax import Syntax
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
 from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -32,7 +32,13 @@ from pyluwen import (
 )
 from tt_umd import (
     TTDevice,
+    wormhole,
+    TelemetryTag,
+    ClusterDescriptor,
+    SmBusArcTelemetryReader,
+    ARCH,
     WarmReset,
+    PCIDevice,
     TopologyDiscovery,
 )
 from tt_tools_common.utils_common.system_utils import (
@@ -57,11 +63,15 @@ class TTSMIBackend:
 
     def __init__(
         self,
-        devices: Dict[int, PciChip],
+        devices: Dict[int, Union[PciChip, TTDevice]] = None,
+        umd_cluster_descriptor: Optional[ClusterDescriptor] = None,
         fully_init: bool = True,
         pretty_output: bool = True,
     ):
         self.devices = devices
+        self.use_umd = umd_cluster_descriptor is not None
+        if (self.use_umd):
+            self.umd_cluster_descriptor = umd_cluster_descriptor
         self.pretty_output = pretty_output
         self.log: log.TTSMILog = log.TTSMILog(
             time=datetime.datetime.now(),
@@ -101,23 +111,28 @@ class TTSMIBackend:
                 self.chip_limits.append(self.get_chip_limits(i))
     
     def is_blackhole(self, device_idx) -> bool:
-        return self.devices[device_idx].as_bh()
+        return (self.devices[device_idx].as_bh() if not self.use_umd
+                else self.devices[device_idx].get_arch() == ARCH.BLACKHOLE)
     
     def is_wormhole(self, device_idx) -> bool:
-        return self.devices[device_idx].as_wh()
+        return (self.devices[device_idx].as_wh() if not self.use_umd
+                else self.devices[device_idx].get_arch() == ARCH.WORMHOLE_B0)
 
     def is_grayskull(self, device_idx) -> bool:
-        return self.devices[device_idx].as_gs()
+        return (self.devices[device_idx].as_gs() if not self.use_umd
+                else False)
     
     def get_pci_device_id(self, device_idx) -> str:
         if self.devices[device_idx].is_remote():
             return "N/A"
-        return self.devices[device_idx].get_pci_interface_id()
+        return (self.devices[device_idx].get_pci_interface_id() if not self.use_umd
+                else self.devices[device_idx].get_pci_device().get_device_num())
         
     def get_pci_bdf(self, device_idx) -> str:
         if self.devices[device_idx].is_remote():
             return "N/A"
-        return self.devices[device_idx].get_pci_bdf()
+        return (self.devices[device_idx].get_pci_bdf() if not self.use_umd
+                else self.devices[device_idx].get_pci_device().get_device_info().pci_bdf)
     
     def get_device_name(self, device_idx):
         """Get device name from chip object"""
@@ -262,6 +277,23 @@ class TTSMIBackend:
 
     def get_smbus_board_info(self, board_num: int) -> Dict:
         """Update board info by reading SMBUS_TELEMETRY"""
+        if self.use_umd:
+            smbus_telem_dict = {}
+            arch = self.devices[board_num].get_arch()
+            if arch == ARCH.WORMHOLE_B0:
+                telem_reader = SmBusArcTelemetryReader(self.devices[board_num])
+                tag_collection = wormhole.TelemetryTag
+            elif arch == ARCH.BLACKHOLE:
+                telem_reader = self.devices[board_num].get_arc_telemetry_reader()
+                tag_collection = TelemetryTag
+            else:
+                raise ValueError(f"Unknown arch for device {board_num}")
+            
+            for telem_key in tag_collection:
+                telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
+                smbus_telem_dict[telem_key.name] = telem_value
+            return smbus_telem_dict
+        
         pyluwen_chip = self.devices[board_num]
         if pyluwen_chip.as_bh():
             telem_struct = pyluwen_chip.as_bh().get_telemetry()
@@ -285,7 +317,7 @@ class TTSMIBackend:
 
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
-        if self.smbus_telem_info[board_num]["BOARD_ID"]:
+        if "BOARD_ID" in self.smbus_telem_info[board_num] and self.smbus_telem_info[board_num]["BOARD_ID"]:
             board_id = int(self.smbus_telem_info[board_num]["BOARD_ID"], base=16)
             return f"{board_id:016x}"
         else:
@@ -420,9 +452,18 @@ class TTSMIBackend:
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
                 if self.is_wormhole(board_num):
-                    dev_info[
-                        field
-                    ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
+                    if self.use_umd:
+                        if board_num in self.umd_cluster_descriptor.get_chip_locations():
+                            eth_coord = self.umd_cluster_descriptor.get_chip_locations()[board_num]
+                            dev_info[
+                                field
+                            ] = f"({eth_coord.x}, {eth_coord.y}, {eth_coord.rack}, {eth_coord.shelf})"
+                        else:
+                            dev_info[field] = "(0, 0, 0, 0)"
+                    else:
+                        dev_info[
+                            field
+                        ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
                 else:
                     dev_info[field] = "N/A"
             elif field == "dram_status":
@@ -606,14 +647,16 @@ class TTSMIBackend:
         fw_versions = {}
         for field in constants.FW_LIST:
             if field == "cm_fw":
-                val = self.smbus_telem_info[board_num]["ARC0_FW_VERSION"]
+                if "ARC0_FW_VERSION" in self.smbus_telem_info[board_num]:
+                    val = self.smbus_telem_info[board_num]["ARC0_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
             elif field == "cm_fw_date":
-                val = self.smbus_telem_info[board_num]["WH_FW_DATE"]
+                if "WH_FW_DATE" in self.smbus_telem_info[board_num]:
+                    val = self.smbus_telem_info[board_num]["WH_FW_DATE"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
@@ -626,19 +669,34 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
             elif field == "bm_bl_fw":
-                val = self.smbus_telem_info[board_num]["M3_BL_FW_VERSION"]
+                if self.use_umd:
+                    # The tag has different value for old WH telemetry and new telemetry.
+                    if "M3_BL_FW_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["M3_BL_FW_VERSION"]
+                    if "DM_BL_FW_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["DM_BL_FW_VERSION"]
+                else:
+                    val = self.smbus_telem_info[board_num]["M3_BL_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "bm_app_fw":
-                val = self.smbus_telem_info[board_num]["M3_APP_FW_VERSION"]
+                if self.use_umd:
+                    # The tag has different value for WH and BH
+                    if "M3_APP_FW_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["M3_APP_FW_VERSION"]
+                    if "DM_APP_FW_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["DM_APP_FW_VERSION"]
+                else:
+                    val = self.smbus_telem_info[board_num]["M3_APP_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "tt_flash_version":
-                val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
+                if "TT_FLASH_VERSION" in self.smbus_telem_info[board_num]:
+                    val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
                 # See below- Galaxy systems manually get an N/A tt_flash_version
@@ -647,7 +705,14 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
-                val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
+                if self.use_umd:
+                    # The tag has different value for WH and BH
+                    if "FW_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
+                    elif "FLASH_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
+                        val = self.smbus_telem_info[board_num]["FLASH_BUNDLE_VERSION"]
+                else:
+                    val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
                 if (
                     get_board_type(self.get_board_id(board_num)) == "wh_4u"
                     and val == "0xffffffff"
