@@ -22,6 +22,9 @@ from typing import List, Tuple, Union
 from importlib.resources import files
 from importlib.metadata import version
 from pyluwen import pci_scan
+from tt_umd import (
+    TopologyDiscovery,
+)
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
@@ -877,9 +880,13 @@ def main():
             sys.exit(1)
 
     try:
-        devices = dict(enumerate(detect_chips_with_callback(
-            local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-        )))
+        if args.use_umd:
+            cluster_descriptor, devices = TopologyDiscovery.discover()
+        else:
+            cluster_descriptor = None
+            devices = dict(enumerate(detect_chips_with_callback(
+                local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
+            )))
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -894,7 +901,7 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    backend = TTSMIBackend(devices, pretty_output=is_tty)
+    backend = TTSMIBackend(devices=devices, umd_cluster_descriptor=cluster_descriptor, pretty_output=is_tty)
 
     tt_smi_main(backend, args)
 
