@@ -678,6 +678,12 @@ def parse_args():
         action="store_true",
         help="Don't detect devices post reset",
     )
+    parser.add_argument(
+        "--use_umd",
+        default=False,
+        action="store_true",
+        help="Use UMD instead of Luwen driver.",
+    )
     args = parser.parse_args()
     return args
 
