@@ -742,6 +742,7 @@ def get_host_software_versions() -> dict:
     return {
         "tt_smi": version("tt_smi"),
         "pyluwen": version("pyluwen"),
+        "tt_umd": version("tt_umd"),
     }
 
 
