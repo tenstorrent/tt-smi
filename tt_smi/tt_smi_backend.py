@@ -18,7 +18,7 @@ from rich.table import Table
 from tt_smi import constants
 from rich import get_console
 from rich.syntax import Syntax
-from typing import Dict, List
+from typing import Any, Dict, List
 from rich.progress import track
 from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -52,7 +52,7 @@ class TTSMIBackend:
 
     def __init__(
         self,
-        devices: List[PciChip],
+        devices: Dict[int, PciChip],
         fully_init: bool = True,
         pretty_output: bool = True,
     ):
@@ -81,8 +81,8 @@ class TTSMIBackend:
         self.pci_properties = []
 
         if fully_init:
-            for i, device in track(
-                enumerate(self.devices),
+            for i, _ in track(
+                self.devices.items(),
                 total=len(self.devices),
                 description="Gathering Information",
                 update_period=0.01,
@@ -94,12 +94,31 @@ class TTSMIBackend:
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
+    
+    def is_blackhole(self, device_idx) -> bool:
+        return self.devices[device_idx].as_bh()
+    
+    def is_wormhole(self, device_idx) -> bool:
+        return self.devices[device_idx].as_wh()
 
-    def get_device_name(self, device):
+    def is_grayskull(self, device_idx) -> bool:
+        return self.devices[device_idx].as_gs()
+    
+    def get_pci_device_id(self, device_idx) -> str:
+        if self.devices[device_idx].is_remote():
+            return "N/A"
+        return self.devices[device_idx].get_pci_interface_id()
+        
+    def get_pci_bdf(self, device_idx) -> str:
+        if self.devices[device_idx].is_remote():
+            return "N/A"
+        return self.devices[device_idx].get_pci_bdf()
+    
+    def get_device_name(self, device_idx):
         """Get device name from chip object"""
-        if device.as_wh():
+        if self.is_wormhole(device_idx):
             return "Wormhole"
-        elif device.as_bh():
+        elif self.is_blackhole(device_idx):
             return "Blackhole"
         else:
             assert False, "Unknown chip name, FIX!"
@@ -136,13 +155,13 @@ class TTSMIBackend:
 
     def get_logs_json(self) -> str:
         """Get logs as JSON"""
-        for i, device in enumerate(self.devices):
+        for i in self.devices:
             self.log.device_info[i].smbus_telem = self.smbus_telem_info[i]
             self.log.device_info[i].board_info = self.device_infos[i]
             # Add L/R for nb300 to separate local and remote asics
-            if device.as_wh():
+            if self.is_wormhole(i):
                 board_type = self.device_infos[i]["board_type"]
-                suffix = " R" if device.is_remote() else " L"
+                suffix = " R" if self.devices[i].is_remote() else " L"
                 board_type = board_type + suffix
                 self.log.device_info[i].board_info["board_type"] = board_type
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
@@ -159,19 +178,17 @@ class TTSMIBackend:
         table_1.add_column("Board Type")
         table_1.add_column("Device Series")
         table_1.add_column("Board Number")
-        for i, device in enumerate(self.devices):
+        for i in self.devices:
             board_id = self.device_infos[i]["board_id"]
             board_type = self.device_infos[i]["board_type"]
-            pci_dev_id = (
-                device.get_pci_interface_id() if not device.is_remote() else "N/A"
-            )
-            if device.as_wh():
-                suffix = " R" if device.is_remote() else " L"
+            pci_dev_id = self.get_pci_device_id(i)
+            if self.is_wormhole(i):
+                suffix = " R" if self.devices[i].is_remote() else " L"
                 board_type = board_type + suffix
 
             table_1.add_row(
                 f"{pci_dev_id}",
-                f"{self.get_device_name(device)}",
+                f"{self.get_device_name(i)}",
                 f"{board_type}",
                 f"{board_id}",
             )
@@ -181,20 +198,20 @@ class TTSMIBackend:
         table_2.add_column("Board Type")
         table_2.add_column("Device Series")
         table_2.add_column("Board Number")
-        for i, device in enumerate(self.devices):
+        for i in self.devices:
             if (
-                not device.is_remote()
+                not self.devices[i].is_remote()
                 and self.device_infos[i]["board_type"] != "wh_4u"
             ):
                 board_id = self.device_infos[i]["board_id"]
                 board_type = self.device_infos[i]["board_type"]
-                pci_dev_id = device.get_pci_interface_id()
-                if device.as_wh():
-                    suffix = " R" if device.is_remote() else " L"
+                pci_dev_id = self.get_pci_device_id(i)
+                if self.is_wormhole(i):
+                    suffix = " R" if self.devices[i].is_remote() else " L"
                     board_type = board_type + suffix
                 table_2.add_row(
                     f"{pci_dev_id}",
-                    f"{self.get_device_name(device)}",
+                    f"{self.get_device_name(i)}",
                     f"{board_type}",
                     f"{board_id}",
                 )
@@ -257,7 +274,7 @@ class TTSMIBackend:
 
     def update_telem(self):
         """Update telemetry in a given interval"""
-        for i, _ in enumerate(self.devices):
+        for i in self.devices:
             self.smbus_telem_info[i] = self.get_smbus_board_info(i)
             self.device_telemetrys[i] = self.get_chip_telemetry(i)
 
@@ -276,7 +293,7 @@ class TTSMIBackend:
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
-        if self.devices[board_num].as_bh():
+        if self.is_blackhole(board_num):
             if self.smbus_telem_info[board_num]["DDR_SPEED"] is None:
                 return "N/A"
             dram_speed = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
@@ -286,7 +303,7 @@ class TTSMIBackend:
                 return f"{dram_speed}G"
             else:
                 return f"{dram_speed}"
-        elif self.devices[board_num].as_wh():
+        elif self.is_wormhole(board_num):
             if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
                 dram_speed_raw = (
                     int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
@@ -313,7 +330,7 @@ class TTSMIBackend:
             return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
 
         try:
-            pcie_bdf = self.devices[board_num].get_pci_bdf()
+            pcie_bdf = self.get_pci_bdf(board_num)
             pci_bus_path = os.path.realpath(f"/sys/bus/pci/devices/{pcie_bdf}")
         except:
             return {prop: "N/A" for prop in constants.PCI_PROPERTIES}
@@ -351,7 +368,7 @@ class TTSMIBackend:
         Get DRAM Training Status
         True means it passed training, False means it failed or did not train at all
         """
-        if self.devices[board_num].as_wh():
+        if self.is_wormhole(board_num):
             # DDR_STATUS field in WH:
             # (31:24) dram speed
             # (23:0) per channel dram status (6 channels)
@@ -364,7 +381,7 @@ class TTSMIBackend:
             if dram_status == 0x222222:
                 return True
             return False
-        elif self.devices[board_num].as_bh():
+        elif self.is_blackhole(board_num):
             # DDR Status in BH is a 16-bit field with the following layout:
 			#  [0] - Training complete GDDR 0
 			#  [1] - Error GDDR 0
@@ -386,7 +403,7 @@ class TTSMIBackend:
         for field in constants.DEV_INFO_LIST:
             if field == "bus_id":
                 try:
-                    dev_info[field] = self.devices[board_num].get_pci_bdf()
+                    dev_info[field] = self.get_pci_bdf(board_num)
                 except:
                     dev_info[field] = "N/A"
             elif field == "board_type":
@@ -397,7 +414,7 @@ class TTSMIBackend:
             elif field == "board_id":
                 dev_info[field] = self.get_board_id(board_num)
             elif field == "coords":
-                if self.devices[board_num].as_wh():
+                if self.is_wormhole(board_num):
                     dev_info[
                         field
                     ] = f"({self.devices[board_num].as_wh().get_local_coord().shelf_x}, {self.devices[board_num].as_wh().get_local_coord().shelf_y}, {self.devices[board_num].as_wh().get_local_coord().rack_x}, {self.devices[board_num].as_wh().get_local_coord().rack_y})"
@@ -500,9 +517,9 @@ class TTSMIBackend:
 
     def get_chip_telemetry(self, board_num) -> Dict:
         """Return the correct chip telemetry for a given board"""
-        if self.devices[board_num].as_bh():
+        if self.is_blackhole(board_num):
             return self.get_bh_chip_telemetry(board_num)
-        elif self.devices[board_num].as_wh():
+        elif self.is_wormhole(board_num):
             return self.get_wh_chip_telemetry(board_num)
         else:
             print(
@@ -513,9 +530,9 @@ class TTSMIBackend:
             return {}
 
     def get_chip_limits(self, board_num: int) -> Dict[str, str]:
-        if self.devices[board_num].as_bh():
+        if self.is_blackhole(board_num):
             return self.get_bh_chip_limits(board_num)
-        elif self.devices[board_num].as_wh():
+        elif self.is_wormhole(board_num):
             return self.get_wh_chip_limits(board_num)
         else:
             print(
