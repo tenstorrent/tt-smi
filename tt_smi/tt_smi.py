@@ -22,6 +22,9 @@ from typing import List, Tuple, Union
 from importlib.resources import files
 from importlib.metadata import version
 from pyluwen import pci_scan
+from tt_umd import (
+    TopologyDiscovery,
+)
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
@@ -948,9 +951,12 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(
-            local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-        )
+        if args.use_umd:
+            devices = TopologyDiscovery.create_cluster_descriptor()
+        else:
+            devices = detect_chips_with_callback(
+                local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
+            )
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -965,10 +971,14 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    backend = TTSMIBackend(devices, pretty_output=is_tty)
-    # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(backend.devices):
-        check_fw_version(device, i)
+    if args.use_umd:
+        backend = TTSMIBackend(umd_cluster_descriptor=devices, pretty_output=is_tty)
+    else:
+        backend = TTSMIBackend(devices=devices, pretty_output=is_tty)
+        # Check firmware version before running tt_smi to avoid crashes.
+        # This is done only for grayskull devices.
+        for i, device in enumerate(backend.devices):
+            check_fw_version(device, i)
 
     tt_smi_main(backend, args)
 
