@@ -180,7 +180,7 @@ class TTSMI(App):
     def format_firmware_rows(self):
         """Format firmware rows"""
         all_rows = []
-        for i, _ in enumerate(self.backend.devices):
+        for i in self.backend.devices:
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for fw in constants.FW_LIST:
                 val = self.backend.firmware_infos[i][fw]
@@ -198,7 +198,7 @@ class TTSMI(App):
     def format_telemetry_rows(self) -> List[List[Text]]:
         """Format telemetry rows"""
         all_rows = []
-        for board_num, _ in enumerate(self.backend.devices):
+        for board_num in self.backend.devices:
             device_row = [
                 Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
             ]
@@ -307,7 +307,7 @@ class TTSMI(App):
     def format_device_info_rows(self):
         """Format device info rows"""
         all_rows = []
-        for i, device in enumerate(self.backend.devices):
+        for i, device in self.backend.devices.items():
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
             for info in constants.DEV_INFO_LIST:
                 val = self.backend.device_infos[i][info]
@@ -449,7 +449,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_status":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
@@ -470,7 +470,7 @@ class TTSMI(App):
                             )
                 elif info == "dram_speed":
                     # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if self.backend.is_blackhole(i):
                         rows.append(
                             Text("N/A", style=self.text_theme["gray"], justify="center")
                         )
@@ -942,9 +942,9 @@ def main():
         sys.exit(0)
 
     try:
-        devices = detect_chips_with_callback(
+        devices = dict(enumerate(detect_chips_with_callback(
             local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-        )
+        )))
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -961,7 +961,7 @@ def main():
         sys.exit(1)
     backend = TTSMIBackend(devices, pretty_output=is_tty)
     # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(backend.devices):
+    for i, device in backend.devices.items():
         check_fw_version(device, i)
 
     tt_smi_main(backend, args)
