@@ -225,7 +225,7 @@ class TTSMIBackend:
                     tray_num = bus_id_to_tray[tray_bus_id]
                     tray_to_devices.setdefault(tray_num, []).append(i)
             return tray_to_devices
-        
+
         tray_to_devices = _get_mapping_tray_to_device()
 
         console = get_console()
@@ -282,23 +282,36 @@ class TTSMIBackend:
         if self.devices[board_num].as_gs():
             val = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
             return f"{val}"
-        if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
-            dram_speed_raw = (
-                int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
-            )
-            if dram_speed_raw == 0:
-                return "16G"
-            elif dram_speed_raw == 1:
-                return "14G"
-            elif dram_speed_raw == 2:
-                return "12G"
-            elif dram_speed_raw == 3:
-                return "10G"
-            elif dram_speed_raw == 4:
-                return "8G"
+        elif self.devices[board_num].as_bh():
+            if self.smbus_telem_info[board_num]["DDR_SPEED"] is None:
+                return "N/A"
+            dram_speed = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
+            # check if its div by 1000 and then return num GHz else MHz
+            if dram_speed % 1000 == 0:
+                dram_speed = dram_speed // 1000
+                return f"{dram_speed}G"
             else:
-                return None
-        return "N/A"
+                return f"{dram_speed}"
+        elif self.devices[board_num].as_wh():
+            if self.smbus_telem_info[board_num]["DDR_STATUS"] is not None:
+                dram_speed_raw = (
+                    int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> 24
+                )
+                if dram_speed_raw == 0:
+                    return "16G"
+                elif dram_speed_raw == 1:
+                    return "14G"
+                elif dram_speed_raw == 2:
+                    return "12G"
+                elif dram_speed_raw == 3:
+                    return "10G"
+                elif dram_speed_raw == 4:
+                    return "8G"
+                else:
+                    return None
+            return "N/A"
+        else:
+            return "N/A"
 
     def get_pci_properties(self, board_num):
         """Get the PCI link speed and link width details from sysfs files"""
@@ -340,8 +353,10 @@ class TTSMIBackend:
         return properties
 
     def get_dram_training_status(self, board_num) -> bool:
-        """Get DRAM Training Status
-        True means it passed training, False means it failed or did not train at all"""
+        """
+        Get DRAM Training Status
+        True means it passed training, False means it failed or did not train at all
+        """
         if self.devices[board_num].as_wh():
             num_channels = 8
             for i in range(num_channels):
@@ -353,6 +368,20 @@ class TTSMIBackend:
                 if dram_status != 2:
                     return False
                 return True
+        elif self.devices[board_num].as_bh():
+            # DDR Status in BH is a 16-bit field with the following layout:
+			#  [0] - Training complete GDDR 0
+			#  [1] - Error GDDR 0
+			#  [2] - Training complete GDDR 1
+			#  [3] - Error GDDR 1
+			#  ...
+			#  [14] - Training Complete GDDR 7
+			#  [15] - Error GDDR 7
+            dram_status = int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)
+            # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
+            if dram_status == 0x5555:
+                return True
+            return False
         elif self.devices[board_num].as_gs():
             num_channels = 6
             for i in range(num_channels):
