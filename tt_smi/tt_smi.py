@@ -448,49 +448,37 @@ class TTSMI(App):
                                 )
                             )
                 elif info == "dram_status":
-                    # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if val:
                         rows.append(
-                            Text("N/A", style=self.text_theme["gray"], justify="center")
+                            Text(
+                                "Y",
+                                style=self.text_theme["text_green"],
+                                justify="center",
+                            )
                         )
                     else:
-                        if val:
-                            rows.append(
-                                Text(
-                                    "Y",
-                                    style=self.text_theme["text_green"],
-                                    justify="center",
-                                )
+                        rows.append(
+                            Text(
+                                "N", style=self.text_theme["attention"], justify="center"
                             )
-                        else:
-                            rows.append(
-                                Text(
-                                    "N", style=self.text_theme["attention"], justify="center"
-                                )
-                            )
+                        )
                 elif info == "dram_speed":
-                    # TODO: Update once DRAM status becomes availible
-                    if device.as_bh():
+                    if val:
                         rows.append(
-                            Text("N/A", style=self.text_theme["gray"], justify="center")
+                            Text(
+                                f"{val}",
+                                style=self.text_theme["text_green"],
+                                justify="center",
+                            )
                         )
                     else:
-                        if val:
-                            rows.append(
-                                Text(
-                                    f"{val}",
-                                    style=self.text_theme["text_green"],
-                                    justify="center",
-                                )
+                        rows.append(
+                            Text(
+                                "N/A",
+                                style=self.text_theme["red_bold"],
+                                justify="center",
                             )
-                        else:
-                            rows.append(
-                                Text(
-                                    "N/A",
-                                    style=self.text_theme["red_bold"],
-                                    justify="center",
-                                )
-                            )
+                        )
                 else:
                     if val == "N/A":
                         rows.append(
