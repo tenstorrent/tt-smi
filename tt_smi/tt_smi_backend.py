@@ -139,7 +139,7 @@ class TTSMIBackend:
         if self.is_remote(device_idx):
             return "N/A"
         return (self.devices[device_idx].get_pci_interface_id() if not self.use_umd
-                else self.umd_device_dict[device_idx].get_pci_device().get_device_info().pci_device)
+                else self.umd_device_dict[device_idx].get_pci_device().get_device_num())
         
     def get_pci_bdf(self, device_idx) -> str:
         if self.is_remote(device_idx):
