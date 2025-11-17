@@ -5,10 +5,10 @@
 Tenstorrent System Management Interface (TT-SMI) is a command line utility
 to interact with all Tenstorrent devices on host.
 
-Main objective of TT-SMI is to provide a simple and easy to use interface
-to collect and display device, telemetry and firmware information.
+The main objective of TT-SMI is to provide a simple and easy-to-use interface
+to display devices, device telemetry, and system information.
 
-In addition user can issue Grayskull and Wormhole board level resets.
+TT-SMI is also used to issue board-level resets.
 """
 import os
 import sys
@@ -28,15 +28,12 @@ from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_tools_common.reset_common.reset_utils import (
-    generate_reset_logs,
     ResetType,
     parse_reset_input,
 )
 from tt_smi.tt_smi_backend import (
     TTSMIBackend,
     pci_board_reset,
-    pci_indices_from_json,
-    mobo_reset_from_json,
     glx_6u_trays_reset
 )
 from tt_tools_common.utils_common.tools_utils import (
@@ -591,7 +588,7 @@ def parse_args():
         "--list",
         default=False,
         action="store_true",
-        help="List boards that are available on host and quits",
+        help="List boards that are available on host and quit",
     )
     parser.add_argument(
         "-f",
@@ -604,17 +601,6 @@ def parse_args():
         dest="filename",
     )
     parser.add_argument(
-        "-g",
-        "--generate_reset_json",
-        nargs="?",
-        const=True,
-        default=False,
-        help=(
-            "Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json.\n"
-            "Update the generated file and use it as an input for the --reset option"
-        ),
-    )
-    parser.add_argument(
         "-c",
         "--compact",
         default=False,
@@ -624,13 +610,13 @@ def parse_args():
     parser.add_argument(
         "-r",
         "--reset",
-        metavar="0,1 ... or config.json",
+        metavar="0,1",
         default=None,
         nargs="*",
         help=(
-            "Provide list of PCI index or a json file with reset configs. "
+            "Provide a list of PCI indices. "
             "Find PCI index of board using the -ls option. "
-            "Generate a default reset json file with the -g option."
+            "If no indices are provided, all devices will be reset"
         ),
         dest="reset",
     )
@@ -645,7 +631,7 @@ def parse_args():
         "--galaxy_6u_trays_reset",
         default=False,
         action="store_true",
-        help="Reset all the asics on the galaxy host.",
+        help="Reset all the ASICs on the galaxy host",
         dest="glx_reset",
     )
     parser.add_argument(
@@ -653,7 +639,7 @@ def parse_args():
         "--galaxy_6u_trays_reset_auto",
         default=False,
         action="store_true",
-        help="Reset all the asics on the galaxy host, but do auto retries upto 3 times if reset fails.",
+        help="Reset all ASICs on the galaxy host, but do auto retries up to 3 times if reset fails",
         dest="glx_reset_auto",
     )
     parser.add_argument(
@@ -661,7 +647,7 @@ def parse_args():
         "--galaxy_6u_reset_tray",
         choices=["1", "2", "3", "4",],
         default=None,
-        help="Reset a specific tray on the galaxy.",
+        help="Reset a specific tray on the galaxy",
         dest="glx_reset_tray",
     )
     parser.add_argument(
@@ -669,14 +655,14 @@ def parse_args():
         "--galaxy_6u_list_tray_to_device",
         default=False,
         action="store_true",
-        help="List the mapping of devices to trays on the galaxy.",
+        help="List the mapping of devices to trays on the galaxy",
         dest="glx_list_tray_to_device",
     )
     parser.add_argument(
         "--no_reinit",
         default=False,
         action="store_true",
-        help="Don't detect devices post reset.",
+        help="Don't detect devices post reset",
     )
     args = parser.parse_args()
     return args
@@ -825,14 +811,6 @@ def main():
             reset_indices = reset_input.value
             pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty)
 
-        elif reset_input.type == ResetType.CONFIG_JSON:
-            json_input = reset_input.value
-            # If mobo reset, perform it first
-            parsed_dict = mobo_reset_from_json(json_input)
-            pci_indices, reinit = pci_indices_from_json(parsed_dict)
-            if pci_indices:
-                pci_board_reset(pci_indices, reinit, print_status=is_tty)
-
         # All went well - exit
         sys.exit(0)
     # Handle ubb reset without backend
@@ -899,35 +877,6 @@ def main():
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
-
-    if args.generate_reset_json:
-        # Use filename if provided, else use default
-        try:
-            devices = detect_chips_with_callback(local_only=True, print_status=is_tty)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error in detecting devices!\n{e}\n Exiting...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-
-        file = (
-            generate_reset_logs(devices)
-            if isinstance(args.generate_reset_json, bool)
-            else generate_reset_logs(devices, args.generate_reset_json)
-        )
-        print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Generated sample reset config file for this host: {file}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"Update the generated file and use it as an input for the -r/--reset option.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(0)
 
     try:
         devices = detect_chips_with_callback(

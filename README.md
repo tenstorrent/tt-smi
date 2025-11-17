@@ -3,200 +3,174 @@
 Tenstorrent System Management Interface (TT-SMI) is a command line utility
 to interact with all Tenstorrent devices on host.
 
-Main objective of TT-SMI is to provide a simple and easy to use interface
-to collect and display device, telemetry and firmware information.
+The main objective of TT-SMI is to provide a simple and easy-to-use interface
+to display devices, device telemetry, and system information.
 
-In addition user can issue Grayskull board Tensix core reset.
+TT-SMI is also used to issue board-level resets.
 
 ## Official Repository
 
 [https://github.com/tenstorrent/tt-smi/](https://github.com/tenstorrent/tt-smi/)
 
 # Getting started
-Build and editing instruction are as follows -
 
-### Building from Git
+## Install Rust (if you don't already have it)
 
-Install and source rust for the luwen library
+If Rust isn't already installed on your system, you can install it through either of the following methods:
+
+### Using Distribution packages (preferred)
+
+- **Fedora / EL9**
+
+  `sudo dnf install cargo`
+
+- **Ubuntu / Debian**
+
+  `sudo apt install cargo`
+
+### Using Rustup
+
 ```
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 ```
 
-### Optional
-Generate and source a python environment.  This is useful not only to isolate
-your environment, but potentially easier to debug and use.  This environment
-can be shared if you want to use a single environment for all your Tenstorrent
-tools
+## Installation (for users)
+
+tt-smi is available on pypi and can be installed using pip (on Python v3.10 and up).
 
 ```
-python3 -m venv .venv
+pip install tt-smi
+```
+
+### (Optional) Virtual environment
+If you aren't doing a system-level install, install in a virtual environment.
+
+```
+python -m venv .venv
 source .venv/bin/activate
-pip3 install --upgrade pip
-```
-### Required
-
-Install tt-smi.
-```
-pip3 install .
+pip install tt-smi
 ```
 
-### Optional - for TT-SMI developers
+## Installation (for developers)
 
-Generate and source a python3 environment
+### Clone the repository
+
 ```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install pre-commit
+git clone https://github.com/tenstorrent/tt-smi.git
+cd tt-smi
 ```
 
-For users who would like to edit the code without re-building, install SMI in editable mode.
+### Install
+```
+pip install .
+```
+or for users who would like to edit the code without re-building, install tt-smi in editable mode.
 ```
 pip install --editable .
 ```
-Recommended: install the pre-commit hooks so there is auto formatting for all files on committing.
+Recommended: install the pre-commit hooks so there is auto-formatting for all files on commit.
 ```
 pre-commit install
 ```
 
 # Usage
 
-Command line arguments
-```
-tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-g [GENERATE_RESET_JSON]] [-c]
-              [-r [0,1 ... or config.json ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
-              [-glx_reset_tray {1,2,3,4}] [--no_reinit]
-```
-## Getting Help!
-
-Running tt-smi with the ```-h, --help``` flag should bring up something that looks like this
+tt-smi can be used as a GUI (`tt-smi`) or CLI (`tt-smi -s`) to display system information and Tenstorrent device telemetry, and it can be used to reset Tenstorrent devices (`tt-smi -r`).
 
 ```
-$ tt-smi --help
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit]
+```
 
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-g [GENERATE_RESET_JSON]] [-c]
-              [-r [0,1 ... or config.json ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
-              [-glx_reset_tray {1,2,3,4}] [--no_reinit]
+## Getting Help
 
-Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices
-on host. Main objective of TT-SMI is to provide a simple and easy to use interface to collect and display device,
-telemetry and firmware information. In addition user can issue Grayskull and Wormhole board level resets.
+Running tt-smi with the ```-h, --help``` flag displays the help text.
+
+```
+$ tt-smi -h
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device]
+              [--no_reinit]
+
+Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
+interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
 
 options:
   -h, --help            show this help message and exit
   -l, --local           Run on local chips (Wormhole only)
   -v, --version         show program's version number and exit
   -s, --snapshot        Dump snapshot of current tt-smi information to STDOUT
-  -ls, --list           List boards that are available on host and quits
+  -ls, --list           List boards that are available on host and quit
   -f [snapshot filename], --filename [snapshot filename]
                         Write snapshot to a file. Default: ~/tt_smi/<timestamp>_snapshot.json
-  -g [GENERATE_RESET_JSON], --generate_reset_json [GENERATE_RESET_JSON]
-                        Generate default reset json file that reset consumes. Default stored at
-                        ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an input
-                        for the --reset option
   -c, --compact         Run in compact mode, hiding the sidebar and other static elements
-  -r [0,1 ... or config.json ...], --reset [0,1 ... or config.json ...]
-                        Provide list of PCI index or a json file with reset configs. Find PCI index of board using
-                        the -ls option. Generate a default reset json file with the -g option.
+  -r [0,1 ...], --reset [0,1 ...]
+                        Provide a list of PCI indices. Find PCI index of board using the -ls option. If no indices are provided, all devices will be reset
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
   -glx_reset, --galaxy_6u_trays_reset
-                        Reset all the asics on the galaxy host.
+                        Reset all the ASICs on the galaxy host
   -glx_reset_auto, --galaxy_6u_trays_reset_auto
-                        Reset all the asics on the galaxy host, but do auto retries upto 3 times if reset fails.
-  -glx_reset_tray {1,2,3,4}
-                        Reset a specific tray on the galaxy.
-  --no_reinit           Don't detect devices post reset.
+                        Reset all ASICs on the galaxy host, but do auto retries up to 3 times if reset fails
+  -glx_reset_tray {1,2,3,4}, --galaxy_6u_reset_tray {1,2,3,4}
+                        Reset a specific tray on the galaxy
+  -glx_list_tray_to_device, --galaxy_6u_list_tray_to_device
+                        List the mapping of devices to trays on the galaxy
+  --no_reinit           Don't detect devices post reset
   ```
 
-Some of these flags will be discussed in more detail in the following sections.
+These options will be discussed in more detail in the following sections.
 
 ## GUI
 To bring up the tt-smi GUI run
 ```
 $ tt-smi
 ```
-This should bring up a display that looks as below.
+This is the default mode where the user can view device information, telemetry, and firmware versions.
 
 ![tt-smi](images/tt_smi.png)
 
-This is the default mode where user can see device information, telemetry and firmware.
-
-### Latest SW Versions
-This section will display the software version of the device. If failures occur, error messages will show as below.
-
-![tt-smi](images/error.png)
-
-### App keyboard shortcuts
-All app keyboard shortcuts can be found in the help menu that user can bring up by hitting "h" or clicking the "help" button on the footer.
+### Keyboard Shortcuts
+All GUI keyboard shortcuts can be found in the help menu that user can bring up by pressing the `h` key or clicking the `help` button on the footer.
 
 ![help_menu](images/help.png)
 
 ## Resets
 
-Another feature of tt-smi is performing resets on Blackhole, Wormhole and Grayskull PCIe cards, using the  ```-r/ --reset``` argument.
+Another feature of tt-smi is performing resets on Blackhole, Wormhole and Grayskull PCIe cards, using the  ```-r / --reset``` argument.
 
-**WARNING for ARM systems.**
-PCIe config is set up differently on those systems. Hence our current implementation of PCIe reset doesn't work as expected on them. It is recommended to reboot the system if you would like to perform a board reset on your ARM system.
+**WARNING for ARM systems.** PCIe config is set up differently on those systems. Hence our current implementation of PCIe reset doesn't work as expected on them. It is recommended to reboot the system if you would like to perform a board reset on your ARM system.
 
 ```
-$ tt-smi -r 0,1 ... or config.json, --reset 0,1 ... or config.json
-
-    Provide list of PCI index or a json file with reset configs. Find PCI index of board using the -ls option. Generate a default reset json file with the -g option.
+$ tt-smi -r 0,1 ..., --reset 0,1 ...
 ```
 
-To perform the reset, either provide a list of comma separated values of the PCI index of the cards on the host, or an input reset_config.json file that can be generated using the ```-g/ --generate_reset_json``` command line argument.
+To perform the reset, provide a list of comma-separated PCI indices of the cards on the host. You can find PCI index of board using the -ls option. If no indices are provided, all devices will be reset.
 
 TT-SMI will perform different types of resets depending on the device:
 - Grayskull
-  - Tensix level reset that will reset each Tensix cores.
+  - Tensix-level reset that will reset each Tensix cores.
 - Wormhole
-  - A board level reset will be perfomed. Power will be cut to the board and brought back up.
-  - Post reset the ethernet connections will be re-trained.
+  - A board-level reset will be perfomed. Power will be cut to the board and brought back up.
+  - After reset, the ethernet connections will be re-trained.
 - Blackhole
-  - A board level reset will be perfomed. Power will be cut to the board and brought back up.
+  - An ASIC-level reset will be perfomed.
 
-By default, the reset command will re-initialize the boards after reset. To disable this, update the json config file.
+By default, the reset command will re-initialize the boards after reset.
 
-
-A successful reset on a system with both Wormhole and Grayskull should look something like the follows:
-
-```
-$ tt-smi -r 0,1
-
-  Starting PCI link reset on WH devices at PCI indices: 1
-  Finishing PCI link reset on WH devices at PCI indices: 1
-
-  Starting Tensix reset on GS board at PCI index 0
-  Lowering clks to safe value...
-  Beginning reset sequence...
-  Finishing reset sequence...
-  Returning clks to original values...
-  Finished Tensix reset on GS board at PCI index 0
-
-  Re-initializing boards after reset....
- Done! Detected 3 boards on host.
-```
-OR
-```
-tt-smi -r reset_config.json
-
-  Starting PCI link reset on WH devices at PCI indices: 1
-  Finishing PCI link reset on WH devices at PCI indices: 1
-
-  Starting Tensix reset on GS board at PCI index 0
-  Lowering clks to safe value...
-  Beginning reset sequence...
-  Finishing reset sequence...
-  Returning clks to original values...
-  Finished Tensix reset on GS board at PCI index 0
-
-  Re-initializing boards after reset....
-  Done! Detected 3 boards on host.
+A successful reset on a system with a Wormhole N300 board looks like the following:
 
 ```
+$ tt-smi -r
+ Starting reset on devices at PCI indices: 0 
+ Waiting for 2 seconds for potential hotplug removal. 
+ Waiting for devices to reappear on pci bus... 
+ Reset successfully completed for device at PCI index 0. 
+ Finishing reset on devices at PCI indices: 0 
+ Re-initializing boards after reset.... 
+ Detected Chips: 2
+```
 
-In order to find the correct board dev id to call the reset on, the user can use the tt-smi board list function `tt-smi -ls` or `tt-smi --list`. The dev id listed is the same as found on `/dev/tenstorrent/<dev pci id>`
+In order to find the correct device ID to call the reset on, the user can use the tt-smi board list function `tt-smi -ls` or `tt-smi --list`.
+The dev id listed is the same as found on `/dev/tenstorrent/<dev pci id>`.
 The generated output will include a list of all boards on host as well as the ones that can be reset.
 
 ```
@@ -219,25 +193,15 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 │ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
 └────────────┴────────────┴───────────────┴──────────────────┘
 ```
-### Disabling SW version reporting
-
-To disable the reporting of software versions and reporting of serial numbers, you can update the following parameters in the reset config file. The reset file can be generated into  ```~/.config/tenstorrent/reset_config.json``` using ``` tt-smi -g``` and then updated as follows :
-
-```
-    "disable_serial_report": false,     // make this true
-    "disable_sw_version_report": false, // make this true
-```
-
-If the ```disable_sw_version_report``` is set to true, all the software versions in the ```Latest SW Versions``` block get reported as "N/A".
 
 ## Galaxy resets
 
-There are two options available for resetting WH galaxy 6u trays.
-  - glx_reset: resets the galaxy, informs users if there has been an eth failure
-  - glx_reset_auto: resets the galaxy upto 3 times if eth failures are detected
+There are several options available for resetting Galaxy 6U trays.
+  - glx_reset: resets the galaxy, informs users if an Ethernet failure has been detected
+  - glx_reset_auto: same as -glx_reset, but resets up to 3 times if an Ethernet failure has been detected
   - glx_reset_tray <tray_num>: performs reset on one galaxy tray. Tray number has to be between 1-4
 
-Full galaxy reset -
+### Full galaxy reset
 ```
 tt-smi -glx_reset
  Resetting WH Galaxy trays with reset command...
@@ -248,7 +212,7 @@ Driver loaded
  Detected Chips: 32
  Re-initialized 32 boards after reset. Exiting...
 ```
-Tray reset -
+### Tray reset
 ```
 tt-smi -glx_reset_tray 3 --no_reinit
  Resetting WH Galaxy trays with reset command...
@@ -258,7 +222,7 @@ Driver loaded
  Re-initializing boards after reset....
  Exiting after galaxy reset without re-initializing chips.
 ```
-To identify the correct tray number for resetting specific devices, users can run either `tt-smi -glx_list_tray_to_device` or `tt-smi --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
+To identify the correct tray number for resetting specific devices, users can run `tt-smi -glx_list_tray_to_device / --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
 
 ```
 $ tt-sml -glx_list_tray_to_device
@@ -277,20 +241,19 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 
 ## Snapshots
 
-TT-SMI provides an easy way to get all the information that is displayed on the GUI in a json file, using the ```-s, --snapshot``` argument. By default the file is named and stored as
-``` ~/tt_smi/<timestamp>_snapshot.json```. User can also provide their own filename if desired, using the ```-f``` option.
-If you don't want to pipe the output to a file, you can use ```tt-smi -f -```. It behaves like ```tt-smi -s```,printing snapshot info directly to STDOUT.
+TT-SMI provides an easy way to get all the information that is displayed on the GUI in a json format using the ```-s / --snapshot``` argument. This prints the snapshot info directly to STDOUT. 
+Use the `-f` option to save the output to a file. By default the file is named and stored as ``` ~/tt_smi/<timestamp>_snapshot.json```, but users can also provide their own filename if desired.
 
 Example usage:
 ```
-$ tt-smi -s -f tt_smi_example.json
+$ tt-smi -f tt_smi_example.json
 
     Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
       Saved tt-smi log to: tt_smi_example.json
 ```
 
 ```
-$ tt-smi -f -
+$ tt-smi -s
 
     Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
     {
