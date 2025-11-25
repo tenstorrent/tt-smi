@@ -1,3 +1,13 @@
+tt-smi (3.0.36) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Remove reference to GS as support was sunset in luwen
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.36
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 25 Nov 2025 22:41:30 +0000
+
 tt-smi (3.0.35) noble; urgency=medium
 
   [ Petra Alexson ]
