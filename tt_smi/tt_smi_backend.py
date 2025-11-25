@@ -98,9 +98,7 @@ class TTSMIBackend:
 
     def get_device_name(self, device):
         """Get device name from chip object"""
-        if device.as_gs():
-            return "Grayskull"
-        elif device.as_wh():
+        if device.as_wh():
             return "Wormhole"
         elif device.as_bh():
             return "Blackhole"
@@ -249,7 +247,7 @@ class TTSMIBackend:
         elif pyluwen_chip.as_wh():
             telem_struct = pyluwen_chip.as_wh().get_telemetry()
         else:
-            telem_struct = pyluwen_chip.as_gs().get_telemetry()
+            raise ValueError(f"Unknown chip type for device {board_num}")
         json_map = dict_from_public_attrs(telem_struct)
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
 
@@ -279,10 +277,7 @@ class TTSMIBackend:
 
     def get_dram_speed(self, board_num) -> int:
         """Read DRAM Frequency from CSM and alternatively from SPI if FW not loaded on chip"""
-        if self.devices[board_num].as_gs():
-            val = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
-            return f"{val}"
-        elif self.devices[board_num].as_bh():
+        if self.devices[board_num].as_bh():
             if self.smbus_telem_info[board_num]["DDR_SPEED"] is None:
                 return "N/A"
             dram_speed = int(self.smbus_telem_info[board_num]["DDR_SPEED"], 16)
@@ -382,17 +377,8 @@ class TTSMIBackend:
             if dram_status == 0x5555:
                 return True
             return False
-        elif self.devices[board_num].as_gs():
-            num_channels = 6
-            for i in range(num_channels):
-                if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
-                    return False
-                dram_status = (
-                    int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> (4 * i)
-                ) & 0xF
-                if dram_status != 1:
-                    return False
-                return True
+        else:
+            return False
 
     def get_device_info(self, board_num) -> dict:
         dev_info = {}
@@ -527,8 +513,6 @@ class TTSMIBackend:
         """Return the correct chip telemetry for a given board"""
         if self.devices[board_num].as_bh():
             return self.get_bh_chip_telemetry(board_num)
-        elif self.devices[board_num].as_gs():
-            return self.get_gs_chip_telemetry(board_num)
         elif self.devices[board_num].as_wh():
             return self.get_wh_chip_telemetry(board_num)
         else:
@@ -778,7 +762,6 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
-    reset_gs_devs = []
     reset_bh_pci_idx = []
     for pci_idx in list_of_boards:
         try:
@@ -793,8 +776,6 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             continue
         if chip.as_wh():
             reset_wh_pci_idx.append(pci_idx)
-        elif chip.as_gs():
-            reset_gs_devs.append(chip)
         elif chip.as_bh():
             reset_bh_pci_idx.append(pci_idx)
         else:
@@ -812,12 +793,6 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
         WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
-
-    # reset gs devices by creating a partially init backend
-    if reset_gs_devs:
-        backend = TTSMIBackend(devices=reset_gs_devs, fully_init=False)
-        for i, _ in enumerate(reset_gs_devs):
-            backend.gs_tensix_reset(i)
 
     if reset_bh_pci_idx:
         BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
