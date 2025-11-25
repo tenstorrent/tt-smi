@@ -1,3 +1,18 @@
+tt-smi (3.0.35) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Remove code related to reset jsons
+  * Update README.md
+
+  [ Samridhi Bansal ]
+  * Added DRAM status and speed reporting to table
+  * Updated pyluwen 0.7.12 -> 0.7.14
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.35
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 25 Nov 2025 21:08:29 +0000
+
 tt-smi (3.0.34) noble; urgency=medium
 
   [ Samridhi Bansal ]
