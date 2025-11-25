@@ -716,32 +716,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
     )
     tt_smi_app.run()
 
-
-def check_fw_version(pyluwen_chip, board_num):
-    """
-    Check firmware version before running tt_smi and exit gracefully if not supported
-    For Grayskull, we only support fw version >= 1.3.0.0
-    """
-    if pyluwen_chip.as_gs():
-        fw_version, exit_code = pyluwen_chip.arc_msg(
-            constants.MSG_TYPE_FW_VERSION, arg0=0, arg1=0
-        )
-        if fw_version < constants.MAGIC_FW_VERSION:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Unsupported FW version {hex_to_semver_m3_fw(fw_version)} detected on Grayskull device {board_num}.",
-                f"\n Require FW version >= {hex_to_semver_m3_fw(constants.MAGIC_FW_VERSION)} to run tt-smi",
-                CMD_LINE_COLOR.ENDC,
-            )
-            print(
-                CMD_LINE_COLOR.PURPLE,
-                "Please update FW on device using tt-flash: https://github.com/tenstorrent/tt-flash",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-    return
-
-
 def check_is_galaxy(backend: TTSMIBackend, user_arg: str):
     """Check if the board is a Galaxy board"""
     if len(backend.device_infos) < 1:
@@ -897,9 +871,6 @@ def main():
         )
         sys.exit(1)
     backend = TTSMIBackend(devices, pretty_output=is_tty)
-    # Check firmware version before running tt_smi to avoid crashes
-    for i, device in enumerate(backend.devices):
-        check_fw_version(device, i)
 
     tt_smi_main(backend, args)
 
