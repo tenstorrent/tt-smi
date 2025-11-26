@@ -24,7 +24,6 @@ from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
-from tt_tools_common.reset_common.gs_tensix_reset import GSTensixReset
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from pyluwen import (
     PciChip,
@@ -497,36 +496,6 @@ class TTSMIBackend:
 
         return chip_telemetry
 
-    def get_gs_chip_telemetry(self, board_num) -> Dict:
-        """Get telemetry data for GS chip. None if ARC FW not running"""
-        current = int(self.smbus_telem_info[board_num]["TDC"], 16) & 0xFFFF
-        if self.smbus_telem_info[board_num]["VCORE"] is not None:
-            voltage = int(self.smbus_telem_info[board_num]["VCORE"], 16) / 1000
-        else:
-            voltage = 10000
-        power = int(self.smbus_telem_info[board_num]["TDP"], 16) & 0xFFFF
-        asic_temperature = (
-            int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
-        ) / 16
-        aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
-        arc0_heartbeat = int(self.smbus_telem_info[board_num]["ARC0_HEALTH"], 16) // 1000 # Watchdog heartbeat, ~2 per second
-        if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
-            fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16)
-        else:
-            fan_speed = 0
-
-        chip_telemetry = {
-            "voltage": f"{voltage:4.2f}",
-            "current": f"{current:5.1f}",
-            "power": f"{power:5.1f}",
-            "aiclk": f"{aiclk:4.0f}",
-            "asic_temperature": f"{asic_temperature:4.1f}",
-            "fan_speed": f"{fan_speed:3.0f}",
-            "heartbeat": f"{arc0_heartbeat}"
-        }
-
-        return chip_telemetry
-
     def get_chip_telemetry(self, board_num) -> Dict:
         """Return the correct chip telemetry for a given board"""
         if self.devices[board_num].as_bh():
@@ -544,8 +513,8 @@ class TTSMIBackend:
     def get_chip_limits(self, board_num: int) -> Dict[str, str]:
         if self.devices[board_num].as_bh():
             return self.get_bh_chip_limits(board_num)
-        elif self.devices[board_num].as_wh() or self.devices[board_num].as_gs():
-            return self.get_wh_gs_chip_limits(board_num)
+        elif self.devices[board_num].as_wh():
+            return self.get_wh_chip_limits(board_num)
         else:
             print(
                 CMD_LINE_COLOR.RED,
@@ -554,7 +523,7 @@ class TTSMIBackend:
             )
             return {}
 
-    def get_wh_gs_chip_limits(self, board_num: int) -> Dict[str, str]:
+    def get_wh_chip_limits(self, board_num: int) -> Dict[str, str]:
         """Get chip limits from the CSM. None if ARC FW not running"""
 
         chip_limits = {}
@@ -676,23 +645,6 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
-
-    def gs_tensix_reset(self, board_num) -> None:
-        """Reset the Tensix cores on a GS chip"""
-        print(
-            CMD_LINE_COLOR.BLUE,
-            f"Starting Tensix reset on GS board at PCI index {board_num}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        device = self.devices[board_num]
-        # Init reset object and call reset
-        GSTensixReset(device).tensix_reset()
-
-        print(
-            CMD_LINE_COLOR.GREEN,
-            f"Finished Tensix reset on GS board at PCI index {board_num}\n",
-            CMD_LINE_COLOR.ENDC,
-        )
 
 
 def get_board_type(board_id: str) -> str:
