@@ -28,7 +28,7 @@ dependencies = [
   'elasticsearch>=8.11.0',
   'pydantic>=1.2',
   'tt_tools_common==1.4.32',
-  'pyluwen==0.7.14',
+  'pyluwen==0.7.15',
   'rich>=13.7.0',
   'textual>=0.59.0',
   'pre-commit>=3.5.0',
