@@ -8,6 +8,15 @@ to display devices, device telemetry, and system information.
 
 TT-SMI is also used to issue board-level resets.
 
+> [!IMPORTANT]
+> TT-SMI needs driver version ≥ 2.0.0 to work correctly. Please install the correct version from [tt-kmd](https://github.com/tenstorrent/tt-kmd).
+
+> [!IMPORTANT]
+> As of v3.0.35 we no longer support Grayskull Devices on TT-SMI.
+
+> [!WARNING]
+> Reset will not work on ARM systems since PCIe config is set up differently on those systems. Only way to perform a reliable board reset on those systems is to reboot the host.
+
 ## Official Repository
 
 [https://github.com/tenstorrent/tt-smi/](https://github.com/tenstorrent/tt-smi/)
@@ -137,7 +146,6 @@ All GUI keyboard shortcuts can be found in the help menu that user can bring up 
 
 Another feature of tt-smi is performing resets on Blackhole, Wormhole and Grayskull PCIe cards, using the  ```-r / --reset``` argument.
 
-**WARNING for ARM systems.** PCIe config is set up differently on those systems. Hence our current implementation of PCIe reset doesn't work as expected on them. It is recommended to reboot the system if you would like to perform a board reset on your ARM system.
 
 ```
 $ tt-smi -r 0,1 ..., --reset 0,1 ...
@@ -160,12 +168,12 @@ A successful reset on a system with a Wormhole N300 board looks like the followi
 
 ```
 $ tt-smi -r
- Starting reset on devices at PCI indices: 0 
- Waiting for 2 seconds for potential hotplug removal. 
- Waiting for devices to reappear on pci bus... 
- Reset successfully completed for device at PCI index 0. 
- Finishing reset on devices at PCI indices: 0 
- Re-initializing boards after reset.... 
+ Starting reset on devices at PCI indices: 0
+ Waiting for 2 seconds for potential hotplug removal.
+ Waiting for devices to reappear on pci bus...
+ Reset successfully completed for device at PCI index 0.
+ Finishing reset on devices at PCI indices: 0
+ Re-initializing boards after reset....
  Detected Chips: 2
 ```
 
@@ -228,7 +236,7 @@ To identify the correct tray number for resetting specific devices, users can ru
 $ tt-sml -glx_list_tray_to_device
 
 Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
-      Mapping of trays to devices on the galaxy:       
+      Mapping of trays to devices on the galaxy:
 ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Tray Number ┃ Tray Bus ID ┃ PCI Dev ID              ┃
 ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
@@ -241,7 +249,7 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 
 ## Snapshots
 
-TT-SMI provides an easy way to get all the information that is displayed on the GUI in a json format using the ```-s / --snapshot``` argument. This prints the snapshot info directly to STDOUT. 
+TT-SMI provides an easy way to get all the information that is displayed on the GUI in a json format using the ```-s / --snapshot``` argument. This prints the snapshot info directly to STDOUT.
 Use the `-f` option to save the output to a file. By default the file is named and stored as ``` ~/tt_smi/<timestamp>_snapshot.json```, but users can also provide their own filename if desired.
 
 Example usage:
