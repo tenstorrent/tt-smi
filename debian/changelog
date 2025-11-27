@@ -1,3 +1,14 @@
+tt-smi (3.0.37) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Fix WH DRAM training status parsing
+  * Bump pyluwen version to 0.7.15
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.37
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 27 Nov 2025 18:44:52 +0000
+
 tt-smi (3.0.36) noble; urgency=medium
 
   [ Samridhi Bansal ]
