@@ -353,16 +353,18 @@ class TTSMIBackend:
         True means it passed training, False means it failed or did not train at all
         """
         if self.devices[board_num].as_wh():
-            num_channels = 8
-            for i in range(num_channels):
-                if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
-                    return False
-                dram_status = (
-                    int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16) >> (4 * i)
-                ) & 0xF
-                if dram_status != 2:
-                    return False
+            # DDR_STATUS field in WH:
+            # (31:24) dram speed
+            # (23:0) per channel dram status (6 channels)
+            # DRAM_TRAINING_FAIL = 0x1
+            # DRAM_TRAINING_PASS = 0x2
+            if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
+                return False
+            dram_status = (
+                int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)) & 0xFFFFFF
+            if dram_status == 0x222222:
                 return True
+            return False
         elif self.devices[board_num].as_bh():
             # DDR Status in BH is a 16-bit field with the following layout:
 			#  [0] - Training complete GDDR 0
