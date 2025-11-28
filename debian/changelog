@@ -1,3 +1,14 @@
+tt-smi (3.0.38) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Docs: Update README with important notes and warnings
+  * Chore: Bump pyluwen for bh arc msg bug fix
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.38
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 28 Nov 2025 16:34:22 +0000
+
 tt-smi (3.0.37) noble; urgency=medium
 
   [ Petra Alexson ]
