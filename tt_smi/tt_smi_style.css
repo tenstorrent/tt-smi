@@ -40,10 +40,6 @@ TabPane {
   width: 100
 }
 
-#host_info {
-  height: 12;
-}
-
 DataTable {
   text-align: center;
 }
