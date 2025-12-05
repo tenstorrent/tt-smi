@@ -41,6 +41,10 @@ optional-dependencies.dev = [
   "black == 23.3.0; python_version == '3.7'"
 ]
 
+optional-dependencies.test = [
+  "pytest",
+]
+
 [project.urls]
 "Homepage" = "http://tenstorrent.com"
 "Bug Reports" = "https://github.com/tenstorrent/tt-smi/issues"
