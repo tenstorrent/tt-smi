@@ -1,3 +1,16 @@
+tt-smi (3.0.39) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Remove height styling from TTHostCompatabilityMenu
+  * Bump tt-tools-common to 1.4.33
+  * Add fan speed percentage column to telemetry tab
+  * Clean up remaining mentions of Grayskull
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.0.39
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 08 Dec 2025 16:40:17 +0000
+
 tt-smi (3.0.38) noble; urgency=medium
 
   [ Samridhi Bansal ]
