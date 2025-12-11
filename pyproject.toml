@@ -29,8 +29,8 @@ dependencies = [
   'pydantic>=1.2',
   'tt_tools_common~=1.6.0',
   'pyluwen~=0.8.0',
-  # NOTE: to be changed before merged to main
-  'tt_umd @ git+https://github.com/tenstorrent/tt-umd.git@brosko/topo_py',
+  # NOTE: to be changed to use a pinned version
+  'tt_umd @ git+https://github.com/tenstorrent/tt-umd.git@main',
   'rich>=13.7.0',
   'textual>=0.59.0',
   'pre-commit>=3.5.0',
