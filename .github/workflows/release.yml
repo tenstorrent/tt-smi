@@ -3,6 +3,16 @@ run-name: Create Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version_bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
   workflow_call:
 
 env:
@@ -106,7 +116,9 @@ jobs:
         run: |
           . ./venv/bin/activate
           pip install bump2version
-          bump2version --current-version ${{ steps.packagever.outputs.package_version }} patch pyproject.toml
+          bump2version \
+            --current-version ${{ steps.packagever.outputs.package_version }} \
+            ${{ github.event.inputs.version_bump_type }} pyproject.toml
       - name: What NEW Version?
         id: new-package-version
         run: |
