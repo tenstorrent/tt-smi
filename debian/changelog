@@ -1,3 +1,17 @@
+tt-smi (3.1.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add tests/ with some basic reset tests
+
+  [ Zakhary Kaplan ]
+  * build(deps): bump pyluwen to 0.8.0, tt-tools-common to 1.5
+  * ci(release): specify version bump type
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 19 Dec 2025 20:39:19 +0000
+
 tt-smi (3.0.39) noble; urgency=medium
 
   [ Petra Alexson ]
