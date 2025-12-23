@@ -733,6 +733,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
 
     reset_wh_pci_idx = []
     reset_bh_pci_idx = []
+    board_types = set()
     for pci_idx in list_of_boards:
         try:
             chip = PciChip(pci_interface=pci_idx)
@@ -746,12 +747,14 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             continue
         if chip.as_wh():
             reset_wh_pci_idx.append(pci_idx)
+            board_types.add(chip.as_wh().pci_board_type())
         elif chip.as_bh():
             reset_bh_pci_idx.append(pci_idx)
+            board_types.add(chip.as_bh().pci_board_type())
         else:
             print(
                 CMD_LINE_COLOR.RED,
-                "Unkown chip!!",
+                "Unknown chip type detected. Exiting...",
                 CMD_LINE_COLOR.ENDC,
             )
             # Close the chip  before exiting- needed for docker resets to work
@@ -760,12 +763,15 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
         # Close the chip - needed for docker resets to work
         del chip
 
+    # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
+    secondary_bus_reset = False if board_types <= {0x35, 0x47} else True
+
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
-        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx)
+        WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx, secondary_bus_reset=secondary_bus_reset)
 
     if reset_bh_pci_idx:
-        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
+        BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx, secondary_bus_reset=secondary_bus_reset)
 
     if reinit:
         # Enable backtrace for debugging
