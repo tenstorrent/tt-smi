@@ -763,8 +763,19 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
         # Close the chip - needed for docker resets to work
         del chip
 
+    is_galaxy = True if board_types <= {0x35, 0x47} else False
+    # Notify users of requirements for using tt-smi -r on Galaxy 6U
+    if is_galaxy:
+        # TODO: only print in the case of insufficient CPLD version
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
+            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
+            CMD_LINE_COLOR.ENDC,
+        )
+
     # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
-    secondary_bus_reset = False if board_types <= {0x35, 0x47} else True
+    secondary_bus_reset = not is_galaxy
 
     # reset wh devices with pci indices
     if reset_wh_pci_idx:
