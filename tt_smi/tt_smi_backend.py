@@ -416,7 +416,9 @@ class TTSMIBackend:
 
     def convert_signed_16_16_to_float(self, value):
         """Convert signed 16.16 to float"""
-        return (value >> 16) + (value & 0xFFFF) / 65536.0
+        if value & (1 << (32 - 1)): # if the value is negative (two's complement)
+            value -= 1 << 32 # convert to negative value
+        return value / 65536.0
 
     def get_bh_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for bh chip. None if ARC FW not running"""
