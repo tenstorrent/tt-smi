@@ -805,8 +805,12 @@ def main():
     if args.glx_reset:
         # Galaxy reset, without auto retries
         try:
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "Hint: tt-smi -r is now supported on Galaxy 6U.",
+                CMD_LINE_COLOR.ENDC,
+            )
             # reinit has to be enabled to detect devices post reset
-
             glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty)
         except Exception as e:
             print(
