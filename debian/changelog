@@ -1,3 +1,16 @@
+tt-smi (3.1.1) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Don't perform secondary_bus_reset during reset on Galaxy (WH, BH) 6U
+  * Bump tt-tools-common to 1.6.X
+  * Properly compute and display negative ASIC temp values
+  * Add hints for usage of tt-smi -r with Galaxy 6U
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 3.1.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 13 Jan 2026 17:20:24 +0000
+
 tt-smi (3.1.0) noble; urgency=medium
 
   [ Petra Alexson ]
