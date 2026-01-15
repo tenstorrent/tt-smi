@@ -826,7 +826,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
     for pci_idx in list_of_boards:
         try:
             if use_umd:
-                chip = TTDevice.create(pci_idx)
+                chip = PCIDevice(pci_idx)
             else:
                 chip = PciChip(pci_interface=pci_idx)
         except Exception as e:
@@ -838,7 +838,10 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             )
             # Exit the loop to go to the next chip
             continue
-        if not use_umd:
+
+        if use_umd:
+            board_types.add(chip.get_device_info().subsystem_vendor_id)
+        else:
             if chip.as_wh():
                 reset_wh_pci_idx.append(pci_idx)
                 board_types.add(chip.as_wh().pci_board_type())
@@ -857,23 +860,24 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             # Close the chip - needed for docker resets to work
             del chip
 
+
+    is_galaxy = True if board_types <= {0x35, 0x47} else False
+    # Notify users of requirements for using tt-smi -r on Galaxy 6U
+    if is_galaxy:
+        # TODO: only print in the case of insufficient CPLD version
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
+            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
+            CMD_LINE_COLOR.ENDC,
+        )
+
+    # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
+    secondary_bus_reset = not is_galaxy
+
     if use_umd:
-        WarmReset.warm_reset(list_of_boards)
+        WarmReset.warm_reset(list_of_boards, secondary_bus_reset=secondary_bus_reset)
     else:
-        is_galaxy = True if board_types <= {0x35, 0x47} else False
-        # Notify users of requirements for using tt-smi -r on Galaxy 6U
-        if is_galaxy:
-            # TODO: only print in the case of insufficient CPLD version
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
-                "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
-                CMD_LINE_COLOR.ENDC,
-            )
-
-        # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
-        secondary_bus_reset = not is_galaxy
-
         # reset wh devices with pci indices
         if reset_wh_pci_idx:
             WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx, secondary_bus_reset=secondary_bus_reset)
