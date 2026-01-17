@@ -45,6 +45,12 @@ optional-dependencies.test = [
   "pytest",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+  "requires_hardware: marks tests as requiring Tenstorrent hardware",
+  "requires_galaxy: marks tests as requiring Galaxy hardware",
+]
+
 [project.urls]
 "Homepage" = "http://tenstorrent.com"
 "Bug Reports" = "https://github.com/tenstorrent/tt-smi/issues"
