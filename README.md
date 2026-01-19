@@ -8,13 +8,19 @@ to display devices, device telemetry, and system information.
 
 TT-SMI is also used to issue board-level resets.
 
+# Important Notes
+
+> [!IMPORTANT]
+> As of v4.0.0 we are officially using [tt-umd](https://github.com/tenstorrent/tt-umd) as our backend. To use the [luwen](https://github.com/tenstorrent/luwen) backend, please use the `--use_luwen` flag. 
+> Please file any issues you see with the `umd-backend` label
+
 > [!IMPORTANT]
 > TT-SMI needs driver version ≥ 2.0.0 to work correctly. Please install the correct version from [tt-kmd](https://github.com/tenstorrent/tt-kmd).
 
-> [!IMPORTANT]
-> As of v3.0.35 we no longer support Grayskull Devices on TT-SMI.
+> [!CAUTION]
+> As of v3.0.35 we no longer support Grayskull Devices on TT-SMI. Kernel mode driver support for Grayskull was depreciated in [ttkmd-2.2.0](https://github.com/tenstorrent/tt-kmd/releases/tag/ttkmd-2.2.0)
 
-> [!WARNING]
+> [!CAUTION]
 > Reset will not work on ARM systems since PCIe config is set up differently on those systems. Only way to perform a reliable board reset on those systems is to reboot the host.
 
 ## Official Repository
@@ -97,8 +103,7 @@ Running tt-smi with the ```-h, --help``` flag displays the help text.
 
 ```
 $ tt-smi -h
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device]
-              [--no_reinit]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
 
 Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
 interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
@@ -124,6 +129,7 @@ options:
   -glx_list_tray_to_device, --galaxy_6u_list_tray_to_device
                         List the mapping of devices to trays on the galaxy
   --no_reinit           Don't detect devices post reset
+  --use_luwen           Use deprecated Luwen driver instead of UMD (default).
   ```
 
 These options will be discussed in more detail in the following sections.
