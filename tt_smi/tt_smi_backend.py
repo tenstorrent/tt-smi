@@ -414,12 +414,6 @@ class TTSMIBackend:
 
         return dev_info
 
-    def convert_signed_16_16_to_float(self, value):
-        """Convert signed 16.16 to float"""
-        if value & (1 << (32 - 1)): # if the value is negative (two's complement)
-            value -= 1 << 32 # convert to negative value
-        return value / 65536.0
-
     def get_bh_chip_telemetry(self, board_num) -> Dict:
         """Get telemetry data for bh chip. None if ARC FW not running"""
         current = (
@@ -438,7 +432,7 @@ class TTSMIBackend:
         )
         asic_temperature = (
             (
-                self.convert_signed_16_16_to_float(
+                convert_signed_16_16_to_float(
                     int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16)
                 )
             )
@@ -709,6 +703,12 @@ def get_board_type(board_id: str) -> str:
         return "tt-galaxy-bh"
     else:
         return "N/A"
+
+def convert_signed_16_16_to_float(value):
+    """Convert signed 16.16 to float"""
+    if value & (1 << (32 - 1)): # if the value is negative (two's complement)
+        value -= 1 << 32 # convert to negative value
+    return value / 65536.0
 
 def dict_from_public_attrs(obj) -> dict:
     """Parse an object's public attributes into a dictionary"""
