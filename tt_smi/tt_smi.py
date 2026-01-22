@@ -760,7 +760,8 @@ def main():
     First entry point for TT-SMI. Detects devices and instantiates backend.
     """
     # Enable backtrace for debugging
-    os.environ["RUST_BACKTRACE"] = "full"
+    # "0" is no backtrace, "1" is short backtrace, "full" is full backtrace
+    # os.environ["RUST_BACKTRACE"] = "full"
 
     args = parse_args()
 
