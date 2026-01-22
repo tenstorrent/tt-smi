@@ -25,7 +25,7 @@ from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
-from textual.worker import get_current_worker
+from textual.worker import get_current_worker, Worker, WorkerState
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_tools_common.reset_common.reset_utils import (
     ResetType,
@@ -550,7 +550,7 @@ class TTSMI(App):
             self.telem_worker = self.run_worker(
                 self.update_telem,
                 thread=True,
-                exit_on_error=False, # Change to True for debugging errors in update_telem thread
+                exit_on_error=False, # tt-smi exits on error, but in worker state change handler
                 name="telem_thread",
             )
 
@@ -561,6 +561,13 @@ class TTSMI(App):
         if tab_id == "tab-2":  # Telemetry tab
             # Dispatch the telemetry thread
             self.dispatch_telem_thread()
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """Handle worker state change. Here we just use it to catch telem_thread errors."""
+        if event.worker.name == "telem_thread" and event.state == WorkerState.ERROR:
+            error = event.worker.error
+            exit_message = Text(f"Error when attempting to fetch telemetry: {error}", style="red")
+            self.exit(message=exit_message)
 
 def parse_args():
     """Parse user args"""
