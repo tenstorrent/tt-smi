@@ -1,3 +1,40 @@
+tt-smi (4.0.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add requires_hardware and requires_galaxy test markers
+  * Add test GitHub workflow to run tests in CI
+  * Revert commits 0156db7 and 91168a5
+  * Add requires_hardware and requires_galaxy test markers
+  * Add test GitHub workflow to run tests in CI
+  * Make convert_signed_16_16_to_float a standalone function
+  * Add test_utils.py to test some data formatting utilities
+  * Add test_snapshot.py to tests
+
+  [ Bojan Rosko ]
+  * Prepare functions which are different for different driver
+  * Introduce tt-umd package without usage
+  * Implement warm reset using UMD
+  * Implement telemetry and main smi view through UMD
+  * Switch from --use_umd to --use_luwen
+  * secondary_bus_reset
+  * Use newer umd which supports ubuntu 20
+  * Update umd to actually use manylinux_2_28
+
+  [ Samridhi ]
+  * Update README with note of moving to UMD
+
+  [ Bojan Rosko ]
+  * Consume UMD from pypi
+
+  [ Petra Alexson ]
+  * format luwen devices as dict[int, PciChip] for TTSMIBackend in tests
+  * Only show error log messages from UMD in a non-tty environment
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.0.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 26 Jan 2026 22:09:48 +0000
+
 tt-smi (3.1.1) noble; urgency=medium
 
   [ Petra Alexson ]
