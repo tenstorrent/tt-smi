@@ -29,12 +29,7 @@ dependencies = [
   'pydantic>=1.2',
   'tt_tools_common~=1.6.0',
   'pyluwen~=0.8.0',
-  # tt_umd v0.8.5 - GitHub Release Artifacts
-  'tt_umd @ https://github.com/tenstorrent/tt-umd/releases/download/v0.8.5/tt_umd-0.8.5-cp39-cp39-manylinux_2_28_x86_64.whl ; python_version == "3.9"',
-  'tt_umd @ https://github.com/tenstorrent/tt-umd/releases/download/v0.8.5/tt_umd-0.8.5-cp310-cp310-manylinux_2_28_x86_64.whl ; python_version == "3.10"',
-  'tt_umd @ https://github.com/tenstorrent/tt-umd/releases/download/v0.8.5/tt_umd-0.8.5-cp311-cp311-manylinux_2_28_x86_64.whl ; python_version == "3.11"',
-  'tt_umd @ https://github.com/tenstorrent/tt-umd/releases/download/v0.8.5/tt_umd-0.8.5-cp312-cp312-manylinux_2_28_x86_64.whl ; python_version == "3.12"',
-  'tt_umd @ https://github.com/tenstorrent/tt-umd/releases/download/v0.8.5/tt_umd-0.8.5-cp313-cp313-manylinux_2_28_x86_64.whl ; python_version == "3.13"',
+  'tt-umd>=0.9.1',
   'rich>=13.7.0',
   'textual>=0.59.0',
   'pre-commit>=3.5.0',
