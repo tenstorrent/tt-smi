@@ -794,6 +794,9 @@ def main():
 
     # Detect non-tty stdout, but allow users to override
     is_tty = sys.stdout.isatty() and not args.snapshot_no_tty
+    if not is_tty:
+        # Suppress UMD log messages to be error only
+        os.environ["TT_LOGGER_LEVEL"] = "error"
 
     # Handle reset first, without setting up backend
     if args.reset is not None:
