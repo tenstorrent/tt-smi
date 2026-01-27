@@ -683,6 +683,12 @@ def parse_args():
         action="store_true",
         help="Use deprecated Luwen driver instead of UMD (default).",
     )
+    parser.add_argument(
+        "--skip_eth_wait",
+        default=False,
+        action="store_true",
+        help="Skip waiting for ethernet training post reset when using UMD.",
+    )
     args = parser.parse_args()
     return args
 
@@ -796,12 +802,11 @@ def main():
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
             reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, wait_for_eth=not args.skip_eth_wait)
 
         elif reset_input.type == ResetType.ID_LIST:
             reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
-
+            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, wait_for_eth=not args.skip_eth_wait)
         # All went well - exit
         sys.exit(0)
     # Handle ubb reset without backend
