@@ -13,9 +13,8 @@ TT-SMI is also used to issue board-level resets.
 import os
 import sys
 import time
-import signal
 import argparse
-import threading
+
 from rich.text import Text
 from tt_smi import constants
 from typing import List, Tuple, Union
@@ -29,6 +28,7 @@ from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
+from textual.worker import get_current_worker, Worker, WorkerState
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
 from tt_tools_common.reset_common.reset_utils import (
     ResetType,
@@ -56,15 +56,6 @@ from tt_tools_common.ui_common.widgets import (
 
 # Global variables
 TextualKeyBindings = List[Tuple[str, str, str]]
-INTERRUPT_RECEIVED = False
-TELEM_THREADS = []
-RUNNING_TELEM_THREAD = False
-
-
-def interrupt_handler(sig, action) -> None:
-    """Handle interrupts to exit processes gracefully"""
-    global INTERRUPT_RECEIVED
-    INTERRUPT_RECEIVED = True
 
 
 class TTSMI(App):
@@ -110,6 +101,7 @@ class TTSMI(App):
         self.show_sidebar = show_sidebar
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
+        self.telem_worker = None
 
         if key_bindings:
             self.BINDINGS += key_bindings
@@ -516,16 +508,14 @@ class TTSMI(App):
 
     async def action_quit(self) -> None:
         """An [action](/guide/actions) to quit the app as soon as possible."""
-        global INTERRUPT_RECEIVED, TELEM_THREADS
         exit_message = Text(f"Exiting TT-SMI.", style="yellow")
         if self.snapshot:
             log_name = self.backend.save_logs(self.result_filename)
             exit_message = exit_message + Text(
                 f"\nSaved tt-smi log to: {log_name}", style="purple"
             )
-        INTERRUPT_RECEIVED = True
-        for thread in TELEM_THREADS:
-            thread.join(timeout=0.1)
+        if self.telem_worker is not None:
+            self.telem_worker.cancel()
         self.exit(message=exit_message)
 
     def action_tab_one(self) -> None:
@@ -550,31 +540,37 @@ class TTSMI(App):
         )
         self.push_screen(tt_confirm_box)
 
-    async def dispatch_telem_thread(self) -> None:
-        global INTERRUPT_RECEIVED, TELEM_THREADS, RUNNING_TELEM_THREAD
-        if not RUNNING_TELEM_THREAD:
-            signal.signal(signal.SIGTERM, interrupt_handler)
-            signal.signal(signal.SIGINT, interrupt_handler)
+    def update_telem(self) -> None:
+        """Worker function that continuously updates telemetry"""
+        worker = get_current_worker()
+        while not worker.is_cancelled:
+            self.call_from_thread(self.update_telem_table)
+            time.sleep(constants.GUI_INTERVAL_TIME)
 
-            def update_telem():
-                global INTERRUPT_RECEIVED
-                while not INTERRUPT_RECEIVED:
-                    self.update_telem_table()
-                    time.sleep(constants.GUI_INTERVAL_TIME)
+    def dispatch_telem_thread(self) -> None:
+        """Start the telemetry update thread if not already running"""
+        if self.telem_worker is None or self.telem_worker.is_finished:
+            self.telem_worker = self.run_worker(
+                self.update_telem,
+                thread=True,
+                exit_on_error=False, # tt-smi exits on error, but in worker state change handler
+                name="telem_thread",
+            )
 
-            thread = threading.Thread(target=update_telem, name="telem_thread")
-            thread.setDaemon(True)
-            thread.start()
-            TELEM_THREADS.append(thread)
-            RUNNING_TELEM_THREAD = True
-
-    async def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """This function runs every time a tab is activated"""
         tab_id = self.query_one(TabbedContent).active
 
         if tab_id == "tab-2":  # Telemetry tab
             # Dispatch the telemetry thread
-            await self.dispatch_telem_thread()
+            self.dispatch_telem_thread()
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """Handle worker state change. Here we just use it to catch telem_thread errors."""
+        if event.worker.name == "telem_thread" and event.state == WorkerState.ERROR:
+            error = event.worker.error
+            exit_message = Text(f"Error when attempting to fetch telemetry: {error}", style="red")
+            self.exit(message=exit_message)
 
 def parse_args():
     """Parse user args"""
@@ -700,12 +696,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
     Returns:
         None: None
     """
-    global INTERRUPT_RECEIVED
-    INTERRUPT_RECEIVED = False
-
-    signal.signal(signal.SIGINT, interrupt_handler)
-    signal.signal(signal.SIGTERM, interrupt_handler)
-
     if args.list:
         backend.print_all_available_devices()
         sys.exit(0)
@@ -779,7 +769,8 @@ def main():
     First entry point for TT-SMI. Detects devices and instantiates backend.
     """
     # Enable backtrace for debugging
-    os.environ["RUST_BACKTRACE"] = "full"
+    # "0" is no backtrace, "1" is short backtrace, "full" is full backtrace
+    # os.environ["RUST_BACKTRACE"] = "full"
 
     args = parse_args()
 
