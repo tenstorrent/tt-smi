@@ -305,7 +305,9 @@ class TTSMIBackend:
         smbus_telem_dict = dict.fromkeys(constants.SMBUS_TELEMETRY_LIST)
 
         for key, value in json_map.items():
-            smbus_telem_dict[key.upper()] = hex(value)
+            if value is not None:
+                value = hex(value)
+            smbus_telem_dict[key.upper()] = value
         return smbus_telem_dict
 
     def update_telem(self):
