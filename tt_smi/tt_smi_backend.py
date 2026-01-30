@@ -861,17 +861,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             # Close the chip - needed for docker resets to work
             del chip
 
-
     is_galaxy = True if board_types <= {0x35, 0x47} else False
-    # Notify users of requirements for using tt-smi -r on Galaxy 6U
-    if is_galaxy:
-        # TODO: only print in the case of insufficient CPLD version
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
-            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
-            CMD_LINE_COLOR.ENDC,
-        )
 
     # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
     secondary_bus_reset = not is_galaxy
@@ -1073,3 +1063,32 @@ def glx_6u_trays_reset(
         CMD_LINE_COLOR.ENDC,
     )
     sys.exit(0)
+
+def glx_6u_get_cpld_fw_version():
+    """
+    Read and parse CPLD FW version using ipmitool.
+
+    Returns:
+        Dict[str, Tuple[int, int, int]], a dict of CPLD components and their CPLD FW versions
+    """
+    cmds = {
+        "MB": "sudo ipmitool raw 0x06 0x52 0x17 0x62 0x04 0x00",
+        "PDB": "sudo ipmitool raw 0x06 0x52 0x09 0x62 0x04 0x00",
+        "UBB1": "sudo ipmitool raw 0x06 0x52 0x0D 0x80 0x04 0x00",
+        "UBB2": "sudo ipmitool raw 0x06 0x52 0x0F 0x80 0x04 0x00",
+        "UBB3": "sudo ipmitool raw 0x06 0x52 0x11 0x80 0x04 0x00",
+        "UBB4": "sudo ipmitool raw 0x06 0x52 0x13 0x80 0x04 0x00"
+    }
+    fw_vers = {}
+    for key, cmd in cmds.items():
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        ver_str = result.stdout
+        try:
+            major = int(ver_str[8:9])
+            minor = int(ver_str[4:6])
+            patch = int(ver_str[1:3])
+            fw_vers[key] = (major, minor, patch)
+        except (ValueError, IndexError):
+            fw_vers[key] = None
+
+    return fw_vers
