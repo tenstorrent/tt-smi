@@ -807,12 +807,26 @@ def main():
     # Handle ubb reset without backend
     if args.glx_reset:
         # Galaxy reset, without auto retries
-        try:
+        # Messaging about tt-smi -r availability
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Hint: tt-smi -r is now supported on Galaxy 6U. CPLD FW v1.16 or higher is required. Checking CPLD FW version for compatability...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        cpld_fw_vers = glx_6u_get_cpld_fw_version()
+        if all(fw_ver >= (1, 16, 0) for fw_ver in cpld_fw_vers.values()):
             print(
                 CMD_LINE_COLOR.YELLOW,
-                "Hint: tt-smi -r is now supported on Galaxy 6U.",
+                "CPLD FW version on this Galaxy is sufficient. Try tt-smi -r next time.",
                 CMD_LINE_COLOR.ENDC,
             )
+        else:
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "CPLD FW version on this Galaxy is insufficient. Please continue to use tt-smi -glx_reset and contact your system administrator to request a CPLD update.",
+                CMD_LINE_COLOR.ENDC,
+            )
+        try:
             # reinit has to be enabled to detect devices post reset
             glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
         except Exception as e:
