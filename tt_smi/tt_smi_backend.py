@@ -40,6 +40,7 @@ from tt_umd import (
     WarmReset,
     PCIDevice,
     TopologyDiscovery,
+    TopologyDiscoveryOptions,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
@@ -109,11 +110,11 @@ class TTSMIBackend:
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-    
+
     def is_blackhole(self, device_idx) -> bool:
         return (self.devices[device_idx].as_bh() if not self.use_umd
                 else self.devices[device_idx].get_arch() == ARCH.BLACKHOLE)
-    
+
     def is_wormhole(self, device_idx) -> bool:
         return (self.devices[device_idx].as_wh() if not self.use_umd
                 else self.devices[device_idx].get_arch() == ARCH.WORMHOLE_B0)
@@ -121,19 +122,19 @@ class TTSMIBackend:
     def is_grayskull(self, device_idx) -> bool:
         return (self.devices[device_idx].as_gs() if not self.use_umd
                 else False)
-    
+
     def get_pci_device_id(self, device_idx) -> str:
         if self.devices[device_idx].is_remote():
             return "N/A"
         return (self.devices[device_idx].get_pci_interface_id() if not self.use_umd
                 else self.devices[device_idx].get_pci_device().get_device_num())
-        
+
     def get_pci_bdf(self, device_idx) -> str:
         if self.devices[device_idx].is_remote():
             return "N/A"
         return (self.devices[device_idx].get_pci_bdf() if not self.use_umd
                 else self.devices[device_idx].get_pci_device().get_device_info().pci_bdf)
-    
+
     def get_device_name(self, device_idx):
         """Get device name from chip object"""
         if self.is_wormhole(device_idx):
@@ -288,12 +289,12 @@ class TTSMIBackend:
                 tag_collection = TelemetryTag
             else:
                 raise ValueError(f"Unknown arch for device {board_num}")
-            
+
             for telem_key in tag_collection:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
             return smbus_telem_dict
-        
+
         pyluwen_chip = self.devices[board_num]
         if pyluwen_chip.as_bh():
             telem_struct = pyluwen_chip.as_bh().get_telemetry()
@@ -818,7 +819,7 @@ def get_host_software_versions() -> dict:
 
 
 # Reset specific functions
-def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False, wait_for_eth: bool = True):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -897,7 +898,15 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
         )
         try:
             if use_umd:
-                TopologyDiscovery.discover()
+                options = TopologyDiscoveryOptions()
+                options.no_wait_for_eth_training = not wait_for_eth
+                if not wait_for_eth:
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        "Skipping Ethernet link training wait after reset.",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                TopologyDiscovery.discover(options)
             else:
                 detect_chips_with_callback(print_status=print_status)
         except Exception as e:
@@ -967,24 +976,24 @@ def umd_ubb_wait_for_driver_load():
     """
     attempts = 0
     expected_chip_count = 32
-    
+
     while attempts < 100:
         device_count = 0
         try:
             devices = PCIDevice.enumerate_devices()
             device_count = len(devices)
-            
+
             if device_count == expected_chip_count:
                 print(f"Driver loaded with {device_count} devices")
                 return
         except Exception as e:
             # If enumerate_devices fails, continue waiting
             pass
-        
+
         print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
         time.sleep(1)
         attempts += 1
-    
+
     # If we reach here, the driver was not loaded
     raise Exception(f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up")
 
@@ -1019,7 +1028,7 @@ def glx_6u_trays_reset(
         f"Resetting WH Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
-    
+
     if use_umd:
         if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
             print(
@@ -1035,7 +1044,7 @@ def glx_6u_trays_reset(
         run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
         timed_wait(30)
         run_ubb_wait_for_driver_load()
-    
+
     print(
         CMD_LINE_COLOR.PURPLE,
         f"Re-initializing boards after reset....",
