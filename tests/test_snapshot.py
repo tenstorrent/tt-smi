@@ -5,25 +5,6 @@ import json
 import pytest
 import subprocess
 
-from typing import Dict
-
-from pyluwen import PciChip
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-
-
-@pytest.fixture(scope="session")
-def devices() -> Dict[int, PciChip]:
-    """Return a list of Tenstorrent PciChips."""
-    # TODO: Test using the UMD function to detect chips
-    return dict(enumerate(detect_chips_with_callback()))
-
-
-@pytest.fixture(scope="session")
-def backend(devices) -> TTSMIBackend:
-    """Return a TTSMIBackend instance created from devices."""
-    return TTSMIBackend(devices)
-
 
 @pytest.fixture(scope="session")
 def snapshot(backend) -> dict:
