@@ -3,19 +3,7 @@
 
 import pytest
 
-from typing import List
-
-from pyluwen import PciChip
 from tt_smi.tt_smi_backend import get_board_type, convert_signed_16_16_to_float
-from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-
-
-@pytest.fixture(scope="session")
-def devices() -> List[PciChip]:
-    """Return a list of Tenstorrent PciChips."""
-    # TODO: Test using the UMD function to detect chips
-    return detect_chips_with_callback()
-
 
 class TestGetBoardType:
     @pytest.mark.parametrize(
@@ -52,7 +40,7 @@ class TestGetBoardType:
     @pytest.mark.requires_hardware
     def test_get_board_id_real_device(self, devices):
         """Test get_board_id with a real example."""
-        for dev in devices:
+        for dev in devices.values():
             result = get_board_type(f"{dev.board_id():x}")
             # This is a real board ID, so just verify it returns a valid type
             assert result in [
