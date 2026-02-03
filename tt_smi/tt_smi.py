@@ -683,6 +683,12 @@ def parse_args():
         action="store_true",
         help="Use deprecated Luwen driver instead of UMD (default).",
     )
+    parser.add_argument(
+        "--umd_log_level",
+        default="error",
+        choices=["error", "warning", "info", "debug", "trace"],
+        help="Set the UMD log level",
+    )
     args = parser.parse_args()
     return args
 
@@ -785,9 +791,9 @@ def main():
 
     # Detect non-tty stdout, but allow users to override
     is_tty = sys.stdout.isatty() and not args.snapshot_no_tty
-    if not is_tty:
-        # Suppress UMD log messages to be error only
-        os.environ["TT_LOGGER_LEVEL"] = "error"
+
+    # Set UMD log level, error by default
+    os.environ["TT_LOGGER_LEVEL"] = args.umd_log_level
 
     # Handle reset first, without setting up backend
     if args.reset is not None:
