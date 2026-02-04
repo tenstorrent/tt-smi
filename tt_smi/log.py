@@ -234,11 +234,11 @@ class Telemetry(ElasticModel):
 
 @optional
 class Firmwares(ElasticModel):
-    arc_fw: str
-    arc_fw_date: str
+    cm_fw: str
+    cm_fw_date: str
     eth_fw: str
-    m3_bl_fw: str
-    m3_app_fw: str
+    dm_bl_fw: str
+    dm_app_fw: str
     tt_flash_version: str
 
 
