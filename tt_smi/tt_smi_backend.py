@@ -884,7 +884,7 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
             WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx, secondary_bus_reset=secondary_bus_reset)
 
         if reset_bh_pci_idx:
-            BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
+            BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx, secondary_bus_reset=secondary_bus_reset)
 
     if reinit:
         # Enable backtrace for debugging
