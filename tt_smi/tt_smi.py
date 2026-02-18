@@ -37,10 +37,11 @@ from tt_tools_common.reset_common.reset_utils import (
 from tt_smi.tt_smi_backend import (
     TTSMIBackend,
     pci_board_reset,
-    glx_6u_trays_reset
+    hex_to_semver_eth,
+    glx_6u_trays_reset,
+    hex_to_semver_m3_fw,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    hex_to_semver_m3_fw,
     detect_chips_with_callback,
 )
 from tt_tools_common.utils_common.system_utils import (
@@ -175,9 +176,9 @@ class TTSMI(App):
         all_rows = []
         for i in self.backend.devices:
             rows = [Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")]
-            for fw in constants.FW_LIST:
+            for fw in constants.FW_LIST_GUI:
                 val = self.backend.firmware_infos[i][fw]
-                if val == "N/A":
+                if val == "N/A" or val == hex_to_semver_m3_fw(0) or val == hex_to_semver_eth(0):
                     rows.append(
                         Text(f"{val}", style=self.text_theme["gray"], justify="center")
                     )

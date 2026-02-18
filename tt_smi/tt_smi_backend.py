@@ -45,15 +45,46 @@ from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    hex_to_semver_m3_fw,
-    hex_to_date,
-    hex_to_semver_eth,
     init_logging,
     detect_chips_with_callback,
 )
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
 
+def hex_to_date(hexdate: int, include_time=True):
+    """Converts a date given in hex from format 0xYMDDHHMM to string YYYY-MM-DD HH:MM"""
+    if hexdate == 0 or hexdate == 0xFFFFFFFF:
+        return "N/A"
+
+    year = (hexdate >> 28 & 0xF) + 2020
+    month = hexdate >> 24 & 0xF
+    day = hexdate >> 16 & 0xFF
+    hour = hexdate >> 8 & 0xFF
+    minute = hexdate & 0xFF
+
+    date = f"{year:04}-{month:02}-{day:02}"
+
+    if include_time:
+        date += f" {hour:02}:{minute:02}"
+
+    return date
+
+def hex_to_semver_eth(hexsemver: int):
+    """Converts a semantic version string from format 0x061000 to 6.1.0"""
+    major = hexsemver >> 16 & 0xFF
+    minor = hexsemver >> 12 & 0xF
+    patch = hexsemver & 0xFFF
+
+    return f"{major}.{minor}.{patch}"
+
+def hex_to_semver_m3_fw(hexsemver: int):
+    """Converts a semantic version string from format 0x0A0F0100 to 10.15.1"""
+    major = hexsemver >> 24 & 0xFF
+    minor = hexsemver >> 16 & 0xFF
+    patch = hexsemver >> 8 & 0xFF
+    ver = hexsemver >> 0 & 0xFF
+
+    return f"{major}.{minor}.{patch}.{ver}"
 
 class TTSMIBackend:
     """
@@ -646,10 +677,14 @@ class TTSMIBackend:
     def get_firmware_versions(self, board_num):
         """Translate the telem struct semver for gui"""
         fw_versions = {}
-        for field in constants.FW_LIST:
+        for field in constants.FW_LIST_SNAPSHOT:
             if field == "cm_fw":
                 if "ARC0_FW_VERSION" in self.smbus_telem_info[board_num]:
                     val = self.smbus_telem_info[board_num]["ARC0_FW_VERSION"]
+                elif "CM_FW_VERSION" in self.smbus_telem_info[board_num]:
+                    val = self.smbus_telem_info[board_num]["CM_FW_VERSION"]
+                else:
+                    val = "N/A"
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
@@ -669,7 +704,7 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
-            elif field == "bm_bl_fw":
+            elif field == "dm_bl_fw":
                 if self.use_umd:
                     # The tag has different value for old WH telemetry and new telemetry.
                     if "M3_BL_FW_VERSION" in self.smbus_telem_info[board_num]:
@@ -682,7 +717,7 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
-            elif field == "bm_app_fw":
+            elif field == "dm_app_fw":
                 if self.use_umd:
                     # The tag has different value for WH and BH
                     if "M3_APP_FW_VERSION" in self.smbus_telem_info[board_num]:

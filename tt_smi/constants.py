@@ -120,14 +120,23 @@ LIMITS = [
     "bus_peak_limit",
 ]
 
-FW_LIST = [
+# leaving this intact for the snapshot version of the firmware list 
+# Don't want to break any automations we have around the snapshot
+FW_LIST_SNAPSHOT = [
     "fw_bundle_version",
     "tt_flash_version",
     "cm_fw",
     "cm_fw_date",
     "eth_fw",
-    "bm_bl_fw",
-    "bm_app_fw",
+    "dm_bl_fw",
+    "dm_app_fw",
+]
+
+FW_LIST_GUI = [
+    "fw_bundle_version",
+    "cm_fw",
+    "eth_fw",
+    "dm_app_fw",
 ]
 
 DEV_INFO_LIST = [
@@ -189,12 +198,9 @@ TELEMETRY_TABLE_HEADER = [
 FIRMWARES_TABLE_HEADER = [
     "#",
     "FW Bundle Version",
-    "TT-Flash Version",
     "CM FW Version",
-    "CM FW Date",
     "ETH FW Version",
-    "BM BL Version",
-    "BM App Version",
+    "DM App Version",
 ]
 
 PCI_PROPERTIES = [
