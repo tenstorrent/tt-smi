@@ -699,7 +699,10 @@ def tt_smi_main(backend: TTSMIBackend, args):
         None: None
     """
     if args.list:
-        backend.print_all_available_devices()
+        if backend.use_umd:
+            backend.print_all_available_devices_umd()
+        else:
+            backend.print_all_available_devices_luwen()
         sys.exit(0)
     if args.glx_list_tray_to_device:
         check_is_galaxy(backend, "-glx_list_tray_to_device")
