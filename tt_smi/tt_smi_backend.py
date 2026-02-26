@@ -181,10 +181,11 @@ class TTSMIBackend:
 
         return self.log.get_clean_json_string()
 
-    def print_all_available_devices(self):
-        """Print all available boards on host"""
+    def print_all_available_devices_luwen(self):
+        """Print all available boards on host (Luwen path). Shows both PCI BDF and PCI Dev ID. Doesn't show UMD Chip ID."""
         console = get_console()
         table_1 = Table(title="All available boards on host:")
+        table_1.add_column("PCI BDF")
         table_1.add_column("PCI Dev ID")
         table_1.add_column("Board Type")
         table_1.add_column("Device Series")
@@ -198,13 +199,15 @@ class TTSMIBackend:
                 board_type = board_type + suffix
 
             table_1.add_row(
-                f"{pci_dev_id}",
+                f"{self.get_pci_bdf(i)}",
+                f"/dev/tenstorrent/{i}",
                 f"{self.get_device_name(i)}",
                 f"{board_type}",
                 f"{board_id}",
             )
         console.print(table_1)
         table_2 = Table(title="Boards that can be reset:")
+        table_2.add_column("PCI BDF")
         table_2.add_column("PCI Dev ID")
         table_2.add_column("Board Type")
         table_2.add_column("Device Series")
@@ -221,7 +224,64 @@ class TTSMIBackend:
                     suffix = " R" if self.devices[i].is_remote() else " L"
                     board_type = board_type + suffix
                 table_2.add_row(
-                    f"{pci_dev_id}",
+                    f"{self.get_pci_bdf(i)}",
+                    f"/dev/tenstorrent/{i}",
+                    f"{self.get_device_name(i)}",
+                    f"{board_type}",
+                    f"{board_id}",
+                )
+        console.print(table_2)
+
+    def print_all_available_devices_umd(self):
+        """Print all available boards on host (UMD path). Shows UMD Chip ID, PCI BDF, and PCI Dev ID."""
+        if not self.use_umd:
+            raise RuntimeError("print_all_available_devices_umd requires UMD backend (umd_cluster_descriptor set)")
+        console = get_console()
+        table_1 = Table(title="All available boards on host (UMD):")
+        table_1.add_column("UMD Chip ID")
+        table_1.add_column("PCI BDF")
+        table_1.add_column("PCI Dev ID")
+        table_1.add_column("Board Type")
+        table_1.add_column("Device Series")
+        table_1.add_column("Board Number")
+        for i in self.devices:
+            pci_dev_num = self.get_pci_device_id(i)
+            board_id = self.device_infos[i]["board_id"]
+            board_type = self.device_infos[i]["board_type"]
+            if self.is_wormhole(i):
+                suffix = " R" if self.devices[i].is_remote() else " L"
+                board_type = board_type + suffix
+            table_1.add_row(
+                f"{i}",
+                f"{self.get_pci_bdf(i)}",
+                f"/dev/tenstorrent/{pci_dev_num}",
+                f"{self.get_device_name(i)}",
+                f"{board_type}",
+                f"{board_id}",
+            )
+        console.print(table_1)
+        table_2 = Table(title="Boards that can be reset (UMD):")
+        table_2.add_column("UMD Chip ID")
+        table_2.add_column("PCI BDF")
+        table_2.add_column("PCI Dev ID")
+        table_2.add_column("Board Type")
+        table_2.add_column("Device Series")
+        table_2.add_column("Board Number")
+        for i in self.devices:
+            if (
+                not self.devices[i].is_remote()
+                and self.device_infos[i]["board_type"] != "wh_4u"
+            ):
+                pci_dev_num = self.get_pci_device_id(i)
+                board_id = self.device_infos[i]["board_id"]
+                board_type = self.device_infos[i]["board_type"]
+                if self.is_wormhole(i):
+                    suffix = " R" if self.devices[i].is_remote() else " L"
+                    board_type = board_type + suffix
+                table_2.add_row(
+                    f"{i}",
+                    f"{self.get_pci_bdf(i)}",
+                    f"/dev/tenstorrent/{pci_dev_num}",
                     f"{self.get_device_name(i)}",
                     f"{board_type}",
                     f"{board_id}",
@@ -257,7 +317,7 @@ class TTSMIBackend:
         table = Table(title="Mapping of trays to devices on the galaxy:")
         table.add_column("Tray Number")
         table.add_column("Tray Bus ID")
-        table.add_column("PCI Dev ID")
+        table.add_column("/dev/tenstorrent/<id>")
         for tray_num in sorted(tray_to_devices):
             table.add_row(
                 f"{tray_num}",
