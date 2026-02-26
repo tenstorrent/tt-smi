@@ -5,7 +5,7 @@ import pytest
 from typing import List
 
 from pyluwen import pci_scan
-from tt_smi.tt_smi_backend import pci_board_reset, glx_6u_trays_reset
+from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
 
 NUM_RESETS_STRESS_TEST = 10
 
