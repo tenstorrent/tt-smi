@@ -6,7 +6,7 @@ import pytest
 from typing import List
 
 from pyluwen import PciChip
-from tt_smi.tt_smi_backend import get_board_type, convert_signed_16_16_to_float
+from tt_smi.tt_smi_utils import get_board_type, convert_signed_16_16_to_float
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 
 
