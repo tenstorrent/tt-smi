@@ -22,6 +22,7 @@ from importlib.resources import files
 from importlib.metadata import version
 from pyluwen import pci_scan
 from tt_umd import (
+    PCIDevice,
     TopologyDiscovery,
 )
 from textual.app import App, ComposeResult
@@ -30,10 +31,6 @@ from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from textual.worker import get_current_worker, Worker, WorkerState
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
-from tt_tools_common.reset_common.reset_utils import (
-    ResetType,
-    parse_reset_input,
-)
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_smi.tt_smi_utils import (
     check_is_galaxy,
@@ -41,7 +38,12 @@ from tt_smi.tt_smi_utils import (
     hex_to_semver_m3_fw,
     is_vm,
 )
-from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
+from tt_smi.tt_smi_reset import (
+    umd_bdf_to_indices,
+    pci_board_reset, 
+    glx_6u_trays_reset, 
+    parse_reset_input
+)
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
 )
@@ -762,6 +764,10 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_reset_input(args.reset)
+        print(reset_input)
+        # umd_bdf_to_indices(["0000:01:00.0"], PCIDevice.enumerate_devices_info())
+        pci_board_reset([0,0], reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, reset_input=reset_input)
+        sys.exit(0)
 
         if reset_input.type == ResetType.ALL:
             # Assume user wants all pci devices to be reset
