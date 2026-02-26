@@ -34,10 +34,12 @@ from tt_tools_common.reset_common.reset_utils import (
     ResetType,
     parse_reset_input,
 )
-from tt_smi.tt_smi_backend import (
-    TTSMIBackend,
+from tt_smi.tt_smi_backend import TTSMIBackend
+from tt_smi.tt_smi_utils import (
+    check_is_galaxy,
     hex_to_semver_eth,
     hex_to_semver_m3_fw,
+    is_vm,
 )
 from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
 from tt_tools_common.utils_common.tools_utils import (
@@ -728,41 +730,6 @@ def tt_smi_main(backend: TTSMIBackend, args):
         show_sidebar=not args.compact,
     )
     tt_smi_app.run()
-
-def check_is_galaxy(backend: TTSMIBackend, user_arg: str):
-    """Check if the board is a Galaxy board"""
-    if len(backend.device_infos) < 1:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"No devices detected.",
-            CMD_LINE_COLOR.ENDC
-        )
-        sys.exit(1)
-
-    if backend.device_infos[0]["board_type"] not in constants.GLX_BOARD_TYPES:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"This is not a Galaxy board, `{user_arg}` is only supported on Galaxy.",
-            CMD_LINE_COLOR.ENDC
-        )
-        sys.exit(1)
-    return
-
-
-def is_vm():
-    try:
-        with open("/proc/cpuinfo", "r") as f:
-            if "hypervisor" in f.read():
-                return True
-    except (FileNotFoundError, PermissionError):
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"Cannot access /proc/cpuinfo: {e}",
-            CMD_LINE_COLOR.ENDC
-        )
-        pass
-    return False
-
 
 def main():
     """

@@ -20,9 +20,19 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
-from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from pyluwen import PciChip
+from tt_smi.tt_smi_utils import (
+    LOG_FOLDER,
+    hex_to_date,
+    hex_to_semver_eth,
+    hex_to_semver_m3_fw,
+    hex_to_semver_eth_wh,
+    get_board_type,
+    convert_signed_16_16_to_float,
+    dict_from_public_attrs,
+    get_host_software_versions,
+)
 from tt_umd import (
     TTDevice,
     wormhole,
@@ -35,56 +45,6 @@ from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
 from tt_tools_common.utils_common.tools_utils import init_logging
-
-LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
-
-def hex_to_date(hexdate: int, include_time=True):
-    """Converts a date given in hex from format 0xYMDDHHMM to string YYYY-MM-DD HH:MM"""
-    if hexdate == 0 or hexdate == 0xFFFFFFFF:
-        return "N/A"
-
-    year = (hexdate >> 28 & 0xF) + 2020
-    month = hexdate >> 24 & 0xF
-    day = hexdate >> 16 & 0xFF
-    hour = hexdate >> 8 & 0xFF
-    minute = hexdate & 0xFF
-
-    date = f"{year:04}-{month:02}-{day:02}"
-
-    if include_time:
-        date += f" {hour:02}:{minute:02}"
-
-    return date
-
-def hex_to_semver_eth_wh(hexsemver: int):
-    """
-    Converts a semantic version string from format 0x061000 to 6.1.0
-    Used in WH firmware only.
-    """
-    major = hexsemver >> 16 & 0xFF
-    minor = hexsemver >> 12 & 0xF
-    patch = hexsemver & 0xFFF
-
-    return f"{major}.{minor}.{patch}"
-
-def hex_to_semver_eth(hexsemver: int):
-    """
-    Converts a semantic version string from format 0x060100 to 6.1.0
-    """
-    major = hexsemver >> 16 & 0xFF
-    minor = hexsemver >> 8 & 0xFF
-    patch = hexsemver & 0xFF
-
-    return f"{major}.{minor}.{patch}"
-
-def hex_to_semver_m3_fw(hexsemver: int):
-    """Converts a semantic version string from format 0x0A0F0100 to 10.15.1"""
-    major = hexsemver >> 24 & 0xFF
-    minor = hexsemver >> 16 & 0xFF
-    patch = hexsemver >> 8 & 0xFF
-    ver = hexsemver >> 0 & 0xFF
-
-    return f"{major}.{minor}.{patch}.{ver}"
 
 class TTSMIBackend:
     """
@@ -766,89 +726,3 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
-
-
-def get_board_type(board_id: str) -> str:
-    """
-    Get board type from board ID string.
-    Ex:
-        Board ID: AA-BBBBB-C-D-EE-FF-XXX
-                   ^     ^ ^ ^  ^  ^   ^
-                   |     | | |  |  |   +- XXX
-                   |     | | |  |  +----- FF
-                   |     | | |  +-------- EE
-                   |     | | +----------- D
-                   |     | +------------- C = Revision
-                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
-                   +--------------------- AA
-    """
-    if board_id == "N/A":
-        return "N/A"
-    serial_num = int(f"0x{board_id}", base=16)
-    upi = (serial_num >> 36) & 0xFFFFF
-
-    # Grayskull cards
-    if upi == 0x3:
-        return "e150"
-    elif upi == 0xA:
-        return "e300"
-    elif upi == 0x7:
-        return "e75"
-
-    # Wormhole cards
-    elif upi == 0x8:
-        return "nb_cb"
-    elif upi == 0xB:
-        return "wh_4u"
-    elif upi == 0x14:
-        return "n300"
-    elif upi == 0x18:
-        return "n150"
-    elif upi == 0x35:
-        return "tt-galaxy-wh"
-
-    # Blackhole cards
-    elif upi == 0x36:
-        return "bh-scrappy"
-    elif upi == 0x43:
-        return "p100a"
-    elif upi == 0x40:
-        return "p150a"
-    elif upi == 0x41:
-        return "p150b"
-    elif upi == 0x42:
-        return "p150c"
-    elif upi == 0x44:
-        return "p300b"
-    elif upi == 0x45:
-        return "p300a"
-    elif upi == 0x46:
-        return "p300c"
-    elif upi == 0x47:
-        return "tt-galaxy-bh"
-    else:
-        return "N/A"
-
-def convert_signed_16_16_to_float(value):
-    """Convert signed 16.16 to float"""
-    if value & (1 << (32 - 1)): # if the value is negative (two's complement)
-        value -= 1 << 32 # convert to negative value
-    return value / 65536.0
-
-def dict_from_public_attrs(obj) -> dict:
-    """Parse an object's public attributes into a dictionary"""
-    all_attrs = obj.__dir__()
-    # Filter private attrs
-    public = [attr for attr in all_attrs if not attr.startswith("_")]
-    ret = {}
-    for attr in public:
-        ret[attr] = getattr(obj, attr)
-    return ret
-
-
-def get_host_software_versions() -> dict:
-    return {
-        "tt_smi": version("tt_smi"),
-        "pyluwen": version("pyluwen"),
-        "tt_umd": version("tt_umd"),
-    }
