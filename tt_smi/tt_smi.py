@@ -36,11 +36,10 @@ from tt_tools_common.reset_common.reset_utils import (
 )
 from tt_smi.tt_smi_backend import (
     TTSMIBackend,
-    pci_board_reset,
     hex_to_semver_eth,
-    glx_6u_trays_reset,
     hex_to_semver_m3_fw,
 )
+from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
 )
