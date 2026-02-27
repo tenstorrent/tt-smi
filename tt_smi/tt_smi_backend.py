@@ -69,11 +69,24 @@ def hex_to_date(hexdate: int, include_time=True):
 
     return date
 
-def hex_to_semver_eth(hexsemver: int):
-    """Converts a semantic version string from format 0x061000 to 6.1.0"""
+def hex_to_semver_eth_wh(hexsemver: int):
+    """
+    Converts a semantic version string from format 0x061000 to 6.1.0
+    Used in WH firmware only.
+    """
     major = hexsemver >> 16 & 0xFF
     minor = hexsemver >> 12 & 0xF
     patch = hexsemver & 0xFFF
+
+    return f"{major}.{minor}.{patch}"
+
+def hex_to_semver_eth(hexsemver: int):
+    """
+    Converts a semantic version string from format 0x060100 to 6.1.0
+    """
+    major = hexsemver >> 16 & 0xFF
+    minor = hexsemver >> 8 & 0xFF
+    patch = hexsemver & 0xFF
 
     return f"{major}.{minor}.{patch}"
 
@@ -702,6 +715,8 @@ class TTSMIBackend:
                 val = self.smbus_telem_info[board_num]["ETH_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
+                elif self.is_wormhole(board_num):
+                    fw_versions[field] = hex_to_semver_eth_wh(int(val, 16))
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
             elif field == "dm_bl_fw":
