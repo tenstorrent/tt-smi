@@ -40,6 +40,7 @@ from tt_umd import (
     WarmReset,
     PCIDevice,
     TopologyDiscovery,
+    TopologyDiscoveryOptions,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
@@ -868,7 +869,7 @@ def get_host_software_versions() -> dict:
 
 
 # Reset specific functions
-def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False):
+def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False, wait_for_eth: bool = False):
     """Given a list of PCI index's init the PCI chip and call reset on it"""
 
     reset_wh_pci_idx = []
@@ -947,7 +948,15 @@ def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_statu
         )
         try:
             if use_umd:
-                TopologyDiscovery.discover()
+                options = TopologyDiscoveryOptions()
+                options.no_wait_for_eth_training = not wait_for_eth
+                if not wait_for_eth:
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        "Skipping Ethernet link training wait after reset.",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                TopologyDiscovery.discover(options)
             else:
                 detect_chips_with_callback(print_status=print_status)
         except Exception as e:
