@@ -23,3 +23,4 @@ debian/*.files
 debian/cargo_home/
 debian/debhelper-build-stamp
 debian/files
+uv.lock
