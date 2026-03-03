@@ -38,7 +38,8 @@ def timed_wait(seconds):
         sys.stdout.flush()
     print()
 
-
+# Keep this function for now, but it's not used anywhere in the codebase. 
+# It is the check that is used in Funtest for Galaxy systems and we might need to reference it later.
 def check_wh_galaxy_eth_link_status(devices):
     """
     Check the WH Galaxy Ethernet link status.
@@ -75,7 +76,6 @@ def check_wh_galaxy_eth_link_status(devices):
                 CMD_LINE_COLOR.ENDC,
             )
         raise Exception("WH Galaxy Ethernet link errors detected!")
-
 
 def umd_ubb_wait_for_driver_load():
     """
@@ -263,8 +263,6 @@ def glx_6u_trays_reset(
         )
         sys.exit(1)
 
-    if ubb_num == "0xF":
-        check_wh_galaxy_eth_link_status(chips)
     print(
         CMD_LINE_COLOR.GREEN,
         f"Re-initialized {len(chips)} boards after reset. Exiting...",
