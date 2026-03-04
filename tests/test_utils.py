@@ -3,7 +3,7 @@
 
 import pytest
 
-from tt_smi.tt_smi_backend import get_board_type, convert_signed_16_16_to_float
+from tt_smi.tt_smi_utils import get_board_type, convert_signed_16_16_to_float
 
 class TestGetBoardType:
     @pytest.mark.parametrize(
