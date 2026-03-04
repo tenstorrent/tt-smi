@@ -6,9 +6,12 @@ Reset-related functions for tt-smi: PCI board reset, galaxy 6U tray reset, and h
 """
 
 import os
+import re
 import sys
 import time
-from typing import List
+from enum import Enum
+from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union, Dict
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
@@ -27,6 +30,98 @@ from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
 )
 
+"""
+Reset -r target formats: UMD logical ID (int), PCI BDF (0000:aa:00.0), /dev/tenstorrent/<int>
+
+tt-smi -r <UMD logical ID>   e.g. tt-smi -r 0  or  tt-smi -r 0,1,2
+tt-smi -r <PCI BDF>          e.g. tt-smi -r 0000:0a:00.0
+tt-smi -r /dev/tenstorrent/<ID>   e.g. tt-smi -r /dev/tenstorrent/0  or  tt-smi -r /dev/tenstorrent/0, /dev/tenstorrent/1
+Mixing types is not allowed; parse_reset_input returns a single ResetInput with one ResetType.
+"""
+
+DEV_TENSTORRENT_PREFIX = "/dev/tenstorrent/"
+PCI_BDF_FULL_RE = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$")
+
+class ResetType(Enum):
+    ALL = 1
+    UMD_LOGICAL_ID = 2
+    PCI_BDF = 3
+    DEV_TENSTORRENT_ID = 4
+
+@dataclass
+class ResetInput:
+    type: ResetType
+    value: Optional[Union[List[int], List[str]]] = None
+
+def _classify_reset_token(token: str) -> Tuple[str, Union[int, str]]:
+    """Classify a single token as 'int' (UMD logical ID), 'bdf', or 'dev_path'. Returns (kind, value). For dev_path, value is the integer ID only."""
+    token = token.strip()
+    if not token:
+        raise ValueError("Empty token")
+    if token.lower() == "all":
+        raise ValueError("Use 'all' as the only argument to reset all devices")
+    if token.startswith(DEV_TENSTORRENT_PREFIX):
+        suffix = token[len(DEV_TENSTORRENT_PREFIX) :].strip()
+        if suffix.isdigit():
+            return ("dev_path", int(suffix))
+        raise ValueError(f"Invalid path: {token} (expected /dev/tenstorrent/<integer>)")
+    if PCI_BDF_FULL_RE.match(token):
+        return ("bdf", token)
+    if token.lstrip("-").isdigit():
+        return ("int", int(token))
+    raise ValueError(
+        f"Invalid reset target: '{token}'. "
+        "Use UMD logical ID (integer), PCI BDF (e.g. 0000:0a:00.0), or /dev/tenstorrent/<integer>."
+    )
+
+def parse_reset_input(value: list) -> ResetInput:
+    """
+    Parse -r / --reset arguments. All tokens must be the same type (no mixing).
+    Returns a single ResetInput:
+    - ResetInput(type=ALL) for no input or "all".
+    - ResetInput(type=PCI_BDF, value=[...]) for PCI BDFs.
+    - ResetInput(type=UMD_LOGICAL_ID, value=[...]) for UMD logical IDs.
+    - ResetInput(type=DEV_TENSTORRENT_ID, value=[...]) for /dev/tenstorrent/<int> paths.
+    Mixing types is an error to prevent accidentally resetting the same device more than once.
+    """
+    if value is None or len(value) == 0:
+        return ResetInput(type=ResetType.ALL, value=None)
+    tokens = [t.strip() for raw in value for t in raw.split(",") if t.strip()]
+    if not tokens or (len(tokens) == 1 and tokens[0].lower() == "all"):
+        return ResetInput(type=ResetType.ALL, value=None)
+
+    KIND_TO_RESET_TYPE = {
+        "bdf": ResetType.PCI_BDF,
+        "int": ResetType.UMD_LOGICAL_ID,
+        "dev_path": ResetType.DEV_TENSTORRENT_ID,
+    }
+
+    seen: set = set()
+    values: list = []
+    reset_type: Optional[ResetType] = None
+
+    for token in tokens:
+        try:
+            kind, val = _classify_reset_token(token)
+            token_type = KIND_TO_RESET_TYPE[kind]
+            if reset_type is not None and token_type != reset_type:
+                raise ValueError(
+                    f"Mixed reset types are not allowed. "
+                    f"Got '{token}' which is a {token_type.name}, but earlier tokens were {reset_type.name}. "
+                    "Use only one type per invocation."
+                )
+            reset_type = token_type
+            if val not in seen:
+                seen.add(val)
+                values.append(val)
+        except ValueError as e:
+            print(CMD_LINE_COLOR.RED, str(e), CMD_LINE_COLOR.ENDC)
+            sys.exit(1)
+
+    if reset_type in (ResetType.UMD_LOGICAL_ID, ResetType.DEV_TENSTORRENT_ID):
+        values = sorted(values)
+
+    return ResetInput(type=reset_type, value=values)
 
 def timed_wait(seconds):
     print("\033[93mWaiting for {} seconds: 0\033[0m".format(seconds), end='')
@@ -104,9 +199,37 @@ def umd_ubb_wait_for_driver_load():
         f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up"
     )
 
+def umd_pci_warm_reset(
+    reset_input: ResetInput,
+    reinit: bool = False,
+    print_status: bool = True,
+):
+    """
+    Reset the PCI devices using UMD warm reset.
+    """
+    chips = PCIDevice.enumerate_devices_info()
+    reset_indices = reset_input.value
+    if reset_input.type == ResetType.ALL:
+        reset_indices = [chip.pci_index for chip in chips]
+        print(f"Resetting all PCI devices: {reset_indices}")
+        WarmReset.warm_reset(reset_indices)
+        return
+    if reset_input.type == ResetType.UMD_LOGICAL_ID:
+        print(f"Resetting UMD logical IDs: {reset_input.value}")
+        WarmReset.warm_reset_umd_id(reset_indices)
+        return
+    if reset_input.type == ResetType.PCI_BDF:
+        print(f"Resetting PCI BDFs: {reset_input.value}")
+        WarmReset.warm_reset_pci_bdfs(reset_indices)
+        return
+    if reset_input.type == ResetType.DEV_TENSTORRENT_ID:
+        print(f"Resetting /dev/tenstorrent IDs: {reset_input.value}")
+        WarmReset.warm_reset(reset_indices)
+        return
+    raise ValueError(f"Invalid reset type: {reset_input.type}")
 
 def pci_board_reset(
-    list_of_boards: List[int],
+    reset_input: ResetInput,
     reinit: bool = False,
     print_status: bool = True,
     use_umd: bool = False,
@@ -115,9 +238,8 @@ def pci_board_reset(
     reset_wh_pci_idx = []
     reset_bh_pci_idx = []
     board_types = set()
-    if use_umd:
-        chips = PCIDevice.enumerate_devices_info()
-    for pci_idx in list_of_boards:
+    chips = PCIDevice.enumerate_devices_info()
+    for pci_idx in [0,1]:
         try:
             if not use_umd:
                 chip = PciChip(pci_interface=pci_idx)
@@ -161,7 +283,7 @@ def pci_board_reset(
     secondary_bus_reset = not is_galaxy
 
     if use_umd:
-        WarmReset.warm_reset(list_of_boards, secondary_bus_reset=secondary_bus_reset)
+        umd_pci_warm_reset(reset_input, reinit, print_status)
     else:
         if reset_wh_pci_idx:
             WHChipReset().full_lds_reset(
