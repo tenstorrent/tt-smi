@@ -1,3 +1,39 @@
+tt-smi (4.1.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add in fields with a value of 0 when constructing smbus_telem_info
+  * Change update_telem thread to use Textual Worker API
+  * Exit application and print error msg on telem update thread error
+  * Don't display Rust error backtraces in tt-smi
+  * Check if telem value is not None before converting to hex
+  * Move pytest fixtures to conftest.py
+  * Add UMD backend to tests
+
+  [ Samridhi Bansal ]
+  * Modernize the firmware table
+
+  [ Petra Alexson ]
+  * Fix not passing in secondary_bus_reset to BH full_lds_reset
+  * Parse ETH FW version for BH
+
+  [ Luca Barbato ]
+  * Add uv support for nicer development experience
+
+  [ Petra Alexson ]
+  * Refine smbus_telem_list fields that are required in snapshot tests
+
+  [ Samridhi Bansal ]
+  * Update the UMD version from >=0.9.1 to ~=0.9.1
+  * refactor: Moved all the smi reset related functions into a file
+  * refactor: Moved all the util functions into their own file
+  * Update the tt-smi -ls option to include UMD chip ID and PCI BDF
+  * Remove unused eth link check after ipmi reset
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 04 Mar 2026 17:24:56 +0000
+
 tt-smi (4.0.0) noble; urgency=medium
 
   [ Petra Alexson ]
