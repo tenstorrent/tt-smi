@@ -1,3 +1,15 @@
+tt-smi (4.1.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Lock UMD version at 0.9.3 till issues with latest is solved
+  * GUI: Update dram status for FW version >= 19.7.0.3 to include BIST errors
+  * Consolidate the fw_bundle_logic for both umd and luwen
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 11 Mar 2026 20:33:45 +0000
+
 tt-smi (4.1.0) noble; urgency=medium
 
   [ Petra Alexson ]
