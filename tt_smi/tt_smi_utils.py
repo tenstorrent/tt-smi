@@ -182,3 +182,14 @@ def is_vm() -> bool:
             CMD_LINE_COLOR.ENDC,
         )
     return False
+
+def get_fw_bundle_version(smbus_telem_info) -> int:
+    """We have two possible keys for the firmware bundle version: FLASH_BUNDLE_VERSION and FW_BUNDLE_VERSION.
+    We need to return the version of the firmware bundle.
+    """
+    if "FW_BUNDLE_VERSION" in smbus_telem_info:
+        return smbus_telem_info["FW_BUNDLE_VERSION"]
+    elif "FLASH_BUNDLE_VERSION" in smbus_telem_info:
+        return smbus_telem_info["FLASH_BUNDLE_VERSION"]
+    else:
+        return None
