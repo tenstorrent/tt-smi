@@ -471,19 +471,40 @@ class TTSMIBackend:
                 return True
             return False
         elif self.is_blackhole(board_num):
-            # DDR Status in BH is a 16-bit field with the following layout:
-			#  [0] - Training complete GDDR 0
-			#  [1] - Error GDDR 0
-			#  [2] - Training complete GDDR 1
-			#  [3] - Error GDDR 1
-			#  ...
-			#  [14] - Training Complete GDDR 7
-			#  [15] - Error GDDR 7
             dram_status = int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)
-            # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
-            if dram_status == 0x5555:
-                return True
-            return False
+            if int(self.smbus_telem_info[board_num]["FLASH_BUNDLE_VERSION"], 16) >= 0x13070003:
+                # After FW version 19.7.0.3 (hex 0x13070003), the dram status is a 16-bit field with the following layout:
+                # DDR Status:
+                # [0]  - Training complete GDDR 0
+                # [1]  - Error GDDR 0
+                # [2]  - Training complete GDDR 1
+                # [3]  - Error GDDR 1
+                # ...
+                # [14] - Training complete GDDR 7
+                # [15] - Error GDDR 7
+                # [16] - BIST complete GDDR 0
+                # [17] - BIST failed GDDR 0
+                # [18] - BIST complete GDDR 1
+                # [19] - BIST failed GDDR 1
+                # ...
+                # [30] - BIST complete GDDR 7
+                # [31] - BIST failed GDDR 7
+                if dram_status == 0x55555555:
+                    return True
+                return False
+            else:
+                # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
+                #  [0] - Training complete GDDR 0
+                #  [1] - Error GDDR 0
+                #  [2] - Training complete GDDR 1
+                #  [3] - Error GDDR 1
+                #  ...
+                #  [14] - Training Complete GDDR 7
+                #  [15] - Error GDDR 7
+                # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
+                if dram_status == 0x5555:
+                    return True
+                return False
         else:
             return False
 
