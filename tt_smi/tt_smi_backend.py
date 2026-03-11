@@ -32,6 +32,7 @@ from tt_smi.tt_smi_utils import (
     convert_signed_16_16_to_float,
     dict_from_public_attrs,
     get_host_software_versions,
+    get_fw_bundle_version
 )
 from tt_umd import (
     TTDevice,
@@ -471,19 +472,40 @@ class TTSMIBackend:
                 return True
             return False
         elif self.is_blackhole(board_num):
-            # DDR Status in BH is a 16-bit field with the following layout:
-			#  [0] - Training complete GDDR 0
-			#  [1] - Error GDDR 0
-			#  [2] - Training complete GDDR 1
-			#  [3] - Error GDDR 1
-			#  ...
-			#  [14] - Training Complete GDDR 7
-			#  [15] - Error GDDR 7
             dram_status = int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)
-            # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
-            if dram_status == 0x5555:
-                return True
-            return False
+            if int(get_fw_bundle_version(self.smbus_telem_info[board_num]), 16) >= 0x13070000:
+                # After FW version 19.7.0.3 (hex 0x13070003), the dram status is a 16-bit field with the following layout:
+                # DDR Status:
+                # [0]  - Training complete GDDR 0
+                # [1]  - Error GDDR 0
+                # [2]  - Training complete GDDR 1
+                # [3]  - Error GDDR 1
+                # ...
+                # [14] - Training complete GDDR 7
+                # [15] - Error GDDR 7
+                # [16] - BIST complete GDDR 0
+                # [17] - BIST failed GDDR 0
+                # [18] - BIST complete GDDR 1
+                # [19] - BIST failed GDDR 1
+                # ...
+                # [30] - BIST complete GDDR 7
+                # [31] - BIST failed GDDR 7
+                if dram_status == 0x55555555:
+                    return True
+                return False
+            else:
+                # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
+                #  [0] - Training complete GDDR 0
+                #  [1] - Error GDDR 0
+                #  [2] - Training complete GDDR 1
+                #  [3] - Error GDDR 1
+                #  ...
+                #  [14] - Training Complete GDDR 7
+                #  [15] - Error GDDR 7
+                # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
+                if dram_status == 0x5555:
+                    return True
+                return False
         else:
             return False
 
@@ -763,14 +785,7 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
-                if self.use_umd:
-                    # The tag has different value for WH and BH
-                    if "FW_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
-                        val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
-                    elif "FLASH_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
-                        val = self.smbus_telem_info[board_num]["FLASH_BUNDLE_VERSION"]
-                else:
-                    val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
+                val = get_fw_bundle_version(self.smbus_telem_info[board_num])
                 if (
                     get_board_type(self.get_board_id(board_num)) == "wh_4u"
                     and val == "0xffffffff"
