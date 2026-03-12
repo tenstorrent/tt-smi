@@ -27,6 +27,7 @@ from tt_umd import (
     WarmReset,
     PCIDevice,
     TopologyDiscovery,
+    TopologyDiscoveryOptions,
 )
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
@@ -340,7 +341,10 @@ def pci_board_reset(
         )
         try:
             if use_umd:
-                TopologyDiscovery.discover()
+                options = TopologyDiscoveryOptions()
+                options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+                options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+                cluster_descriptor, devices = TopologyDiscovery.discover(options=options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status)
