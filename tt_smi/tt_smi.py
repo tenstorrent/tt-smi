@@ -23,6 +23,7 @@ from importlib.metadata import version
 from pyluwen import pci_scan
 from tt_umd import (
     TopologyDiscovery,
+    TopologyDiscoveryOptions,
 )
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
@@ -844,7 +845,10 @@ def main():
 
     try:
         if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover()
+            options = TopologyDiscoveryOptions()
+            options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+            options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+            cluster_descriptor, devices = TopologyDiscovery.discover(options=options)
         else:
             cluster_descriptor = None
             devices = dict(enumerate(detect_chips_with_callback(

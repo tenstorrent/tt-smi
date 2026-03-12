@@ -342,13 +342,8 @@ def pci_board_reset(
         try:
             if use_umd:
                 options = TopologyDiscoveryOptions()
-                options.no_wait_for_eth_training = not wait_for_eth
-                if not wait_for_eth:
-                    print(
-                        CMD_LINE_COLOR.YELLOW,
-                        "Skipping Ethernet link training wait after reset.",
-                        CMD_LINE_COLOR.ENDC,
-                    )
+                options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+                options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
                 TopologyDiscovery.discover(options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
