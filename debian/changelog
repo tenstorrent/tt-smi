@@ -1,3 +1,13 @@
+tt-smi (4.1.2) noble; urgency=medium
+
+  [ Daniel DeGrasse ]
+  * add option --eth_train_skip, which enables skipping eth training
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.2
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 17 Mar 2026 14:19:45 +0000
+
 tt-smi (4.1.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
