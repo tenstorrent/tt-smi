@@ -722,6 +722,9 @@ def tt_smi_main(backend: TTSMIBackend, args):
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(0)
+    if not sys.stdin.isatty():
+        print(f"{CMD_LINE_COLOR.RED}No TTY detected! Interactive shell required.\nUse tt-smi -s for snapshot output.{CMD_LINE_COLOR.ENDC}")
+        sys.exit(1)
     tt_smi_app = TTSMI(
         backend=backend,
         snapshot=args.snapshot,
