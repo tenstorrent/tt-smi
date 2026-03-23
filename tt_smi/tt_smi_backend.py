@@ -710,7 +710,12 @@ class TTSMIBackend:
                 therm_trip_l1_limit = self.smbus_telem_info[board_num].get("THM_LIMIT_THROTTLE")
                 chip_limits[field] = f"{int(therm_trip_l1_limit, 16):2.0f}" if therm_trip_l1_limit else 0
             elif field == "thm_limit":
-                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                if "THM_LIMIT_SHUTDOWN" in self.smbus_telem_info[board_num]:
+                    thm_limits = self.smbus_telem_info[board_num].get("THM_LIMIT_SHUTDOWN")
+                elif "THM_LIMITS" in self.smbus_telem_info[board_num]:
+                    thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                else:
+                    thm_limits = 0
                 chip_limits[field] = f"{int(thm_limits, 16):2.0f}" if thm_limits else 0
             else:
                 chip_limits[field] = 0

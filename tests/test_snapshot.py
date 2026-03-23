@@ -70,7 +70,7 @@ class TestSnapshot:
             "TDP",
             "TDC",
             "VDD_LIMITS",
-            "THM_LIMITS",
+            # "THM_LIMITS",
             "TT_FLASH_VERSION",
         ]
         device_infos = snapshot["device_info"]
