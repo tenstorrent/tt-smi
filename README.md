@@ -94,7 +94,7 @@ pre-commit install
 tt-smi can be used as a GUI (`tt-smi`) or CLI (`tt-smi -s`) to display system information and Tenstorrent device telemetry, and it can be used to reset Tenstorrent devices (`tt-smi -r`).
 
 ```
-tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit]
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit]
 ```
 
 ## Getting Help
@@ -103,7 +103,7 @@ Running tt-smi with the ```-h, --help``` flag displays the help text.
 
 ```
 $ tt-smi -h
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [0,1 ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
 
 Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
 interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
@@ -113,12 +113,12 @@ options:
   -l, --local           Run on local chips (Wormhole only)
   -v, --version         show program's version number and exit
   -s, --snapshot        Dump snapshot of current tt-smi information to STDOUT
-  -ls, --list           List boards that are available on host and quit
+  -ls, --list           List boards on the host and quit (UMD: UMD Chip ID, PCI BDF, PCI Dev ID, …)
   -f [snapshot filename], --filename [snapshot filename]
                         Write snapshot to a file. Default: ~/tt_smi/<timestamp>_snapshot.json
   -c, --compact         Run in compact mode, hiding the sidebar and other static elements
-  -r [0,1 ...], --reset [0,1 ...]
-                        Provide a list of PCI indices. Find PCI index of board using the -ls option. If no indices are provided, all devices will be reset
+  -r [TARGETS ...], --reset [TARGETS ...]
+                        Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or /dev/tenstorrent/<id>. Use -ls to list devices. Omit targets or use "all" to reset all devices. Do not mix types in one command.
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
   -glx_reset, --galaxy_6u_trays_reset
                         Reset all the ASICs on the galaxy host
@@ -148,69 +148,105 @@ All GUI keyboard shortcuts can be found in the help menu that user can bring up 
 
 ![help_menu](images/help.png)
 
-## Resets
+## Listing devices
 
-Another feature of tt-smi is performing resets on Blackhole, Wormhole and Grayskull PCIe cards, using the  ```-r / --reset``` argument.
+Use **`tt-smi -ls`** or **`tt-smi --list`** to print a table of Tenstorrent devices and exit (no GUI). This is the easiest way to see **UMD Chip ID**, **PCI BDF**, and **`/dev/tenstorrent/<n>`** (shown as **PCI Dev ID**) for each board—use these values with `tt-smi -r` as described in [Resets](#resets).
 
+With the **UMD** backend (default), output includes two tables:
 
-```
-$ tt-smi -r 0,1 ..., --reset 0,1 ...
-```
+- **All available boards on host (UMD)** — every device TT-SMI discovered.
+- **Boards that can be reset (UMD)** — devices eligible for `tt-smi -r`.
 
-To perform the reset, provide a list of comma-separated PCI indices of the cards on the host. You can find PCI index of board using the -ls option. If no indices are provided, all devices will be reset.
+Column meanings:
 
-TT-SMI will perform different types of resets depending on the device:
-- Grayskull
-  - Tensix-level reset that will reset each Tensix cores.
-- Wormhole
-  - A board-level reset will be perfomed. Power will be cut to the board and brought back up.
-  - After reset, the ethernet connections will be re-trained.
-- Blackhole
-  - An ASIC-level reset will be perfomed.
+| Column | Meaning |
+|--------|---------|
+| **UMD Chip ID** | Logical device index used for `tt-smi -r 0`, `tt-smi -r 1`, … |
+| **PCI BDF** | PCI bus/device/function, e.g. `0000:01:00.0` — use with `tt-smi -r 0000:01:00.0` |
+| **PCI Dev ID** | Kernel device node path, e.g. `/dev/tenstorrent/19` — use with `tt-smi -r /dev/tenstorrent/19` |
+| **Board Type** | e.g. Blackhole, Wormhole |
+| **Device Series** | Board SKU / series string |
+| **Board Number** | Board serial identifier |
 
-By default, the reset command will re-initialize the boards after reset.
+On large hosts (e.g. Galaxy), **UMD Chip ID** and **`/dev/tenstorrent/<n>`** are **not** always the same number—always use `-ls` to pick the correct target.
 
-A successful reset on a system with a Wormhole N300 board looks like the following:
+During discovery, **tt-umd** may print log lines (for example Ethernet heartbeat checks on Galaxy). Those messages are from the driver; the tables below still list the boards.
 
-```
-$ tt-smi -r
- Starting reset on devices at PCI indices: 0
- Waiting for 2 seconds for potential hotplug removal.
- Waiting for devices to reappear on pci bus...
- Reset successfully completed for device at PCI index 0.
- Finishing reset on devices at PCI indices: 0
- Re-initializing boards after reset....
- Detected Chips: 2
-```
+### Example: Blackhole Galaxy (32 ASICs, UMD)
 
-In order to find the correct device ID to call the reset on, the user can use the tt-smi board list function `tt-smi -ls` or `tt-smi --list`.
-The dev id listed is the same as found on `/dev/tenstorrent/<dev pci id>`.
-The generated output will include a list of all boards on host as well as the ones that can be reset.
+Abbreviated output from a 32-board Galaxy system; your PCI BDFs and `/dev/tenstorrent/<n>` assignments will differ.
 
 ```
 $ tt-smi -ls
-
+… UMD may log info/warning lines during topology discovery …
 Gathering Information ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
-                All available boards on host:
-┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
-┃ PCI Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
-┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
-│ 0          │ Grayskull  │ e75           │ 0100007311523010 │
-│ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
-│ N/A        │ Wormhole   │ n300 R        │ 010001451170801d │
-└────────────┴────────────┴───────────────┴──────────────────┘
-                  Boards that can be reset:
-┏━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
-┃ PCI Dev ID ┃ Board Type ┃ Device Series ┃ Board Number     ┃
-┡━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
-│ 0          │ Grayskull  │ e75           │ 0100007311523010 │
-│ 1          │ Wormhole   │ n300 L        │ 010001451170801d │
-└────────────┴────────────┴───────────────┴──────────────────┘
+                                All available boards on host (UMD):
+┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ UMD Chip ID ┃ PCI BDF      ┃ PCI Dev ID          ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ 0           │ 0000:01:00.0 │ /dev/tenstorrent/19 │ Blackhole  │ tt-galaxy-bh  │ 0000047131831011 │
+│ 1           │ 0000:02:00.0 │ /dev/tenstorrent/18 │ Blackhole  │ tt-galaxy-bh  │ 0000047131831011 │
+│ 2           │ 0000:03:00.0 │ /dev/tenstorrent/25 │ Blackhole  │ tt-galaxy-bh  │ 0000047131831011 │
+│ …           │ …            │ …                   │ …          │ …             │ …                │
+│ 31          │ 0000:c8:00.0 │ /dev/tenstorrent/6  │ Blackhole  │ tt-galaxy-bh  │ 0000047131831011 │
+└─────────────┴──────────────┴─────────────────────┴────────────┴───────────────┴──────────────────┘
+                                  Boards that can be reset (UMD):
+┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┓
+┃ UMD Chip ID ┃ PCI BDF      ┃ PCI Dev ID          ┃ Board Type ┃ Device Series ┃ Board Number     ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
+│ 0           │ 0000:01:00.0 │ /dev/tenstorrent/19 │ Blackhole  │ tt-galaxy-bh  │ 0000047131831011 │
+│ …           │ …            │ …                   │ …          │ …             │ …                │
+└─────────────┴──────────────┴─────────────────────┴────────────┴───────────────┴──────────────────┘
 ```
+
+With **`--use_luwen`**, the table layout differs (no UMD Chip ID column); use **PCI BDF** and **`/dev/tenstorrent/<n>`** for `tt-smi -r` when using Luwen.
+
+## Resets
+
+Another feature of tt-smi is performing resets on Blackhole and Wormhole PCIe cards and galaxy machines, using the `-r` / `--reset` argument.
+
+Reset targets are parsed as **one type per invocation** (do not mix UMD logical IDs, PCI BDFs, and `/dev/tenstorrent/<id>` paths in the same command).
+
+### UMD (default backend)
+
+With the UMD backend (default, no `--use_luwen`), `-r` accepts **four** kinds of input:
+
+- **No arguments** or **`all`** — reset every detected device (`tt-smi -r` or `tt-smi -r all`).
+- **UMD logical chip IDs** — comma-separated integers, e.g. `0`, `1`, `2` (same numbering as UMD device enumeration).
+- **PCI BDF** — full address, e.g. `0000:0a:00.0` (comma-separated for multiple devices).
+- **`/dev/tenstorrent/<id>`** — device node index, e.g. `/dev/tenstorrent/0`.
+
+### Luwen (`--use_luwen`)
+
+With the Luwen backend, `-r` accepts **three** kinds of input:
+
+- **No arguments** or **`all`** — reset all devices discovered via Luwen.
+- **PCI BDF** — as above.
+- **`/dev/tenstorrent/<id>`** — as above.
+
+**Note:** A bare integer (e.g. `0`) is **not** a valid Luwen reset target. Use the `/dev/tenstorrent/0` form instead.
+
+- **Example (invalid with Luwen):** `tt-smi -r 0 --use_luwen`
+- **Example (valid with Luwen):** `tt-smi -r /dev/tenstorrent/0 --use_luwen`
+
+### Examples of valid resets
+
+```bash
+tt-smi -r 0000:0a:00.0,0000:0b:00.0
+tt-smi -r /dev/tenstorrent/0,/dev/tenstorrent/2,/dev/tenstorrent/3
+tt-smi -r 0,1,2                    # UMD logical IDs (UMD / default backend only)
+tt-smi -r                          # or: tt-smi -r all
+```
+
+Use `tt-smi -ls` (or `tt-smi --list`) to list boards; see [Listing devices](#listing-devices) for UMD Chip ID, PCI BDF, and `/dev/tenstorrent/<id>` columns.
+
+By default, the reset command will re-initialize the boards after reset. Use the `--no_reinit` arg to skip this.
+
 
 ## Galaxy resets
 
 There are several options available for resetting Galaxy 6U trays.
+  - Use the `-r/--reset` argument and treat it like any other pcie card. Warning - Needs CPLD FW v1.16 or higher. 
   - glx_reset: resets the galaxy, informs users if an Ethernet failure has been detected
   - glx_reset_auto: same as -glx_reset, but resets up to 3 times if an Ethernet failure has been detected
   - glx_reset_tray <tray_num>: performs reset on one galaxy tray. Tray number has to be between 1-4

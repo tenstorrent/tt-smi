@@ -604,7 +604,10 @@ def parse_args():
         "--list",
         default=False,
         action="store_true",
-        help="List boards that are available on host and quit",
+        help=(
+            "List boards on the host and quit. With UMD (default), tables include "
+            "UMD Chip ID, PCI BDF, PCI Dev ID (/dev/tenstorrent/<n>), board type, series, and board number."
+        ),
     )
     parser.add_argument(
         "-f",
@@ -626,13 +629,15 @@ def parse_args():
     parser.add_argument(
         "-r",
         "--reset",
-        metavar="0,1",
+        metavar="TARGETS",
         default=None,
         nargs="*",
         help=(
-            "Provide a list of PCI indices. "
-            "Find PCI index of board using the -ls option. "
-            "If no indices are provided, all devices will be reset"
+            "Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or "
+            "/dev/tenstorrent/<id>. Use -ls to list devices. "
+            "Omit targets or use 'all' to reset all devices. "
+            "Do not mix types in one command. "
+            "With --use_luwen, use BDF or /dev/tenstorrent/<id> (not bare integers)."
         ),
         dest="reset",
     )
