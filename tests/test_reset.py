@@ -7,7 +7,12 @@ from typing import List
 
 from pyluwen import pci_scan
 from tt_umd import PCIDevice
-from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
+from tt_smi.tt_smi_reset import (
+    pci_board_reset,
+    glx_6u_trays_reset,
+    ResetInput,
+    ResetType,
+)
 
 NUM_RESETS_STRESS_TEST = 10
 
@@ -28,7 +33,12 @@ class TestPciDriverReset:
         detected before and after.
         """
         pci_indices, use_umd = reset_test_config
-        pci_board_reset(pci_indices, reinit=True, use_umd=use_umd)
+        # Match `tt-smi -r` / `tt-smi -r all`: reset all devices (ResetInput), not a raw index list.
+        pci_board_reset(
+            ResetInput(type=ResetType.ALL, value=None),
+            reinit=True,
+            use_umd=use_umd,
+        )
         post_reset_devices = redetect_devices(use_umd)
         assert len(post_reset_devices) == len(pci_indices)
 
@@ -41,7 +51,11 @@ class TestPciDriverReset:
         """
         pci_indices, use_umd = reset_test_config
         for _ in range(NUM_RESETS_STRESS_TEST):
-            pci_board_reset(pci_indices, reinit=True, use_umd=use_umd)
+            pci_board_reset(
+                ResetInput(type=ResetType.ALL, value=None),
+                reinit=True,
+                use_umd=use_umd,
+            )
             post_reset_devices = redetect_devices(use_umd)
             assert len(post_reset_devices) == len(pci_indices)
 
