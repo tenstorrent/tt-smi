@@ -6,7 +6,7 @@ import pytest
 import subprocess
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def snapshot(backend) -> dict:
     """Return snapshot data from TTSMIBackend."""
     log_str = backend.get_logs_json()
