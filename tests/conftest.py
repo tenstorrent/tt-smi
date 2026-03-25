@@ -6,7 +6,7 @@ import pytest
 from typing import List, Dict, Tuple, Union
 
 from pyluwen import pci_scan, PciChip
-from tt_umd import PCIDevice, TopologyDiscovery, TTDevice
+from tt_umd import PCIDevice, TopologyDiscovery, TTDevice, TopologyDiscoveryOptions
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 
@@ -43,7 +43,11 @@ def umd_reset_test_config() -> Tuple[List[int], bool]:
 @pytest.fixture(scope="session")
 def umd_devices() -> dict[int, TTDevice]:
     """Return a dict of Tenstorrent TTDevices using UMD backend."""
-    _, devices = TopologyDiscovery.discover()
+    # Ignore eth heartbeat failures for now. Not relevant to tests.
+    options = TopologyDiscoveryOptions() # type: ignore
+    options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+    options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+    _, devices = TopologyDiscovery.discover(options=options)
     return devices
 
 
@@ -78,3 +82,17 @@ def backend(request, luwen_backend, umd_backend) -> TTSMIBackend:
     if request.param == "luwen":
         return luwen_backend
     return umd_backend
+
+
+@pytest.fixture(scope="session", params=["luwen", "umd"])
+def reset_test_config_with_backend(
+    request,
+    luwen_reset_test_config,
+    umd_reset_test_config,
+    luwen_backend,
+    umd_backend,
+) -> Tuple[Tuple[List[int], bool], TTSMIBackend]:
+    """Same variant as reset_test_config, paired with the matching TTSMIBackend (one param axis)."""
+    if request.param == "luwen":
+        return luwen_reset_test_config, luwen_backend
+    return umd_reset_test_config, umd_backend
