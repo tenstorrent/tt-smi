@@ -17,6 +17,7 @@ from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_smi.tt_smi_utils import get_dev_id_from_bdf
+from tt_smi.constants import SMBUS_TELEMETRY_OPTIONS
 from pyluwen import (
     PciChip,
     pci_scan,
@@ -27,7 +28,6 @@ from tt_umd import (
     WarmReset,
     PCIDevice,
     TopologyDiscovery,
-    TopologyDiscoveryOptions,
 )
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
@@ -341,10 +341,7 @@ def pci_board_reset(
         )
         try:
             if use_umd:
-                options = TopologyDiscoveryOptions()
-                options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-                options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
-                TopologyDiscovery.discover(options)
+                TopologyDiscovery.discover(SMBUS_TELEMETRY_OPTIONS)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status)

@@ -8,11 +8,8 @@ from typing import List, Dict, Tuple, Union
 from pyluwen import pci_scan, PciChip
 from tt_umd import PCIDevice, TopologyDiscovery, TTDevice, TopologyDiscoveryOptions
 from tt_smi.tt_smi_backend import TTSMIBackend
+from tt_smi.constants import SMBUS_TELEMETRY_OPTIONS
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-
-topology_discovery_options = TopologyDiscoveryOptions()
-topology_discovery_options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-topology_discovery_options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
 
 # Luwen fixtures
 
@@ -53,7 +50,7 @@ def umd_reset_test_config() -> Tuple[List[int], bool]:
 def umd_devices() -> dict[int, TTDevice]:
     """Return fresh Tenstorrent TTDevices for each test."""
     # Ignore eth heartbeat failures for now. Not relevant to tests.
-    _, devices = TopologyDiscovery.discover(options=topology_discovery_options)
+    _, devices = TopologyDiscovery.discover(options=SMBUS_TELEMETRY_OPTIONS)
     try:
         yield devices
     finally:
@@ -63,7 +60,7 @@ def umd_devices() -> dict[int, TTDevice]:
 @pytest.fixture(scope="function")
 def umd_backend() -> TTSMIBackend:
     """Return a TTSMIBackend instance using UMD backend."""
-    cluster_descriptor, devices = TopologyDiscovery.discover(options=topology_discovery_options)
+    cluster_descriptor, devices = TopologyDiscovery.discover(options=SMBUS_TELEMETRY_OPTIONS)
     return TTSMIBackend(devices=devices, umd_cluster_descriptor=cluster_descriptor)
 
 

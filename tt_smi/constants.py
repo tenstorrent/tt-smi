@@ -4,6 +4,15 @@
 ########################################
 #          BACKEND CONSTANTS
 ########################################
+from tt_umd import (
+    TopologyDiscoveryOptions,
+)
+
+SMBUS_TELEMETRY_OPTIONS = TopologyDiscoveryOptions()
+SMBUS_TELEMETRY_OPTIONS.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+SMBUS_TELEMETRY_OPTIONS.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+SMBUS_TELEMETRY_OPTIONS.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+SMBUS_TELEMETRY_OPTIONS.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
 
 SMBUS_TELEMETRY_LIST = [
     "BOARD_ID",
