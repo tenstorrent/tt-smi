@@ -6,7 +6,7 @@ import pytest
 import subprocess
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def snapshot(backend) -> dict:
     """Return snapshot data from TTSMIBackend."""
     log_str = backend.get_logs_json()
@@ -52,7 +52,8 @@ class TestSnapshot:
             assert "limits" in device_info
 
     def test_smbus_telem_fields_present(self, snapshot):
-        """Test if fields are present in smbus_telem."""
+        """Test if fields are present in smbus_telem; at least one therm limit tag must exist."""
+        therm_limit_tags = ("THM_LIMITS", "THM_LIMIT_SHUTDOWN")
         smbus_telem_list = [
             "BOARD_ID_HIGH",
             "BOARD_ID_LOW",
@@ -70,7 +71,6 @@ class TestSnapshot:
             "TDP",
             "TDC",
             "VDD_LIMITS",
-            "THM_LIMITS",
             "TT_FLASH_VERSION",
         ]
         device_infos = snapshot["device_info"]
@@ -78,6 +78,9 @@ class TestSnapshot:
             smbus_telem = device_info["smbus_telem"]
             for field in smbus_telem_list:
                 assert field in smbus_telem
+            assert any(tag in smbus_telem for tag in therm_limit_tags), (
+                f"Expected at least one of {therm_limit_tags} in smbus_telem"
+            )
 
     def test_board_info_fields_present(self, snapshot):
         """Test if fields are present in board_info."""

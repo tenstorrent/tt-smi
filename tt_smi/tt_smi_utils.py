@@ -7,6 +7,7 @@ Utility functions and constants for tt-smi (hex conversion, board type, logging 
 
 import os
 import sys
+import glob
 from importlib.metadata import version
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -193,3 +194,37 @@ def get_fw_bundle_version(smbus_telem_info) -> int:
         return smbus_telem_info["FLASH_BUNDLE_VERSION"]
     else:
         return None
+
+def get_dev_id_from_bdf(bdf: str) -> int:
+    """
+    Resolve /dev/tenstorrent index N from a PCI BDF. Validates that the device
+    exists under sysfs, is a Tenstorrent device (tenstorrent/tenstorrent!N present),
+    then returns N. On failure prints error in red and exits with code 1.
+    Path: /sys/bus/pci/devices/0000:BB:DD.F/tenstorrent/tenstorrent!N -> N is the dev index.
+    """
+    dev_sysfs = f"/sys/bus/pci/devices/{bdf}"
+    if not os.path.exists(dev_sysfs):
+        print(CMD_LINE_COLOR.RED, f"Device does not exist: {dev_sysfs}", CMD_LINE_COLOR.ENDC, file=sys.stderr)
+        sys.exit(1)
+
+    tenstorrent_dir = os.path.join(dev_sysfs, "tenstorrent")
+    if not os.path.isdir(tenstorrent_dir):
+        print(CMD_LINE_COLOR.RED, f"Device exists but is not a Tenstorrent device: {dev_sysfs}", CMD_LINE_COLOR.ENDC, file=sys.stderr)
+        sys.exit(1)
+
+    pattern = f"/sys/bus/pci/devices/{bdf}/tenstorrent/tenstorrent!*"
+    matches = glob.glob(pattern)
+    if not matches:
+        print(CMD_LINE_COLOR.RED, f"Tenstorrent dir present but no tenstorrent!N entry under {tenstorrent_dir}", CMD_LINE_COLOR.ENDC, file=sys.stderr)
+        sys.exit(1)
+    name = os.path.basename(matches[0])
+    if not name.startswith("tenstorrent!") or name == "tenstorrent!":
+        print(CMD_LINE_COLOR.RED, f"Tenstorrent dir present but no tenstorrent!N entry under {tenstorrent_dir}", CMD_LINE_COLOR.ENDC, file=sys.stderr)
+        sys.exit(1)
+    try:
+        n = int(name.replace("tenstorrent!", "", 1))
+    except ValueError:
+        print(CMD_LINE_COLOR.RED, f"Tenstorrent dir present but no tenstorrent!N entry under {tenstorrent_dir}", CMD_LINE_COLOR.ENDC, file=sys.stderr)
+        sys.exit(1)
+
+    return n

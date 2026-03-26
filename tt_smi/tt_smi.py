@@ -30,10 +30,6 @@ from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from textual.worker import get_current_worker, Worker, WorkerState
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR, create_tt_tools_theme
-from tt_tools_common.reset_common.reset_utils import (
-    ResetType,
-    parse_reset_input,
-)
 from tt_smi.tt_smi_backend import TTSMIBackend
 from tt_smi.tt_smi_utils import (
     check_is_galaxy,
@@ -41,7 +37,11 @@ from tt_smi.tt_smi_utils import (
     hex_to_semver_m3_fw,
     is_vm,
 )
-from tt_smi.tt_smi_reset import pci_board_reset, glx_6u_trays_reset
+from tt_smi.tt_smi_reset import (
+    pci_board_reset,
+    glx_6u_trays_reset,
+    parse_reset_input,
+)
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
 )
@@ -603,7 +603,10 @@ def parse_args():
         "--list",
         default=False,
         action="store_true",
-        help="List boards that are available on host and quit",
+        help=(
+            "List boards on the host and quit. With UMD (default), tables include "
+            "UMD Chip ID, PCI BDF, PCI Dev ID (/dev/tenstorrent/<n>), board type, series, and board number."
+        ),
     )
     parser.add_argument(
         "-f",
@@ -625,13 +628,15 @@ def parse_args():
     parser.add_argument(
         "-r",
         "--reset",
-        metavar="0,1",
+        metavar="TARGETS",
         default=None,
         nargs="*",
         help=(
-            "Provide a list of PCI indices. "
-            "Find PCI index of board using the -ls option. "
-            "If no indices are provided, all devices will be reset"
+            "Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or "
+            "/dev/tenstorrent/<id>. Use -ls to list devices. "
+            "Omit targets or use 'all' to reset all devices. "
+            "Do not mix types in one command. "
+            "With --use_luwen, use BDF or /dev/tenstorrent/<id> (not bare integers)."
         ),
         dest="reset",
     )
@@ -689,7 +694,7 @@ def parse_args():
         "--eth_train_skip",
         default=False,
         action="store_true",
-        help="Skip waiting for Ethernet training post reset when using UMD.",
+        help="Skip waiting for Ethernet training post reset.",
     )
     args = parser.parse_args()
     return args
@@ -771,17 +776,7 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_reset_input(args.reset)
-
-        if reset_input.type == ResetType.ALL:
-            # Assume user wants all pci devices to be reset
-            reset_indices = pci_scan()
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, wait_for_eth=not args.eth_train_skip)
-
-        elif reset_input.type == ResetType.ID_LIST:
-            reset_indices = reset_input.value
-            pci_board_reset(reset_indices, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, wait_for_eth=not args.eth_train_skip)
-
-        # All went well - exit
+        pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
     # Handle ubb reset without backend
     if args.glx_reset:
@@ -854,7 +849,7 @@ def main():
 
     try:
         if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover()
+            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.SMBUS_TELEMETRY_OPTIONS)
         else:
             cluster_descriptor = None
             devices = dict(enumerate(detect_chips_with_callback(
