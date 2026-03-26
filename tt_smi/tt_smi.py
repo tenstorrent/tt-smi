@@ -694,7 +694,7 @@ def parse_args():
         "--eth_train_skip",
         default=False,
         action="store_true",
-        help="Skip waiting for Ethernet training post reset when using UMD.",
+        help="Skip waiting for Ethernet training post reset.",
     )
     args = parser.parse_args()
     return args
@@ -776,7 +776,7 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_reset_input(args.reset)
-        pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
+        pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
     # Handle ubb reset without backend
     if args.glx_reset:

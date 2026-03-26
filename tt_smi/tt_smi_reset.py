@@ -325,6 +325,7 @@ def pci_board_reset(
     reinit: bool = False,
     print_status: bool = True,
     use_umd: bool = False,
+    eth_train_skip: bool = False,
 ):
     """Given a list of ResetInput "reset_input", reset the PCI devices using UMD warm reset or luwen (pyluwen)."""
 
@@ -341,10 +342,12 @@ def pci_board_reset(
         )
         try:
             if use_umd:
+                if eth_train_skip:
+                    SMBUS_TELEMETRY_OPTIONS.discover_remote_devices = False
                 TopologyDiscovery.discover(SMBUS_TELEMETRY_OPTIONS)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
-                detect_chips_with_callback(print_status=print_status)
+                detect_chips_with_callback(print_status=print_status, ignore_ethernet=eth_train_skip)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
