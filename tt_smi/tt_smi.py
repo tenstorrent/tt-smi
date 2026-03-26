@@ -835,17 +835,12 @@ def main():
         # All went well - exit
         sys.exit(0)
     if args.glx_reset_tray is not None:
-        # Reset a specific tray on the galaxy
-        try:
-            tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
-            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty, use_umd=not args.use_luwen)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error in resetting galaxy 6u tray {args.glx_reset_tray}!\n{e}\n Exiting...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Galaxy 6U tray reset is no longer supported. Please use tt-smi -glx_reset to reset all chips or tt-smi -r.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
 
     try:
         if not args.use_luwen:
