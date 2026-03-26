@@ -1,3 +1,26 @@
+tt-smi (4.2.0) noble; urgency=medium
+
+  [ Sungjoon Moon ]
+  * Exit with error when stdin is not a TTY
+
+  [ Samridhi Bansal ]
+  * Update tt-umd 0.9.3 -> 0.9.4
+  * Reset refactor: Update reset code to now accept UMD ID, PCI BDF, and /dev/tenstorrent targets.
+  * Update topology discovery to ignore eth heartbeat check
+  * Update README to reflect the new reset and list options
+  * Update reset CI test to reflect the new inputs
+  * Update THM_LIMITS -> THM_LIMIT_SHUTDOWN as per UMD 0.9.4 update
+  * Update the snapshot test to check for either THM_LIMITS or THM_LIMIT_SHUTDOWN flag in telem
+  * Update reset unit tests
+  * Change the scope of devices to avoid ENODEV errors in CI
+  * Update UMD topology discovery options and add it to constants
+  * Reattached eth_train_skip option post reset with the new topology options
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.2.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 26 Mar 2026 17:37:30 +0000
+
 tt-smi (4.1.2) noble; urgency=medium
 
   [ Daniel DeGrasse ]
