@@ -18,7 +18,7 @@ from rich.table import Table
 from tt_smi import constants
 from rich import get_console
 from rich.syntax import Syntax
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from pyluwen import PciChip
@@ -29,11 +29,14 @@ from tt_smi.tt_smi_utils import (
     hex_to_semver_m3_fw,
     hex_to_semver_eth_wh,
     get_board_type,
+    board_type_from_upi,
     convert_signed_16_16_to_float,
     dict_from_public_attrs,
+    get_dev_id_from_bdf,
     get_host_software_versions,
     get_fw_bundle_version
 )
+from tt_smi.tt_smi_reset import ResetInput, ResetType
 from tt_umd import (
     TTDevice,
     wormhole,
@@ -41,11 +44,13 @@ from tt_umd import (
     ClusterDescriptor,
     SmBusArcTelemetryReader,
     ARCH,
+    PCIDevice,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
 from tt_tools_common.utils_common.tools_utils import init_logging
+
 
 class TTSMIBackend:
     """
@@ -806,3 +811,249 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
+
+    @staticmethod
+    def _validate_umd_blinky_targets(pairs: List[Tuple[int, Any]]) -> None:
+        chips = PCIDevice.enumerate_devices_info()
+        for chip_id, device in pairs:
+            if device.get_arch() != ARCH.BLACKHOLE:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "tt-smi --bh_blinky is only supported on Blackhole PCIe cards "
+                    "(not Wormhole or other architectures).",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+            info = chips.get(chip_id)
+            if info is not None and board_type_from_upi(info.subsystem_id) in constants.GLX_BOARD_TYPES:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "tt-smi --bh_blinky is not supported on Galaxy systems.",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+
+    @staticmethod
+    def _validate_luwen_blinky_chip(chip: PciChip) -> None:
+        if chip.as_wh():
+            print(
+                CMD_LINE_COLOR.RED,
+                "tt-smi --bh_blinky is only supported on Blackhole PCIe cards (not Wormhole).",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        if chip.as_bh():
+            if board_type_from_upi(chip.as_bh().pci_board_type()) in constants.GLX_BOARD_TYPES:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "tt-smi --bh_blinky is not supported on Galaxy systems.",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+            return
+        print(
+            CMD_LINE_COLOR.RED,
+            "tt-smi --bh_blinky is only supported on Blackhole PCIe cards.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+
+    @staticmethod
+    def _wait_blinky_key() -> None:
+        if not sys.stdin.isatty():
+            print(
+                CMD_LINE_COLOR.RED,
+                "Interactive stdin required for --bh_blinky (run in a terminal).",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        try:
+            import termios
+            import tty
+        except ImportError:
+            input("Press Enter to stop blinking...")
+            return
+
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            print(
+                CMD_LINE_COLOR.PURPLE,
+                "LED blinking. Press any key to stop...",
+                CMD_LINE_COLOR.ENDC,
+                flush=True,
+            )
+            sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    @staticmethod
+    def _send_blinky_pyluwen(chip: PciChip, blink: bool) -> None:
+        on = 1 if blink else 0
+        chip.arc_msg(constants.TT_SMC_MSG_BLINKY, wait_for_done=True, arg0=on, arg1=0)
+
+    @staticmethod
+    def _send_blinky_umd(device: Any, blink: bool) -> None:
+        on = 1 if blink else 0
+        device.arc_msg(constants.TT_SMC_MSG_BLINKY, wait_for_done=True, arg0=on, arg1=0)
+
+    def _resolve_umd_blinky_devices(self, reset_input: ResetInput) -> List[Any]:
+        devices = self.devices
+        if not devices:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No UMD devices discovered.",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+        pairs: List[Tuple[int, Any]] = []
+
+        if reset_input.type == ResetType.ALL:
+            pairs = list(devices.items())
+
+        elif reset_input.type == ResetType.UMD_LOGICAL_ID:
+            for i in reset_input.value:
+                if i not in devices:
+                    print(
+                        CMD_LINE_COLOR.RED,
+                        f"No device for UMD logical id {i}.",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                    sys.exit(1)
+                pairs.append((i, devices[i]))
+
+        elif reset_input.type == ResetType.PCI_BDF:
+            for bdf in reset_input.value:
+                dev_id = get_dev_id_from_bdf(bdf)
+                if dev_id not in devices:
+                    print(
+                        CMD_LINE_COLOR.RED,
+                        f"No UMD device for BDF {bdf} (dev id {dev_id}).",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                    sys.exit(1)
+                pairs.append((dev_id, devices[dev_id]))
+
+        elif reset_input.type == ResetType.DEV_TENSTORRENT_ID:
+            for n in reset_input.value:
+                if n not in devices:
+                    print(
+                        CMD_LINE_COLOR.RED,
+                        f"No UMD device for /dev/tenstorrent/{n}.",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                    sys.exit(1)
+                pairs.append((n, devices[n]))
+
+        else:
+            raise ValueError(f"Unsupported reset type for blinky: {reset_input.type}")
+
+        TTSMIBackend._validate_umd_blinky_targets(pairs)
+        return [d for _, d in pairs]
+
+    def _luwen_chip_by_pci_interface(self, pci_idx: int) -> PciChip:
+        """Resolve a Luwen PciChip from the backend by PCI interface index (BDF /dev/tenstorrent/<n>)."""
+        for _i in sorted(self.devices):
+            chip = self.devices[_i]
+            if chip.get_pci_interface_id() == pci_idx:
+                return chip
+        print(
+            CMD_LINE_COLOR.RED,
+            f"No Luwen device found for PCI interface {pci_idx}.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+
+    def _resolve_luwen_blinky_chips(self, reset_input: ResetInput) -> List[PciChip]:
+        if reset_input.type == ResetType.UMD_LOGICAL_ID:
+            print(
+                CMD_LINE_COLOR.RED,
+                "UMD logical IDs are not supported with --use_luwen. "
+                "Use --bh_blinky /dev/tenstorrent/<id> or --bh_blinky <PCI BDF>.",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+        chips: List[PciChip] = []
+
+        if reset_input.type == ResetType.ALL:
+            for idx in sorted(self.devices):
+                chip = self.devices[idx]
+                self._validate_luwen_blinky_chip(chip)
+                chips.append(chip)
+
+        elif reset_input.type == ResetType.PCI_BDF:
+            for bdf in reset_input.value:
+                pci_idx = get_dev_id_from_bdf(bdf)
+                chip = self._luwen_chip_by_pci_interface(pci_idx)
+                self._validate_luwen_blinky_chip(chip)
+                chips.append(chip)
+
+        elif reset_input.type == ResetType.DEV_TENSTORRENT_ID:
+            for n in reset_input.value:
+                chip = self._luwen_chip_by_pci_interface(n)
+                self._validate_luwen_blinky_chip(chip)
+                chips.append(chip)
+
+        else:
+            raise ValueError(f"Unsupported reset type for blinky: {reset_input.type}")
+
+        return chips
+
+    def run_led_blinky(self, reset_input: ResetInput) -> None:
+        """
+        Start LED blink on selected device(s), wait for a key, then stop.
+
+        Uses ARC TT_SMC_MSG_BLINKY (0xC5) with is_blinking via arg0 bit 0,
+        matching led_blink_rqst / toggle_blinky_handler in system firmware.
+        Blackhole PCIe only (not Wormhole or Galaxy).
+        """
+        if self.use_umd:
+            targets = self._resolve_umd_blinky_devices(reset_input)
+            send: Callable[[Any, bool], None] = self._send_blinky_umd
+        else:
+            targets = self._resolve_luwen_blinky_chips(reset_input)
+            send = self._send_blinky_pyluwen
+
+        if not targets:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No devices selected for --bh_blinky.",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+
+        print(
+            CMD_LINE_COLOR.BLUE,
+            f"Sending TT_SMC_MSG_BLINKY (0x{constants.TT_SMC_MSG_BLINKY:02X}) to {len(targets)} device(s)...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        for t in targets:
+            try:
+                send(t, True)
+            except Exception as e:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    f"Failed to start blink: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+
+        self._wait_blinky_key()
+
+        print(
+            CMD_LINE_COLOR.BLUE,
+            "Stopping LED blink...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        for t in targets:
+            try:
+                send(t, False)
+            except Exception as e:
+                print(
+                    CMD_LINE_COLOR.YELLOW,
+                    f"Warning: failed to stop blink cleanly: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                )
