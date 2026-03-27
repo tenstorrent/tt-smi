@@ -128,6 +128,15 @@ def get_board_type(board_id: str) -> str:
         return "N/A"
 
 
+def board_type_from_upi(upi: int) -> str:
+    """
+    Same classification as get_board_type for a board serial whose UPI field equals ``upi``.
+    Use when only UPI is known (e.g. PCI subsystem id, luwen pci_board_type).
+    """
+    serial = (upi & 0xFFFFF) << 36
+    return get_board_type(f"{serial:016x}")
+
+
 def convert_signed_16_16_to_float(value: int) -> float:
     """Convert signed 16.16 to float"""
     if value & (1 << (32 - 1)):  # if the value is negative (two's complement)
