@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple, Union, Dict
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
+from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
 from tt_smi.tt_smi_utils import get_dev_id_from_bdf
 from tt_smi.constants import SMBUS_TELEMETRY_OPTIONS
 from pyluwen import (
@@ -368,9 +369,11 @@ def glx_6u_trays_reset(
 ):
     """
     Reset the WH asics on the galaxy systems with the following steps:
-    1. Reset the trays with ipmi command (or UMD warm reset)
-    2. Wait for 30s
-    3. Reinit all chips
+    1. Perform USER_RESET ioctl on all chips
+    2. Reset the trays with ipmi command (or UMD warm reset)
+    3. Wait for 30s
+    4. Perform POST_RESET ioctl on all chips
+    5. Reinit all chips
 
     Args:
         reinit: Whether to reinitialize the chips after reset.
@@ -381,27 +384,65 @@ def glx_6u_trays_reset(
         print_status: Whether to print out animations while detecting chips.
         use_umd: Whether to use UMD (WarmReset.ubb_warm_reset) or pyluwen (run_wh_ubb_ipmi_reset)
     """
+    # First, check if we're trying to do anything other than a full reset
+    if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
+        print(
+            CMD_LINE_COLOR.RED,
+            "Error: Galaxy 6U IPMI reset only supports full Galaxy reset ",
+            "(ubb_num=0xF, dev_num=0xFF, op_mode=0x0, reset_time=0xF)",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
     print(
         CMD_LINE_COLOR.PURPLE,
         "Resetting WH Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
 
+    # Issue USER_RESET ioctl on all devices before IPMI reset
     if use_umd:
-        if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
+        user_reset_ids = list(PCIDevice.enumerate_devices())
+    else:
+        user_reset_ids = pci_scan()
+    print(
+        CMD_LINE_COLOR.BLUE,
+        f"Issuing USER_RESET on {len(user_reset_ids)} devices before IPMI reset...",
+        CMD_LINE_COLOR.ENDC,
+    )
+    for interface_id in user_reset_ids:
+        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.USER_RESET):
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                f"Warning: USER_RESET did not complete for device {interface_id}. Continuing...",
+                CMD_LINE_COLOR.ENDC,
+            )
+
+    # IPMI reset
+    if use_umd:
+        WarmReset.ubb_warm_reset(timeout_s=100.0)
+    else:
+        run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
+    timed_wait(30)
+    run_ubb_wait_for_driver_load()
+
+    # Issue POST_RESET ioctl on all devices after they reappear
+    if use_umd:
+        post_reset_ids = list(PCIDevice.enumerate_devices())
+    else:
+        post_reset_ids = pci_scan()
+    print(
+        CMD_LINE_COLOR.BLUE,
+        f"Issuing POST_RESET on {len(post_reset_ids)} devices after IPMI reset...",
+        CMD_LINE_COLOR.ENDC,
+    )
+    for interface_id in post_reset_ids:
+        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.POST_RESET):
             print(
                 CMD_LINE_COLOR.RED,
-                "Error: UMD warm reset only supports full galaxy reset (ubb_num=0xF, dev_num=0xFF, op_mode=0x0, reset_time=0xF)",
+                f"Error: POST_RESET failed for device {interface_id}.",
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
-        WarmReset.ubb_warm_reset(timeout_s=100.0)
-        timed_wait(30)
-        umd_ubb_wait_for_driver_load()
-    else:
-        run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
-        timed_wait(30)
-        run_ubb_wait_for_driver_load()
 
     print(
         CMD_LINE_COLOR.PURPLE,
