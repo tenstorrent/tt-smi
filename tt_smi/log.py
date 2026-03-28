@@ -270,6 +270,7 @@ class TTSMILog(ElasticModel):
     host_info: HostInfo
     host_sw_vers: HostSWVersions
     device_info: List[TTSMIDeviceLog]
+    processes: List[dict]
 
     def get_clean_json_string(self):
         """Returns a cleaned json string"""

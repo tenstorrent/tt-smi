@@ -212,6 +212,13 @@ FIRMWARES_TABLE_HEADER = [
     "DM App Version",
 ]
 
+PROCESSES_TABLE_HEADER = [
+    "PID",
+    "User",
+    "Device",
+    "Command",
+]
+
 PCI_PROPERTIES = [
     "current_link_speed",
     "max_link_speed",
@@ -237,5 +244,6 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |   Go to device(s) info tab  |        1        |          Switch to tab with device info         |
 |   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
 |   Go to device(s) firmware tab     |        3        |          Switch to tab with all the fw versions on the board(s)          |
+|   Go to process(es) tab    |        4        |          Switch to tab with process info that is updated every 100ms           |
 
 """
