@@ -8,6 +8,7 @@ This is the backend of tt-smi.
 """
 
 import os
+import pwd
 import re
 import sys
 import time
@@ -86,6 +87,7 @@ class TTSMIBackend:
         self.device_telemetrys = []
         self.chip_limits = []
         self.pci_properties = []
+        self.device_processes = []
 
         if fully_init:
             for i, _ in track(
@@ -367,6 +369,75 @@ class TTSMIBackend:
         for i in self.devices:
             self.smbus_telem_info[i] = self.get_smbus_board_info(i)
             self.device_telemetrys[i] = self.get_chip_telemetry(i)
+
+    def get_device_processes(self):
+        """Scan /proc/driver/tenstorrent/N/pids for processes using devices."""
+        procfs_base = "/proc/driver/tenstorrent"
+        seen = {}
+
+        try:
+            devices = os.listdir(procfs_base)
+        except OSError:
+            return []
+
+        for dev_name in devices:
+            if not dev_name.isdigit():
+                continue
+            device = int(dev_name)
+            pids_path = f"{procfs_base}/{dev_name}/pids"
+            try:
+                with open(pids_path) as f:
+                    for line in f:
+                        parts = line.split()
+                        if not parts:
+                            continue
+                        try:
+                            pid = int(parts[0])
+                        except ValueError:
+                            continue
+                        key = (pid, device)
+                        if key not in seen:
+                            seen[key] = {
+                                "pid": pid,
+                                "user": self._get_username(pid),
+                                "cmdline": self._get_cmdline(pid),
+                                "device": device,
+                            }
+            except OSError:
+                continue
+
+        processes = list(seen.values())
+        processes.sort(key=lambda p: (p["device"], p["pid"]))
+        return processes
+
+    @staticmethod
+    def _get_cmdline(pid):
+        """Read command line for a process."""
+        try:
+            with open(f"/proc/{pid}/cmdline") as f:
+                raw = f.read()
+            if raw:
+                return raw.replace("\0", " ").replace("\n", " ").strip()
+        except OSError:
+            pass
+        try:
+            with open(f"/proc/{pid}/comm") as f:
+                return f.read().strip()
+        except OSError:
+            return "?"
+
+    @staticmethod
+    def _get_username(pid):
+        """Get username for a process."""
+        try:
+            uid = os.stat(f"/proc/{pid}").st_uid
+            return pwd.getpwuid(uid).pw_name
+        except (OSError, KeyError):
+            return "?"
+
+    def update_processes(self):
+        """Refresh the process list."""
+        self.device_processes = self.get_device_processes()
 
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
