@@ -182,6 +182,9 @@ class TTSMIBackend:
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
 
+        self.update_processes()
+        self.log.processes = self.device_processes
+
         return self.log.get_clean_json_string()
 
     def print_all_available_devices_luwen(self):
