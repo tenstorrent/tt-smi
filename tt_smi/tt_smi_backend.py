@@ -583,7 +583,7 @@ class TTSMIBackend:
         )
         timer_heartbeat = int(self.smbus_telem_info[board_num]["TIMER_HEARTBEAT"], 16) // 6 # Watchdog heartbeat, ~2 per second
         fan_rpm = (
-            int(self.smbus_telem_info[board_num]["FAN_RPM"], 16)
+            int(self.smbus_telem_info[board_num]["FAN_RPM"], 16) & 0xFFFF
             if self.smbus_telem_info[board_num]["FAN_RPM"] is not None
             else 0
         )
@@ -613,7 +613,10 @@ class TTSMIBackend:
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
         arc3_heartbeat = int(self.smbus_telem_info[board_num]["ARC3_HEALTH"], 16) // 5 # Watchdog heartbeat, ~2 per second
         if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
-            fan_rpm = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16)
+            if self.devices[board_num].is_remote():
+                fan_rpm = (int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) >> 16) & 0xFFFF
+            else:
+                fan_rpm = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) & 0xFFFF
         else:
             fan_rpm = 0
 
