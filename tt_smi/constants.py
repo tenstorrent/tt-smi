@@ -114,7 +114,7 @@ TELEM_LIST = [
     "aiclk",
     "power",
     "asic_temperature",
-    "fan_speed",
+    "fan_rpm",
     "heartbeat",
 ]
 
