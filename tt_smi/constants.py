@@ -14,6 +14,10 @@ SMBUS_TELEMETRY_OPTIONS.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Acti
 SMBUS_TELEMETRY_OPTIONS.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
 SMBUS_TELEMETRY_OPTIONS.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
 
+# Host SMC / ARC: toggle red status LED (TT-System-Firmware led_blink_rqst).
+# https://docs.tenstorrent.com/tt-system-firmware/doxygen/structled__blink__rqst.html
+TT_SMC_MSG_BLINKY = 0xC5
+
 SMBUS_TELEMETRY_LIST = [
     "BOARD_ID",
     "ENUM_VERSION",
