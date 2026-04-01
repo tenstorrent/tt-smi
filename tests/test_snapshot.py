@@ -106,7 +106,7 @@ class TestSnapshot:
             assert "power" in telemetry
             assert "aiclk" in telemetry
             assert "asic_temperature" in telemetry
-            assert "fan_rpm" in telemetry
+            assert "fan_speed" in telemetry
             assert "heartbeat" in telemetry
 
     def test_firmwares_fields_present(self, snapshot):
