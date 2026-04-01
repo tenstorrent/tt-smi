@@ -248,11 +248,17 @@ class TTSMI(App):
                             justify="center",
                         )
                     )
-                elif telem == "fan_rpm":
+                elif telem == "fan_speed":
+                    max_rpm = self.backend.chip_limits[board_num]["fan_rpm_limit"]
                     device_row.append(
                         Text(
                             f"{val}" if int(val) > 0 else "N/A",
                             style=self.text_theme["text_green"] if int(val) > 0 else self.text_theme["gray"],
+                            justify="center",
+                        )
+                        + Text(
+                            f"/ {max_rpm}" if max_rpm else "/ ---",
+                            style=self.text_theme["yellow_bold"] if max_rpm else self.text_theme["gray"],
                             justify="center",
                         )
                     )

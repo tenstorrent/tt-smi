@@ -582,7 +582,7 @@ class TTSMIBackend:
             else 0
         )
         timer_heartbeat = int(self.smbus_telem_info[board_num]["TIMER_HEARTBEAT"], 16) // 6 # Watchdog heartbeat, ~2 per second
-        fan_rpm = (
+        fan_speed = (
             int(self.smbus_telem_info[board_num]["FAN_RPM"], 16) & 0xFFFF
             if self.smbus_telem_info[board_num]["FAN_RPM"] is not None
             else 0
@@ -594,7 +594,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
-            "fan_rpm": f"{fan_rpm}",
+            "fan_speed": f"{fan_speed}",
             "heartbeat": f"{timer_heartbeat}",
         }
         return chip_telemetry
@@ -614,11 +614,11 @@ class TTSMIBackend:
         arc3_heartbeat = int(self.smbus_telem_info[board_num]["ARC3_HEALTH"], 16) // 5 # Watchdog heartbeat, ~2 per second
         if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
             if self.devices[board_num].is_remote():
-                fan_rpm = (int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) >> 16) & 0xFFFF
+                fan_speed = (int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) >> 16) & 0xFFFF
             else:
-                fan_rpm = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) & 0xFFFF
+                fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) & 0xFFFF
         else:
-            fan_rpm = 0
+            fan_speed = 0
 
         chip_telemetry = {
             "voltage": f"{voltage:4.2f}",
@@ -626,7 +626,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
-            "fan_rpm": f"{fan_rpm}",
+            "fan_speed": f"{fan_speed}",
             "heartbeat": f"{arc3_heartbeat}"
         }
 
