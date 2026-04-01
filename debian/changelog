@@ -1,3 +1,17 @@
+tt-smi (5.0.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add USER_RESET ioctl before and POST_RESET ioctl after IPMI reset
+  * Remove support for -glx_reset_tray
+
+  [ Samridhi Bansal ]
+  * Separate out all the frontend formatting logic into its own file
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.0.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 01 Apr 2026 21:09:01 +0000
+
 tt-smi (4.2.0) noble; urgency=medium
 
   [ Sungjoon Moon ]
