@@ -248,16 +248,11 @@ class TTSMI(App):
                             justify="center",
                         )
                     )
-                elif telem == "fan_speed":
+                elif telem == "fan_rpm":
                     device_row.append(
                         Text(
-                            f"{val}" if 0 < float(val) <= 100 else "N/A",
-                            style=self.text_theme["text_green"] if 0 < float(val) <= 100 else self.text_theme["gray"],
-                            justify="center",
-                        )
-                        + Text(
-                            f"/ 100",
-                            style=self.text_theme["yellow_bold"],
+                            f"{val}" if int(val) > 0 else "N/A",
+                            style=self.text_theme["text_green"] if int(val) > 0 else self.text_theme["gray"],
                             justify="center",
                         )
                     )
