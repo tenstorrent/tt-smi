@@ -5,27 +5,8 @@ import json
 import pytest
 import subprocess
 
-from typing import Dict
 
-from pyluwen import PciChip
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-
-
-@pytest.fixture(scope="session")
-def devices() -> Dict[int, PciChip]:
-    """Return a list of Tenstorrent PciChips."""
-    # TODO: Test using the UMD function to detect chips
-    return dict(enumerate(detect_chips_with_callback()))
-
-
-@pytest.fixture(scope="session")
-def backend(devices) -> TTSMIBackend:
-    """Return a TTSMIBackend instance created from devices."""
-    return TTSMIBackend(devices)
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def snapshot(backend) -> dict:
     """Return snapshot data from TTSMIBackend."""
     log_str = backend.get_logs_json()
@@ -71,41 +52,18 @@ class TestSnapshot:
             assert "limits" in device_info
 
     def test_smbus_telem_fields_present(self, snapshot):
-        """Test if fields are present in smbus_telem."""
-        # TODO: these are the values we ensure are present in smbus_telem
-        # derived from constants.SMBUS_TELEM_LIST. but what should it really be?
+        """Test if fields are present in smbus_telem; at least one therm limit tag must exist."""
+        therm_limit_tags = ("THM_LIMITS", "THM_LIMIT_SHUTDOWN")
         smbus_telem_list = [
-            "BOARD_ID",
-            "ENUM_VERSION",
-            "DEVICE_ID",
-            "ASIC_RO",
-            "ASIC_IDD",
             "BOARD_ID_HIGH",
             "BOARD_ID_LOW",
-            "ARC0_FW_VERSION",
-            "ARC1_FW_VERSION",
-            "ARC2_FW_VERSION",
-            "ARC3_FW_VERSION",
-            "SPIBOOTROM_FW_VERSION",
             "ETH_FW_VERSION",
-            "M3_BL_FW_VERSION",
-            "M3_APP_FW_VERSION",
-            "DDR_SPEED",
             "DDR_STATUS",
-            "ETH_STATUS0",
-            "ETH_STATUS1",
-            "PCIE_STATUS",
-            "FAULTS",
-            "ARC0_HEALTH",
-            "ARC1_HEALTH",
-            "ARC2_HEALTH",
-            "ARC3_HEALTH",
             "FAN_SPEED",
-            "FAN_RPM",
+            # "FAN_RPM",
             "AICLK",
             "AXICLK",
             "ARCCLK",
-            "THROTTLER",
             "VCORE",
             "ASIC_TEMPERATURE",
             "VREG_TEMPERATURE",
@@ -113,29 +71,16 @@ class TestSnapshot:
             "TDP",
             "TDC",
             "VDD_LIMITS",
-            "THM_LIMITS",
-            "WH_FW_DATE",
-            "ASIC_TMON0",
-            "ASIC_TMON1",
-            "MVDDQ_POWER",
-            "GDDR_TRAIN_TEMP0",
-            "GDDR_TRAIN_TEMP1",
-            "BOOT_DATE",
-            "RT_SECONDS",
-            "AUX_STATUS",
-            "ETH_DEBUG_STATUS0",
-            "ETH_DEBUG_STATUS1",
             "TT_FLASH_VERSION",
-            "FW_BUNDLE_VERSION",
-            "THERM_TRIP_COUNT",
-            "INPUT_POWER",
-            "BOARD_POWER_LIMIT",
         ]
         device_infos = snapshot["device_info"]
         for device_info in device_infos:
             smbus_telem = device_info["smbus_telem"]
             for field in smbus_telem_list:
                 assert field in smbus_telem
+            assert any(tag in smbus_telem for tag in therm_limit_tags), (
+                f"Expected at least one of {therm_limit_tags} in smbus_telem"
+            )
 
     def test_board_info_fields_present(self, snapshot):
         """Test if fields are present in board_info."""
@@ -174,7 +119,8 @@ class TestSnapshot:
             assert "cm_fw" in firmwares
             assert "cm_fw_date" in firmwares
             assert "eth_fw" in firmwares
-            assert "bm_bl_fw" in firmwares
+            assert "dm_bl_fw" in firmwares
+            assert "dm_app_fw" in firmwares
 
     def test_limits_fields(self, snapshot):
         """Test if fields are present in limits."""

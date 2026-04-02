@@ -1,3 +1,98 @@
+tt-smi (5.0.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add USER_RESET ioctl before and POST_RESET ioctl after IPMI reset
+  * Remove support for -glx_reset_tray
+
+  [ Samridhi Bansal ]
+  * Separate out all the frontend formatting logic into its own file
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.0.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 01 Apr 2026 21:09:01 +0000
+
+tt-smi (4.2.0) noble; urgency=medium
+
+  [ Sungjoon Moon ]
+  * Exit with error when stdin is not a TTY
+
+  [ Samridhi Bansal ]
+  * Update tt-umd 0.9.3 -> 0.9.4
+  * Reset refactor: Update reset code to now accept UMD ID, PCI BDF, and /dev/tenstorrent targets.
+  * Update topology discovery to ignore eth heartbeat check
+  * Update README to reflect the new reset and list options
+  * Update reset CI test to reflect the new inputs
+  * Update THM_LIMITS -> THM_LIMIT_SHUTDOWN as per UMD 0.9.4 update
+  * Update the snapshot test to check for either THM_LIMITS or THM_LIMIT_SHUTDOWN flag in telem
+  * Update reset unit tests
+  * Change the scope of devices to avoid ENODEV errors in CI
+  * Update UMD topology discovery options and add it to constants
+  * Reattached eth_train_skip option post reset with the new topology options
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.2.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 26 Mar 2026 17:37:30 +0000
+
+tt-smi (4.1.2) noble; urgency=medium
+
+  [ Daniel DeGrasse ]
+  * add option --eth_train_skip, which enables skipping eth training
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.2
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 17 Mar 2026 14:19:45 +0000
+
+tt-smi (4.1.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Lock UMD version at 0.9.3 till issues with latest is solved
+  * GUI: Update dram status for FW version >= 19.7.0.3 to include BIST errors
+  * Consolidate the fw_bundle_logic for both umd and luwen
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 11 Mar 2026 20:33:45 +0000
+
+tt-smi (4.1.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add in fields with a value of 0 when constructing smbus_telem_info
+  * Change update_telem thread to use Textual Worker API
+  * Exit application and print error msg on telem update thread error
+  * Don't display Rust error backtraces in tt-smi
+  * Check if telem value is not None before converting to hex
+  * Move pytest fixtures to conftest.py
+  * Add UMD backend to tests
+
+  [ Samridhi Bansal ]
+  * Modernize the firmware table
+
+  [ Petra Alexson ]
+  * Fix not passing in secondary_bus_reset to BH full_lds_reset
+  * Parse ETH FW version for BH
+
+  [ Luca Barbato ]
+  * Add uv support for nicer development experience
+
+  [ Petra Alexson ]
+  * Refine smbus_telem_list fields that are required in snapshot tests
+
+  [ Samridhi Bansal ]
+  * Update the UMD version from >=0.9.1 to ~=0.9.1
+  * refactor: Moved all the smi reset related functions into a file
+  * refactor: Moved all the util functions into their own file
+  * Update the tt-smi -ls option to include UMD chip ID and PCI BDF
+  * Remove unused eth link check after ipmi reset
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 4.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 04 Mar 2026 17:24:56 +0000
+
 tt-smi (4.0.0) noble; urgency=medium
 
   [ Petra Alexson ]

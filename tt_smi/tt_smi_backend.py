@@ -20,15 +20,19 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
-from importlib.metadata import version
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_tools_common.reset_common.wh_reset import WHChipReset
-from tt_tools_common.reset_common.bh_reset import BHChipReset
-from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
-from pyluwen import (
-    PciChip,
-    run_wh_ubb_ipmi_reset,
-    run_ubb_wait_for_driver_load
+from pyluwen import PciChip
+from tt_smi.tt_smi_utils import (
+    LOG_FOLDER,
+    hex_to_date,
+    hex_to_semver_eth,
+    hex_to_semver_m3_fw,
+    hex_to_semver_eth_wh,
+    get_board_type,
+    convert_signed_16_16_to_float,
+    dict_from_public_attrs,
+    get_host_software_versions,
+    get_fw_bundle_version
 )
 from tt_umd import (
     TTDevice,
@@ -37,23 +41,11 @@ from tt_umd import (
     ClusterDescriptor,
     SmBusArcTelemetryReader,
     ARCH,
-    WarmReset,
-    PCIDevice,
-    TopologyDiscovery,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
-from tt_tools_common.utils_common.tools_utils import (
-    hex_to_semver_m3_fw,
-    hex_to_date,
-    hex_to_semver_eth,
-    init_logging,
-    detect_chips_with_callback,
-)
-
-LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
-
+from tt_tools_common.utils_common.tools_utils import init_logging
 
 class TTSMIBackend:
     """
@@ -190,10 +182,11 @@ class TTSMIBackend:
 
         return self.log.get_clean_json_string()
 
-    def print_all_available_devices(self):
-        """Print all available boards on host"""
+    def print_all_available_devices_luwen(self):
+        """Print all available boards on host (Luwen path). Shows both PCI BDF and PCI Dev ID. Doesn't show UMD Chip ID."""
         console = get_console()
         table_1 = Table(title="All available boards on host:")
+        table_1.add_column("PCI BDF")
         table_1.add_column("PCI Dev ID")
         table_1.add_column("Board Type")
         table_1.add_column("Device Series")
@@ -207,13 +200,15 @@ class TTSMIBackend:
                 board_type = board_type + suffix
 
             table_1.add_row(
-                f"{pci_dev_id}",
+                f"{self.get_pci_bdf(i)}",
+                f"/dev/tenstorrent/{i}",
                 f"{self.get_device_name(i)}",
                 f"{board_type}",
                 f"{board_id}",
             )
         console.print(table_1)
         table_2 = Table(title="Boards that can be reset:")
+        table_2.add_column("PCI BDF")
         table_2.add_column("PCI Dev ID")
         table_2.add_column("Board Type")
         table_2.add_column("Device Series")
@@ -230,7 +225,64 @@ class TTSMIBackend:
                     suffix = " R" if self.devices[i].is_remote() else " L"
                     board_type = board_type + suffix
                 table_2.add_row(
-                    f"{pci_dev_id}",
+                    f"{self.get_pci_bdf(i)}",
+                    f"/dev/tenstorrent/{i}",
+                    f"{self.get_device_name(i)}",
+                    f"{board_type}",
+                    f"{board_id}",
+                )
+        console.print(table_2)
+
+    def print_all_available_devices_umd(self):
+        """Print all available boards on host (UMD path). Shows UMD Chip ID, PCI BDF, and PCI Dev ID."""
+        if not self.use_umd:
+            raise RuntimeError("print_all_available_devices_umd requires UMD backend (umd_cluster_descriptor set)")
+        console = get_console()
+        table_1 = Table(title="All available boards on host (UMD):")
+        table_1.add_column("UMD Chip ID")
+        table_1.add_column("PCI BDF")
+        table_1.add_column("PCI Dev ID")
+        table_1.add_column("Board Type")
+        table_1.add_column("Device Series")
+        table_1.add_column("Board Number")
+        for i in self.devices:
+            pci_dev_num = self.get_pci_device_id(i)
+            board_id = self.device_infos[i]["board_id"]
+            board_type = self.device_infos[i]["board_type"]
+            if self.is_wormhole(i):
+                suffix = " R" if self.devices[i].is_remote() else " L"
+                board_type = board_type + suffix
+            table_1.add_row(
+                f"{i}",
+                f"{self.get_pci_bdf(i)}",
+                f"/dev/tenstorrent/{pci_dev_num}",
+                f"{self.get_device_name(i)}",
+                f"{board_type}",
+                f"{board_id}",
+            )
+        console.print(table_1)
+        table_2 = Table(title="Boards that can be reset (UMD):")
+        table_2.add_column("UMD Chip ID")
+        table_2.add_column("PCI BDF")
+        table_2.add_column("PCI Dev ID")
+        table_2.add_column("Board Type")
+        table_2.add_column("Device Series")
+        table_2.add_column("Board Number")
+        for i in self.devices:
+            if (
+                not self.devices[i].is_remote()
+                and self.device_infos[i]["board_type"] != "wh_4u"
+            ):
+                pci_dev_num = self.get_pci_device_id(i)
+                board_id = self.device_infos[i]["board_id"]
+                board_type = self.device_infos[i]["board_type"]
+                if self.is_wormhole(i):
+                    suffix = " R" if self.devices[i].is_remote() else " L"
+                    board_type = board_type + suffix
+                table_2.add_row(
+                    f"{i}",
+                    f"{self.get_pci_bdf(i)}",
+                    f"/dev/tenstorrent/{pci_dev_num}",
                     f"{self.get_device_name(i)}",
                     f"{board_type}",
                     f"{board_id}",
@@ -266,7 +318,7 @@ class TTSMIBackend:
         table = Table(title="Mapping of trays to devices on the galaxy:")
         table.add_column("Tray Number")
         table.add_column("Tray Bus ID")
-        table.add_column("PCI Dev ID")
+        table.add_column("/dev/tenstorrent/<id>")
         for tray_num in sorted(tray_to_devices):
             table.add_row(
                 f"{tray_num}",
@@ -420,19 +472,40 @@ class TTSMIBackend:
                 return True
             return False
         elif self.is_blackhole(board_num):
-            # DDR Status in BH is a 16-bit field with the following layout:
-			#  [0] - Training complete GDDR 0
-			#  [1] - Error GDDR 0
-			#  [2] - Training complete GDDR 1
-			#  [3] - Error GDDR 1
-			#  ...
-			#  [14] - Training Complete GDDR 7
-			#  [15] - Error GDDR 7
             dram_status = int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)
-            # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
-            if dram_status == 0x5555:
-                return True
-            return False
+            if int(get_fw_bundle_version(self.smbus_telem_info[board_num]), 16) >= 0x13070000:
+                # After FW version 19.7.0.3 (hex 0x13070003), the dram status is a 16-bit field with the following layout:
+                # DDR Status:
+                # [0]  - Training complete GDDR 0
+                # [1]  - Error GDDR 0
+                # [2]  - Training complete GDDR 1
+                # [3]  - Error GDDR 1
+                # ...
+                # [14] - Training complete GDDR 7
+                # [15] - Error GDDR 7
+                # [16] - BIST complete GDDR 0
+                # [17] - BIST failed GDDR 0
+                # [18] - BIST complete GDDR 1
+                # [19] - BIST failed GDDR 1
+                # ...
+                # [30] - BIST complete GDDR 7
+                # [31] - BIST failed GDDR 7
+                if dram_status == 0x55555555:
+                    return True
+                return False
+            else:
+                # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
+                #  [0] - Training complete GDDR 0
+                #  [1] - Error GDDR 0
+                #  [2] - Training complete GDDR 1
+                #  [3] - Error GDDR 1
+                #  ...
+                #  [14] - Training Complete GDDR 7
+                #  [15] - Error GDDR 7
+                # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
+                if dram_status == 0x5555:
+                    return True
+                return False
         else:
             return False
 
@@ -637,7 +710,12 @@ class TTSMIBackend:
                 therm_trip_l1_limit = self.smbus_telem_info[board_num].get("THM_LIMIT_THROTTLE")
                 chip_limits[field] = f"{int(therm_trip_l1_limit, 16):2.0f}" if therm_trip_l1_limit else 0
             elif field == "thm_limit":
-                thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                if "THM_LIMIT_SHUTDOWN" in self.smbus_telem_info[board_num]:
+                    thm_limits = self.smbus_telem_info[board_num].get("THM_LIMIT_SHUTDOWN")
+                elif "THM_LIMITS" in self.smbus_telem_info[board_num]:
+                    thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
+                else:
+                    thm_limits = 0
                 chip_limits[field] = f"{int(thm_limits, 16):2.0f}" if thm_limits else 0
             else:
                 chip_limits[field] = 0
@@ -646,10 +724,14 @@ class TTSMIBackend:
     def get_firmware_versions(self, board_num):
         """Translate the telem struct semver for gui"""
         fw_versions = {}
-        for field in constants.FW_LIST:
+        for field in constants.FW_LIST_SNAPSHOT:
             if field == "cm_fw":
                 if "ARC0_FW_VERSION" in self.smbus_telem_info[board_num]:
                     val = self.smbus_telem_info[board_num]["ARC0_FW_VERSION"]
+                elif "CM_FW_VERSION" in self.smbus_telem_info[board_num]:
+                    val = self.smbus_telem_info[board_num]["CM_FW_VERSION"]
+                else:
+                    val = "N/A"
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
@@ -667,9 +749,11 @@ class TTSMIBackend:
                 val = self.smbus_telem_info[board_num]["ETH_FW_VERSION"]
                 if val is None:
                     fw_versions[field] = "N/A"
+                elif self.is_wormhole(board_num):
+                    fw_versions[field] = hex_to_semver_eth_wh(int(val, 16))
                 else:
                     fw_versions[field] = hex_to_semver_eth(int(val, 16))
-            elif field == "bm_bl_fw":
+            elif field == "dm_bl_fw":
                 if self.use_umd:
                     # The tag has different value for old WH telemetry and new telemetry.
                     if "M3_BL_FW_VERSION" in self.smbus_telem_info[board_num]:
@@ -682,7 +766,7 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
-            elif field == "bm_app_fw":
+            elif field == "dm_app_fw":
                 if self.use_umd:
                     # The tag has different value for WH and BH
                     if "M3_APP_FW_VERSION" in self.smbus_telem_info[board_num]:
@@ -706,14 +790,7 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "fw_bundle_version":
-                if self.use_umd:
-                    # The tag has different value for WH and BH
-                    if "FW_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
-                        val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
-                    elif "FLASH_BUNDLE_VERSION" in self.smbus_telem_info[board_num]:
-                        val = self.smbus_telem_info[board_num]["FLASH_BUNDLE_VERSION"]
-                else:
-                    val = self.smbus_telem_info[board_num]["FW_BUNDLE_VERSION"]
+                val = get_fw_bundle_version(self.smbus_telem_info[board_num])
                 if (
                     get_board_type(self.get_board_id(board_num)) == "wh_4u"
                     and val == "0xffffffff"
@@ -729,347 +806,3 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
         return fw_versions
-
-
-def get_board_type(board_id: str) -> str:
-    """
-    Get board type from board ID string.
-    Ex:
-        Board ID: AA-BBBBB-C-D-EE-FF-XXX
-                   ^     ^ ^ ^  ^  ^   ^
-                   |     | | |  |  |   +- XXX
-                   |     | | |  |  +----- FF
-                   |     | | |  +-------- EE
-                   |     | | +----------- D
-                   |     | +------------- C = Revision
-                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
-                   +--------------------- AA
-    """
-    if board_id == "N/A":
-        return "N/A"
-    serial_num = int(f"0x{board_id}", base=16)
-    upi = (serial_num >> 36) & 0xFFFFF
-
-    # Grayskull cards
-    if upi == 0x3:
-        return "e150"
-    elif upi == 0xA:
-        return "e300"
-    elif upi == 0x7:
-        return "e75"
-
-    # Wormhole cards
-    elif upi == 0x8:
-        return "nb_cb"
-    elif upi == 0xB:
-        return "wh_4u"
-    elif upi == 0x14:
-        return "n300"
-    elif upi == 0x18:
-        return "n150"
-    elif upi == 0x35:
-        return "tt-galaxy-wh"
-
-    # Blackhole cards
-    elif upi == 0x36:
-        return "bh-scrappy"
-    elif upi == 0x43:
-        return "p100a"
-    elif upi == 0x40:
-        return "p150a"
-    elif upi == 0x41:
-        return "p150b"
-    elif upi == 0x42:
-        return "p150c"
-    elif upi == 0x44:
-        return "p300b"
-    elif upi == 0x45:
-        return "p300a"
-    elif upi == 0x46:
-        return "p300c"
-    elif upi == 0x47:
-        return "tt-galaxy-bh"
-    else:
-        return "N/A"
-
-def convert_signed_16_16_to_float(value):
-    """Convert signed 16.16 to float"""
-    if value & (1 << (32 - 1)): # if the value is negative (two's complement)
-        value -= 1 << 32 # convert to negative value
-    return value / 65536.0
-
-def dict_from_public_attrs(obj) -> dict:
-    """Parse an object's public attributes into a dictionary"""
-    all_attrs = obj.__dir__()
-    # Filter private attrs
-    public = [attr for attr in all_attrs if not attr.startswith("_")]
-    ret = {}
-    for attr in public:
-        ret[attr] = getattr(obj, attr)
-    return ret
-
-
-def get_host_software_versions() -> dict:
-    return {
-        "tt_smi": version("tt_smi"),
-        "pyluwen": version("pyluwen"),
-        "tt_umd": version("tt_umd"),
-    }
-
-
-# Reset specific functions
-def pci_board_reset(list_of_boards: List[int], reinit: bool = False, print_status: bool = True, use_umd: bool = False):
-    """Given a list of PCI index's init the PCI chip and call reset on it"""
-
-    reset_wh_pci_idx = []
-    reset_bh_pci_idx = []
-    board_types = set()
-    if use_umd:
-        chips = PCIDevice.enumerate_devices_info()
-    for pci_idx in list_of_boards:
-        try:
-            if not use_umd:
-                chip = PciChip(pci_interface=pci_idx)
-        except Exception as e:
-            print(e)
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error accessing board at PCI index {pci_idx}! Use -ls to see all devices available to reset",
-                CMD_LINE_COLOR.ENDC,
-            )
-            # Exit the loop to go to the next chip
-            continue
-
-        if use_umd:
-            board_types.add(chips[pci_idx].subsystem_id)
-        else:
-            if chip.as_wh():
-                reset_wh_pci_idx.append(pci_idx)
-                board_types.add(chip.as_wh().pci_board_type())
-            elif chip.as_bh():
-                reset_bh_pci_idx.append(pci_idx)
-                board_types.add(chip.as_bh().pci_board_type())
-            else:
-                print(
-                    CMD_LINE_COLOR.RED,
-                    "Unknown chip type detected. Exiting...",
-                    CMD_LINE_COLOR.ENDC,
-                )
-                # Close the chip  before exiting- needed for docker resets to work
-                del chip
-                sys.exit(1)
-            # Close the chip - needed for docker resets to work
-            del chip
-
-
-    is_galaxy = True if board_types <= {0x35, 0x47} else False
-    # Notify users of requirements for using tt-smi -r on Galaxy 6U
-    if is_galaxy:
-        # TODO: only print in the case of insufficient CPLD version
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
-            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
-            CMD_LINE_COLOR.ENDC,
-        )
-
-    # Don't do secondary_bus_reset if we are on Galaxy 6U (WH: 0x35, BH: 0x47)
-    secondary_bus_reset = not is_galaxy
-
-    if use_umd:
-        WarmReset.warm_reset(list_of_boards, secondary_bus_reset=secondary_bus_reset)
-    else:
-        # reset wh devices with pci indices
-        if reset_wh_pci_idx:
-            WHChipReset().full_lds_reset(pci_interfaces=reset_wh_pci_idx, secondary_bus_reset=secondary_bus_reset)
-
-        if reset_bh_pci_idx:
-            BHChipReset().full_lds_reset(pci_interfaces=reset_bh_pci_idx)
-
-    if reinit:
-        # Enable backtrace for debugging
-        os.environ["RUST_BACKTRACE"] = "full"
-
-        print(
-            CMD_LINE_COLOR.PURPLE,
-            f"Re-initializing boards after reset....",
-            CMD_LINE_COLOR.ENDC,
-        )
-        try:
-            if use_umd:
-                TopologyDiscovery.discover()
-            else:
-                detect_chips_with_callback(print_status=print_status)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error when re-initializing chips!\n {e}",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-
-def timed_wait(seconds):
-    print("\033[93mWaiting for {} seconds: 0\033[0m".format(seconds), end='')
-    sys.stdout.flush()
-
-    for i in range(1, seconds + 1):
-        time.sleep(1)
-        # Move cursor back and overwrite the number
-        print("\r\033[93mWaiting for {} seconds: {}\033[0m".format(seconds, i), end='')
-        sys.stdout.flush()
-    print()
-
-def check_wh_galaxy_eth_link_status(devices):
-    """
-    Check the WH Galaxy Ethernet link status.
-    Returns True if the link is up, False otherwise.
-    """
-    noc_id = 0
-    DEBUG_BUF_ADDR = 0x12c0 # For eth fw 5.0.0 and above
-    eth_locations_noc_0 = [ (9, 0), (1, 0), (8, 0), (2, 0), (7, 0), (3, 0), (6, 0), (4, 0),
-                        (9, 6), (1, 6), (8, 6), (2, 6), (7, 6), (3, 6), (6, 6), (4, 6) ]
-    LINK_INACTIVE_FAIL_DUMMY_PACKET = 10
-    # Check that we have 32 devices
-    if len(devices) != 32:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Error: Expected 32 devices for WH Galaxy Ethernet link status check, seeing f{len(devices)}, please try reset again or cold boot the system.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-
-    # Collect all the link errors in a dictionary
-    link_errors = {}
-    # Check all 16 eth links for all devices
-    for i, device in enumerate(devices):
-        for eth in range(16):
-            eth_x, eth_y = eth_locations_noc_0[eth]
-            link_error = device.noc_read32(noc_id, eth_x, eth_y, DEBUG_BUF_ADDR + 0x4*96)
-            if link_error == LINK_INACTIVE_FAIL_DUMMY_PACKET:
-                link_errors[i] = eth
-
-    if link_errors:
-        for board_idx, eth in link_errors.items():
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Board {board_idx} has link error on eth port {eth}",
-                CMD_LINE_COLOR.ENDC,
-            )
-        raise Exception(
-            "WH Galaxy Ethernet link errors detected!"
-        )
-        # sys.exit(1)
-
-def umd_ubb_wait_for_driver_load():
-    """
-    Wait for the driver to reload for UMD, try 100 times.
-    Similar to luwen's ubb_wait_for_driver_load but uses PCIDevice.enumerate_devices.
-    """
-    attempts = 0
-    expected_chip_count = 32
-    
-    while attempts < 100:
-        device_count = 0
-        try:
-            devices = PCIDevice.enumerate_devices()
-            device_count = len(devices)
-            
-            if device_count == expected_chip_count:
-                print(f"Driver loaded with {device_count} devices")
-                return
-        except Exception as e:
-            # If enumerate_devices fails, continue waiting
-            pass
-        
-        print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
-        time.sleep(1)
-        attempts += 1
-    
-    # If we reach here, the driver was not loaded
-    raise Exception(f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up")
-
-def glx_6u_trays_reset(
-        reinit: bool = True,
-        ubb_num: str = "0xF",
-        dev_num: str = "0xFF",
-        op_mode: str = "0x0",
-        reset_time: str = "0xF",
-        print_status: bool = True,
-        use_umd=False):
-    """
-    Reset the WH asics on the galaxy systems with the following steps:
-    1. Reset the trays with ipmi command (or UMD warm reset)
-    2. Wait for 30s
-    3. Reinit all chips
-
-    Args:
-        reinit (bool): Whether to reinitialize the chips after reset.
-        ubb_num (str): The UBB number to reset. 0x0~0xF (bit map)
-        dev_num (str): The device number to reset. 0x0~0xFF(bit map)
-        op_mode (str): The operation mode to use.
-                        0x0 - Asserted/Deassert reset with a reset period (reset_time)
-                        0x1 - Asserted reset
-                        0x2 - Deasserted reset
-        reset_time (str): The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
-        print_status (bool): Whether to print out animations while detecting chips.
-        use_umd (bool): Whether to use UMD (WarmReset.ubb_warm_reset) or pyluwen (run_wh_ubb_ipmi_reset)
-    """
-    print(
-        CMD_LINE_COLOR.PURPLE,
-        f"Resetting WH Galaxy trays with reset command...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    
-    if use_umd:
-        if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error: UMD warm reset only supports full galaxy reset (ubb_num=0xF, dev_num=0xFF, op_mode=0x0, reset_time=0xF)",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-        WarmReset.ubb_warm_reset(timeout_s=100.0)
-        timed_wait(30)
-        umd_ubb_wait_for_driver_load()
-    else:
-        run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
-        timed_wait(30)
-        run_ubb_wait_for_driver_load()
-    
-    print(
-        CMD_LINE_COLOR.PURPLE,
-        f"Re-initializing boards after reset....",
-        CMD_LINE_COLOR.ENDC,
-    )
-    if not reinit:
-        print(
-            CMD_LINE_COLOR.GREEN,
-            f"Exiting after galaxy reset without re-initializing chips.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(0)
-    try:
-        # eth status 2 has been reused to denote "connected", leading to false hangs when detecting chips
-        # discover local only to fix that
-        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=True, print_status=print_status)
-        # Check the eth link status for WH Galaxy
-    except Exception as e:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Error when re-initializing chips!\n {e}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        # Error out if chips don't initalize
-        sys.exit(1)
-
-    # after re-init check eth status - only if doing a full galaxy reset.
-    # If doing a partial reset, eth connections will be broken because eth training will go out of sync
-    if ubb_num == 0xF:
-        check_wh_galaxy_eth_link_status(chips)
-    # All went well - exit with success
-    print(
-        CMD_LINE_COLOR.GREEN,
-        f"Re-initialized {len(chips)} boards after reset. Exiting...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    sys.exit(0)
