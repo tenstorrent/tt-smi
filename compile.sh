@@ -15,11 +15,13 @@ setup_venv() {
     VENV_DIR="venv"
 
     if [ -d "$VENV_DIR" ]; then
-        echo -e "${PURPLE}[INFO] Virtual environment already exists${NC}"
-    else
-        echo -e "${PURPLE}[INFO] Creating virtual environment...${NC}"
-        python3 -m venv "$VENV_DIR"
+        echo -e "${PURPLE}[INFO] Virtual environment already exists$. Deleting...${NC}"
+        rm -rf "$VENV_DIR"
     fi
+
+    echo -e "${PURPLE}[INFO] Creating virtual environment...${NC}"
+    python3.10 -m venv "$VENV_DIR"
+
 
     echo -e "${PURPLE}[INFO] Activating virtual environment...${NC}"
     source "$VENV_DIR/bin/activate"
