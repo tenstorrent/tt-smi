@@ -1,5 +1,7 @@
 name: Build All
 run-name: Build All
+permissions:
+  contents: read
 on:
   workflow_dispatch:
   workflow_call:
