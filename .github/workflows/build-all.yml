@@ -52,3 +52,12 @@ jobs:
     with:
       ref: ${{ inputs.ref }}
     secrets: inherit
+  buildpyinstaller:
+    needs:
+      - build_all_depends
+      - buildpypi
+    name: Build PyInstaller binary
+    uses: ./.github/workflows/build-pyinstaller.yml
+    with:
+      ref: ${{ inputs.ref }}
+    secrets: inherit
