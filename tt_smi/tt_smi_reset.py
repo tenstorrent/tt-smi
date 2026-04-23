@@ -19,7 +19,7 @@ from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
 from tt_smi.tt_smi_utils import get_dev_id_from_bdf
-from tt_smi.constants import SMBUS_TELEMETRY_OPTIONS
+from tt_smi.constants import get_default_discovery_options
 from pyluwen import (
     PciChip,
     pci_scan,
@@ -344,7 +344,7 @@ def pci_board_reset(
         )
         try:
             if use_umd:
-                options = copy(SMBUS_TELEMETRY_OPTIONS)
+                options = get_default_discovery_options()
                 if eth_train_skip:
                     options.discover_remote_devices = False
                     options.wait_on_ethernet_link_training = False
