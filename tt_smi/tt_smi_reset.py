@@ -9,7 +9,6 @@ import os
 import re
 import sys
 import time
-from copy import copy
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Dict
@@ -348,7 +347,7 @@ def pci_board_reset(
                 if eth_train_skip:
                     options.discover_remote_devices = False
                     options.wait_on_ethernet_link_training = False
-                TopologyDiscovery.discover(options)
+                TopologyDiscovery.discover(options=options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status, ignore_ethernet=eth_train_skip)
