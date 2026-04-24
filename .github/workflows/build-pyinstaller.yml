@@ -1,0 +1,129 @@
+# Build a self-contained Linux single-file binary of tt-smi using PyInstaller.
+
+# This workflow doesn't have an independent dispatch trigger since it depends on the wheel built in build-pypi workflow. 
+# It can be invoked from the build-all workflow.
+
+name: Build PyInstaller bundle
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build from"
+        default: ${{ github.ref }}
+        required: true
+        type: string
+
+jobs:
+  pyinstaller:
+    name: PyInstaller (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: |
+          echo "What started this ref: ${{ github.ref }}"
+          echo "What started this ref: ${{ github.ref_name }}"
+          echo "What started this sha: ${{ github.sha }}"
+          echo "Did we get a ref pass in? ${{ inputs.ref }}"
+      - name: Figure out branch name
+        id: ref_name
+        run: |
+          echo "ref_name=${{ github.ref_name }}"
+          echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
+          if [[ -n "${{ inputs.ref }}" ]]
+          then
+            echo "ref_name=${{ inputs.ref }}"
+            echo "ref_name=${{ inputs.ref }}" >> $GITHUB_ENV
+          fi
+  
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # workflow_call / workflow_dispatch may pass inputs.ref; push has no inputs — use triggering commit.
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install OS packages for frozen binary
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf \
+            binutils \
+            libc6-dev
+
+      - name: Import GPG key
+        id: gpg_key_import
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
+      - run: gpg --list-keys
+      - run: gpg --list-secret-keys
+
+      - name: Download wheel built by build-pypi
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dists
+          path: wheelhouse
+      - name: Install wheel and PyInstaller into a clean venv
+        run: |
+          set -euxo pipefail
+          python -m venv /tmp/pybuild
+          /tmp/pybuild/bin/pip install --upgrade pip
+          # Install from the exact wheel that build-pypi produced.
+          /tmp/pybuild/bin/pip install \
+            wheelhouse/tt_smi-*.whl \
+            "pyinstaller~=6.12" \
+            pyinstaller-hooks-contrib
+      - name: Build onefile binary
+        run: |
+          set -euxo pipefail
+          /tmp/pybuild/bin/pyinstaller \
+            --clean \
+            --noconfirm \
+            --onefile \
+            --name tt-smi \
+            --copy-metadata tt-smi \
+            --collect-all textual \
+            --collect-all rich \
+            --collect-all pydantic \
+            --collect-all tt_tools_common \
+            --collect-all tt_umd \
+            --collect-all pyluwen \
+            /tmp/pybuild/bin/tt-smi
+
+      - name: Smoke test (no Tenstorrent hardware required)
+        run: |
+          set -euxo pipefail
+          ./dist/tt-smi --help
+          ./dist/tt-smi --version
+
+      - name: Artifact name
+        id: artifact
+        run: |
+          set -euxo pipefail
+          # Same as release.yml: read project.version from pyproject.toml (what `python -m build` uses in build-pypi).
+          python3 -m venv /tmp/tomlver
+          /tmp/tomlver/bin/pip install -q toml-cli
+          VERSION="$( /tmp/tomlver/bin/toml get project.version --toml-path pyproject.toml )"
+          echo "name=tt-smi-${VERSION}-${{ matrix.os }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload tt-smi binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: dist/tt-smi

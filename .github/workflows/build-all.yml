@@ -1,5 +1,7 @@
 name: Build All
 run-name: Build All
+permissions:
+  contents: read
 on:
   workflow_dispatch:
   workflow_call:
@@ -47,6 +49,15 @@ jobs:
     needs:
       - build_all_depends
     uses: ./.github/workflows/build-pypi.yml
+    with:
+      ref: ${{ inputs.ref }}
+    secrets: inherit
+  buildpyinstaller:
+    needs:
+      - build_all_depends
+      - buildpypi
+    name: Build PyInstaller binary
+    uses: ./.github/workflows/build-pyinstaller.yml
     with:
       ref: ${{ inputs.ref }}
     secrets: inherit
