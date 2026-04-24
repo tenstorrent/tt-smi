@@ -343,6 +343,17 @@ jobs:
               "$( echo "${x}" | xargs dirname )/${want}"
           done
 
+      # PyInstaller job names the *artifact* tt-smi-<ver>-<os>; download extracts as that folder + tt-smi.
+      # GitHub release assets need unique basenames, so rename to match the artifact folder name.
+      - name: Unique names for PyInstaller binaries
+        run: |
+          set -euxo pipefail
+          shopt -s nullglob
+          for d in "${GITHUB_WORKSPACE}"/tt-smi-*-ubuntu-*; do
+            [[ -d "${d}" && -f "${d}/tt-smi" ]] || continue
+            mv -v "${d}/tt-smi" "${d}/$(basename "${d}")"
+          done
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -352,6 +363,7 @@ jobs:
             ${{ github.workspace }}/${{ env.project_name }}*/*.deb
             ${{ github.workspace }}/[!artifacts-]*/*.deb
             ${{ github.workspace }}/*/*.whl
+            ${{ github.workspace }}/tt-smi-*-ubuntu-*/tt-smi-*-ubuntu-*
           body: ${{ steps.build_changelog.outputs.changelog }}
           draft: false
           prerelease: false
