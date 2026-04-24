@@ -1,3 +1,14 @@
+tt-smi (5.0.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Fix for pull request finding 'CodeQL / Workflow does not contain permissions'
+  * Added github workflow to create pyinstaller binary
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.0.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 24 Apr 2026 11:37:22 +0000
+
 tt-smi (5.0.0) noble; urgency=medium
 
   [ Petra Alexson ]
