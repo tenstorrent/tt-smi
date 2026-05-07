@@ -27,6 +27,7 @@ from tt_smi.tt_smi_utils import (
     hex_to_date,
     hex_to_semver_eth,
     hex_to_semver_m3_fw,
+    hex_to_semver_gddr_fw,
     hex_to_semver_eth_wh,
     get_board_type,
     convert_signed_16_16_to_float,
@@ -805,4 +806,14 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
+            elif field == "gddr_fw":
+                if self.use_umd:
+                    val = self.smbus_telem_info[board_num].get("GDDR_FW_VERSION")
+                else:
+                    # TODO: Need to add GDDR FW tag into luwen
+                    val = None
+                if val is None or not self.is_blackhole(board_num):
+                    fw_versions[field] = "N/A"
+                else:
+                    fw_versions[field] = hex_to_semver_gddr_fw(int(val, 16))
         return fw_versions
