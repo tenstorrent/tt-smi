@@ -8,11 +8,13 @@ from tt_umd import (
     TopologyDiscoveryOptions,
 )
 
-SMBUS_TELEMETRY_OPTIONS = TopologyDiscoveryOptions()
-SMBUS_TELEMETRY_OPTIONS.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
+def get_default_discovery_options():
+    options = TopologyDiscoveryOptions()
+    options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+    options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+    options.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+    options.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
+    return options
 
 SMBUS_TELEMETRY_LIST = [
     "BOARD_ID",

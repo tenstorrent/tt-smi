@@ -301,7 +301,7 @@ def main():
 
     try:
         if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.SMBUS_TELEMETRY_OPTIONS)
+            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.get_default_discovery_options())
         else:
             cluster_descriptor = None
             devices = dict(enumerate(detect_chips_with_callback(

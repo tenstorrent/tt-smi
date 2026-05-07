@@ -18,7 +18,7 @@ from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
 from tt_smi.tt_smi_utils import get_dev_id_from_bdf
-from tt_smi.constants import SMBUS_TELEMETRY_OPTIONS
+from tt_smi.constants import get_default_discovery_options
 from pyluwen import (
     PciChip,
     pci_scan,
@@ -343,9 +343,11 @@ def pci_board_reset(
         )
         try:
             if use_umd:
+                options = get_default_discovery_options()
                 if eth_train_skip:
-                    SMBUS_TELEMETRY_OPTIONS.discover_remote_devices = False
-                TopologyDiscovery.discover(SMBUS_TELEMETRY_OPTIONS)
+                    options.discover_remote_devices = False
+                    options.wait_on_ethernet_link_training = False
+                TopologyDiscovery.discover(options=options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status, ignore_ethernet=eth_train_skip)
