@@ -3,7 +3,11 @@
 
 import pytest
 
-from tt_smi.tt_smi_utils import get_board_type, convert_signed_16_16_to_float
+from tt_smi.tt_smi_utils import (
+    get_board_type,
+    convert_signed_16_16_to_float,
+    check_blackhole_dram_training_status,
+)
 
 class TestGetBoardType:
     @pytest.mark.parametrize(
@@ -78,3 +82,64 @@ class TestDataFormatting:
     def test_convert_signed_16_16_to_float(self, raw, expected):
         """Test converting signed 16.16 fixed-point number to float."""
         assert convert_signed_16_16_to_float(raw) == pytest.approx(expected)
+
+
+class TestBlackholeDramTrainingStatus:
+    """
+    Tests for check_blackhole_dram_training_status.
+
+    DDR_STATUS packs 2 bits per GDDR channel for training status (bits 0..15)
+    and, on FW >= 19.7.0.3, another 2 bits per channel for BIST status
+    (bits 16..31): bit 2i = complete, bit 2i + 1 = error/failed.
+
+    A fully-trained 8-channel Blackhole reports DDR_STATUS == 0x55555555
+    (modern) or 0x5555 (legacy). p100a ships with channel 3 harvested
+    (ENABLED_GDDR = 0xF7) and the channel 3 bits read back zero.
+    """
+
+    # --- FW >= 19.7.0.3 (32-bit DDR_STATUS with BIST) ---
+
+    def test_full_8ch_pass(self):
+        assert check_blackhole_dram_training_status(0x55555555, 0xFF, has_bist=True)
+
+    def test_p100a_7ch_pass(self):
+        # Real observed value on a healthy p100a (channel 3 harvested).
+        assert check_blackhole_dram_training_status(0x55155515, 0xF7, has_bist=True)
+
+    def test_enabled_channel_missing_train_complete(self):
+        # Channel 2 (bits 4-5) cleared.
+        assert not check_blackhole_dram_training_status(
+            0x55155505, 0xF7, has_bist=True
+        )
+
+    def test_enabled_channel_train_error_set(self):
+        # Channel 0 error bit (bit 1) set.
+        assert not check_blackhole_dram_training_status(
+            0x55155517, 0xF7, has_bist=True
+        )
+
+    def test_enabled_channel_bist_failed(self):
+        # Channel 0 BIST-failed bit (bit 17) set.
+        assert not check_blackhole_dram_training_status(
+            0x55175515, 0xF7, has_bist=True
+        )
+
+    def test_disabled_channel_bits_ignored(self):
+        # Channel 3 bits deliberately dirty but channel 3 is disabled -> still pass.
+        assert check_blackhole_dram_training_status(0x55D555D5, 0xF7, has_bist=True)
+
+    # --- FW < 19.7.0.3 (16-bit DDR_STATUS, no BIST bits) ---
+
+    def test_legacy_full_8ch_pass(self):
+        assert check_blackhole_dram_training_status(0x5555, 0xFF, has_bist=False)
+
+    def test_legacy_p100a_7ch_pass(self):
+        assert check_blackhole_dram_training_status(0x5515, 0xF7, has_bist=False)
+
+    def test_legacy_ignores_upper_bits(self):
+        # Upper bits are undefined on legacy FW and must not affect the decision.
+        assert check_blackhole_dram_training_status(0xFFFF5555, 0xFF, has_bist=False)
+
+    def test_legacy_error_bit_set(self):
+        # Channel 0 error bit set.
+        assert not check_blackhole_dram_training_status(0x5557, 0xFF, has_bist=False)

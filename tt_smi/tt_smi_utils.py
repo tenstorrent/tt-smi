@@ -195,6 +195,39 @@ def get_fw_bundle_version(smbus_telem_info) -> int:
     else:
         return None
 
+
+def check_blackhole_dram_training_status(
+    dram_status: int, enabled_gddr: int, has_bist: bool
+) -> bool:
+    """
+    Check if every enabled GDDR channel on a Blackhole board has trained successfully.
+
+    Blackhole has up to 8 GDDR6 channels, but some SKUs ship with fewer enabled
+    via the ENABLED_GDDR firmware mask (e.g. p100a has 7/8 enabled by design).
+    The previous check compared DDR_STATUS against the literal "all 8 pass"
+    pattern (0x55555555), which always reports a false 'not trained' on
+    reduced-channel SKUs. This helper ignores bits for disabled channels.
+
+    DDR_STATUS layout, 2 bits per channel:
+        bit 2i     : channel i training complete
+        bit 2i + 1 : channel i training error
+        bit 2i + 16: channel i BIST complete   (FW >= 19.7.0.3 only)
+        bit 2i + 17: channel i BIST failed     (FW >= 19.7.0.3 only)
+    """
+    for channel in range(8):
+        if not (enabled_gddr & (1 << channel)):
+            continue
+        train_complete = (dram_status >> (2 * channel)) & 0x1
+        train_error = (dram_status >> (2 * channel + 1)) & 0x1
+        if not train_complete or train_error:
+            return False
+        if has_bist:
+            bist_complete = (dram_status >> (2 * channel + 16)) & 0x1
+            bist_failed = (dram_status >> (2 * channel + 17)) & 0x1
+            if not bist_complete or bist_failed:
+                return False
+    return True
+
 def get_dev_id_from_bdf(bdf: str) -> int:
     """
     Resolve /dev/tenstorrent index N from a PCI BDF. Validates that the device

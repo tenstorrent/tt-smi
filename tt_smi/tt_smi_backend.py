@@ -32,7 +32,8 @@ from tt_smi.tt_smi_utils import (
     convert_signed_16_16_to_float,
     dict_from_public_attrs,
     get_host_software_versions,
-    get_fw_bundle_version
+    get_fw_bundle_version,
+    check_blackhole_dram_training_status,
 )
 from tt_umd import (
     TTDevice,
@@ -472,40 +473,21 @@ class TTSMIBackend:
                 return True
             return False
         elif self.is_blackhole(board_num):
+            if self.smbus_telem_info[board_num]["DDR_STATUS"] is None:
+                return False
             dram_status = int(self.smbus_telem_info[board_num]["DDR_STATUS"], 16)
-            if int(get_fw_bundle_version(self.smbus_telem_info[board_num]), 16) >= 0x13070000:
-                # After FW version 19.7.0.3 (hex 0x13070003), the dram status is a 16-bit field with the following layout:
-                # DDR Status:
-                # [0]  - Training complete GDDR 0
-                # [1]  - Error GDDR 0
-                # [2]  - Training complete GDDR 1
-                # [3]  - Error GDDR 1
-                # ...
-                # [14] - Training complete GDDR 7
-                # [15] - Error GDDR 7
-                # [16] - BIST complete GDDR 0
-                # [17] - BIST failed GDDR 0
-                # [18] - BIST complete GDDR 1
-                # [19] - BIST failed GDDR 1
-                # ...
-                # [30] - BIST complete GDDR 7
-                # [31] - BIST failed GDDR 7
-                if dram_status == 0x55555555:
-                    return True
-                return False
-            else:
-                # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
-                #  [0] - Training complete GDDR 0
-                #  [1] - Error GDDR 0
-                #  [2] - Training complete GDDR 1
-                #  [3] - Error GDDR 1
-                #  ...
-                #  [14] - Training Complete GDDR 7
-                #  [15] - Error GDDR 7
-                # 0x5555 = 0b0101010101010101 means all 8 channels trained successfully
-                if dram_status == 0x5555:
-                    return True
-                return False
+            # ENABLED_GDDR is the per-channel enable mask; reduced-channel SKUs
+            # like p100a ship with fewer than 8 bits set. Fall back to all-8
+            # for older firmware that doesn't expose it.
+            enabled_gddr_raw = self.smbus_telem_info[board_num].get("ENABLED_GDDR")
+            enabled_gddr = int(enabled_gddr_raw, 16) if enabled_gddr_raw is not None else 0xFF
+            has_bist = (
+                int(get_fw_bundle_version(self.smbus_telem_info[board_num]), 16)
+                >= 0x13070000
+            )
+            return check_blackhole_dram_training_status(
+                dram_status, enabled_gddr, has_bist
+            )
         else:
             return False
 
