@@ -16,6 +16,10 @@ def get_default_discovery_options():
     options.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
     return options
 
+# Host SMC / ARC: toggle red status LED (TT-System-Firmware led_blink_rqst).
+# https://docs.tenstorrent.com/tt-system-firmware/doxygen/structled__blink__rqst.html
+TT_SMC_MSG_BLINKY = 0xC5
+
 SMBUS_TELEMETRY_LIST = [
     "BOARD_ID",
     "ENUM_VERSION",

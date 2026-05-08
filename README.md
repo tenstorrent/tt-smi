@@ -94,7 +94,8 @@ pre-commit install
 tt-smi can be used as a GUI (`tt-smi`) or CLI (`tt-smi -s`) to display system information and Tenstorrent device telemetry, and it can be used to reset Tenstorrent devices (`tt-smi -r`).
 
 ```
-tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit]
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
+              [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen] [--eth_train_skip] [--bh_blinky [TARGETS ...]]
 ```
 
 ## Getting Help
@@ -103,22 +104,27 @@ Running tt-smi with the ```-h, --help``` flag displays the help text.
 
 ```
 $ tt-smi -h
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto]
+              [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen] [--eth_train_skip] [--bh_blinky [TARGETS ...]]
 
-Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
-interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
+Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI
+is to provide a simple and easy-to-use interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level
+resets.
 
 options:
   -h, --help            show this help message and exit
   -l, --local           Run on local chips (Wormhole only)
   -v, --version         show program's version number and exit
   -s, --snapshot        Dump snapshot of current tt-smi information to STDOUT
-  -ls, --list           List boards on the host and quit (UMD: UMD Chip ID, PCI BDF, PCI Dev ID, …)
+  -ls, --list           List boards on the host and quit. With UMD (default), tables include UMD Chip ID, PCI BDF, PCI Dev ID (/dev/tenstorrent/<n>),
+                        board type, series, and board number.
   -f [snapshot filename], --filename [snapshot filename]
                         Write snapshot to a file. Default: ~/tt_smi/<timestamp>_snapshot.json
   -c, --compact         Run in compact mode, hiding the sidebar and other static elements
   -r [TARGETS ...], --reset [TARGETS ...]
-                        Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or /dev/tenstorrent/<id>. Use -ls to list devices. Omit targets or use "all" to reset all devices. Do not mix types in one command.
+                        Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or /dev/tenstorrent/<id>. Use -ls to list devices. Omit targets or
+                        use 'all' to reset all devices. Do not mix types in one command. With --use_luwen, use BDF or /dev/tenstorrent/<id> (not bare
+                        integers).
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
   -glx_reset, --galaxy_6u_trays_reset
                         Reset all the ASICs on the galaxy host
@@ -130,6 +136,10 @@ options:
                         List the mapping of devices to trays on the galaxy
   --no_reinit           Don't detect devices post reset
   --use_luwen           Use deprecated Luwen driver instead of UMD (default).
+  --eth_train_skip      Skip waiting for Ethernet training post reset.
+  --bh_blinky [TARGETS ...]
+                        LED blink (ARC TT_SMC_MSG_BLINKY / 0xC5) on Blackhole PCIe cards only (not Wormhole or Galaxy). Same targets as --reset (UMD IDs,
+                        PCI BDF, or /dev/tenstorrent/<n>). Press any key to stop. With --use_luwen, UMD logical IDs are not supported.
   ```
 
 These options will be discussed in more detail in the following sections.
@@ -314,6 +324,30 @@ $ tt-smi -s
             "Kernel": "5.15.0-130-generic",
         .........
 ```
+
+## Blackhole LED blink (`--bh_blinky`)
+
+The **`--bh_blinky`** option drives the host red status LED in a blink pattern by sending the ARC SMC message **TT_SMC_MSG_BLINKY** to the selected device(s), matching [TT-System-Firmware](https://docs.tenstorrent.com/tt-system-firmware/doxygen/structled__blink__rqst.html) behavior.
+
+**Supported hardware:** **Blackhole PCIe cards only.** It is **not** supported on Wormhole cards or on Galaxy systems (WH or BH Galaxy).
+
+**How to use**
+
+- **Targets** use the **same rules as `-r` / `--reset`**: one target type per invocation (UMD logical IDs, PCI BDFs, or `/dev/tenstorrent/<id>` paths—see [Resets](#resets)). Omit targets or pass **`all`** to apply to every discovered device.
+- **UMD (default):** e.g. `tt-smi --bh_blinky`, `tt-smi --bh_blinky 0`, `tt-smi --bh_blinky 0000:0a:00.0`, `tt-smi --bh_blinky /dev/tenstorrent/0`.
+- **`--use_luwen`:** bare integer UMD-style IDs are **not** accepted; use **`/dev/tenstorrent/<id>`** or a **PCI BDF**, e.g. `tt-smi --use_luwen --bh_blinky /dev/tenstorrent/0`.
+- **Interactive:** run from a real terminal. The tool starts blinking, then **press any key** to stop and turn the LED off.
+- **Do not combine** with **`-r` / `--reset`** in the same command.
+
+Use **`tt-smi -ls`** to look up UMD Chip ID, PCI BDF, and `/dev/tenstorrent/<n>` values before choosing targets.
+
+```bash
+tt-smi --bh_blinky                    # all Blackhole PCIe devices (UMD)
+tt-smi --bh_blinky 0                  # UMD logical id 0
+tt-smi --bh_blinky /dev/tenstorrent/2
+tt-smi --use_luwen --bh_blinky 0000:01:00.0
+```
+
 
 ## License
 

@@ -153,6 +153,19 @@ def parse_args():
         action="store_true",
         help="Skip waiting for Ethernet training post reset.",
     )
+    parser.add_argument(
+        "--bh_blinky",
+        metavar="TARGETS",
+        default=None,
+        nargs="*",
+        help=(
+            "LED blink (ARC TT_SMC_MSG_BLINKY / 0xC5) on Blackhole PCIe cards only "
+            "(not Wormhole or Galaxy). Same targets as --reset "
+            "(UMD IDs, PCI BDF, or /dev/tenstorrent/<n>). "
+            "Press any key to stop. With --use_luwen, UMD logical IDs are not supported."
+        ),
+        dest="bh_blinky",
+    )
     args = parser.parse_args()
     return args
 
@@ -214,6 +227,14 @@ def main():
     # os.environ["RUST_BACKTRACE"] = "full"
 
     args = parse_args()
+
+    if args.reset is not None and args.bh_blinky is not None:
+        print(
+            CMD_LINE_COLOR.RED,
+            "Use only one of --reset / -r or --bh_blinky.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(2)
 
     driver = get_driver_version()
     if not driver:
@@ -321,6 +342,18 @@ def main():
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
+
+    if args.bh_blinky is not None:
+        bh_blinky_input = parse_reset_input(args.bh_blinky)
+        backend = TTSMIBackend(
+            devices=devices,
+            umd_cluster_descriptor=cluster_descriptor,
+            fully_init=False,
+            pretty_output=is_tty,
+        )
+        backend.run_led_blinky(bh_blinky_input)
+        sys.exit(0)
+
     backend = TTSMIBackend(devices=devices, umd_cluster_descriptor=cluster_descriptor, pretty_output=is_tty)
 
     tt_smi_main(backend, args)
