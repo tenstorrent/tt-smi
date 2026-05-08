@@ -240,6 +240,7 @@ class Firmwares(ElasticModel):
     dm_bl_fw: str
     dm_app_fw: str
     tt_flash_version: str
+    gddr_fw: str
 
 
 @optional

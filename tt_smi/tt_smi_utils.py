@@ -66,6 +66,19 @@ def hex_to_semver_m3_fw(hexsemver: int):
     return f"{major}.{minor}.{patch}.{ver}"
 
 
+def hex_to_semver_gddr_fw(raw: int) -> str:
+    """
+    Blackhole GDDR/MRISC FW telemetry (TAG_GDDR_FW_VERSION; UMD key GDDR_FW_VERSION): upper 16 bits = major,
+    lower 16 bits = minor (same decoding as UMD for BH). Display as major.minor only.
+    Example: 0x2000f -> 2.15
+    """
+    if raw == 0 or raw == 0xFFFFFFFF:
+        return "N/A"
+    major = (raw >> 16) & 0xFFFF
+    minor = raw & 0xFFFF
+    return f"{major}.{minor}"
+
+
 def get_board_type(board_id: str) -> str:
     """
     Get board type from board ID string.

@@ -99,6 +99,7 @@ BH_TELEMETRY_LIST = [
     "TAG_DDR_SPEED",
     "TAG_ETH_FW_VERSION",
     "TAG_DDR_FW_VERSION",
+    "GDDR_FW_VERSION",  # TAG_GDDR_FW_VERSION for UMD(telemetry tag 25); BH GDDR/MRISC FW
     "TAG_BM_APP_FW_VERSION",
     "TAG_BM_BL_FW_VERSION",
     "TAG_FLASH_BUNDLE_VERSION",
@@ -141,6 +142,7 @@ FW_LIST_SNAPSHOT = [
     "eth_fw",
     "dm_bl_fw",
     "dm_app_fw",
+    "gddr_fw",
 ]
 
 FW_LIST_GUI = [
@@ -148,6 +150,7 @@ FW_LIST_GUI = [
     "cm_fw",
     "eth_fw",
     "dm_app_fw",
+    "gddr_fw",
 ]
 
 DEV_INFO_LIST = [
@@ -212,6 +215,7 @@ FIRMWARES_TABLE_HEADER = [
     "CM FW Version",
     "ETH FW Version",
     "DM App Version",
+    "GDDR FW Version",
 ]
 
 PCI_PROPERTIES = [
