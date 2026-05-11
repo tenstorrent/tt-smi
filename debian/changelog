@@ -1,3 +1,22 @@
+tt-smi (5.1.0) noble; urgency=medium
+
+  [ Aleksa Markovic ]
+  * Fix eth_train_skip option in UMD backend
+  * even better
+  * copilot review
+
+  [ Samridhi Bansal ]
+  * Add GDDR FW version to FW table
+  * Make the pyinstaller binaries actual release artifacts
+  * Remove the deb packages from the release, but they are still part of the build all workflow
+  * Move the reset parsing logic to its own file
+  * Rename files to not have unnecessary tt_smi_ prefix
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 11 May 2026 16:19:57 +0000
+
 tt-smi (5.0.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
