@@ -148,6 +148,14 @@ def parse_args():
         help="Use deprecated Luwen driver instead of UMD (default).",
     )
     parser.add_argument(
+        "--use_dal",
+        default=False,
+        action="store_true",
+        help=(
+            "[experimental] Use the tt-dal backend instead of UMD. "
+        ),
+    )
+    parser.add_argument(
         "--eth_train_skip",
         default=False,
         action="store_true",
@@ -233,7 +241,19 @@ def main():
     # Handle reset first, without setting up backend
     if args.reset is not None:
         reset_input = parse_smi_device_input(args.reset)
-        pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
+        if args.use_dal:
+            try:
+                from tt_smi.tt_smi_dal_backend import dal_pci_reset
+            except ImportError as e:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    f"--use_dal requires ttdal, which is not installed: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
+            dal_pci_reset(reset_input, reinit=not args.no_reinit, print_status=is_tty)
+        else:
+            pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
     # Handle ubb reset without backend
     if args.glx_reset:
@@ -299,29 +319,61 @@ def main():
         )
         sys.exit(1)
 
-    try:
-        if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.get_default_discovery_options())
-        else:
-            cluster_descriptor = None
-            devices = dict(enumerate(detect_chips_with_callback(
-                local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
-            )))
-    except Exception as e:
+    if args.use_dal:
+        try:
+            from tt_smi.tt_smi_dal_backend import TTDalBackend
+        except ImportError as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"--use_dal requires ttdal, which is not installed: {e}",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
         print(
-            CMD_LINE_COLOR.RED,
-            f"Error in detecting devices!\n{e}\n Exiting...",
+            CMD_LINE_COLOR.YELLOW,
+            "[experimental] Using tt-dal backend.",
             CMD_LINE_COLOR.ENDC,
         )
-        sys.exit(1)
-    if not devices:
-        print(
-            CMD_LINE_COLOR.RED,
-            "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-    backend = TTSMIBackend(devices=devices, umd_cluster_descriptor=cluster_descriptor, pretty_output=is_tty)
+        try:
+            backend = TTDalBackend(pretty_output=is_tty)
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error initialising tt-dal backend!\n{e}\n Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        if not backend.devices:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+    else:
+        try:
+            if not args.use_luwen:
+                cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.get_default_discovery_options())
+            else:
+                cluster_descriptor = None
+                devices = dict(enumerate(detect_chips_with_callback(
+                    local_only=args.local, ignore_ethernet=args.local, print_status=is_tty
+                )))
+        except Exception as e:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"Error in detecting devices!\n{e}\n Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        if not devices:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        backend = TTSMIBackend(devices=devices, umd_cluster_descriptor=cluster_descriptor, pretty_output=is_tty)
 
     tt_smi_main(backend, args)
 
