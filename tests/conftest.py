@@ -11,6 +11,19 @@ from tt_smi.backend import TTSMIBackend
 from tt_smi.constants import get_default_discovery_options
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 
+# tt-dal fixtures (experimental backend)
+
+
+@pytest.fixture(scope="function")
+@pytest.mark.requires_hardware
+def dal_backend():
+    """Return a TTDalBackend instance. Skipped if ttdal is not installed."""
+    pytest.importorskip("ttdal", reason="ttdal not installed")
+    from tt_smi.tt_smi_dal_backend import TTDalBackend
+    backend = TTDalBackend(pretty_output=False)
+    yield backend
+    backend.close()
+
 # Luwen fixtures
 
 
