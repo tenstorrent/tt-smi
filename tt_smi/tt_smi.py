@@ -26,8 +26,8 @@ from tt_smi.tt_smi_utils import check_is_galaxy, is_vm
 from tt_smi.tt_smi_reset import (
     pci_board_reset,
     glx_6u_trays_reset,
-    parse_reset_input,
 )
+from tt_smi.device_input import parse_smi_device_input
 from tt_smi.tt_smi_frontend import TTSMI
 
 
@@ -232,7 +232,7 @@ def main():
 
     # Handle reset first, without setting up backend
     if args.reset is not None:
-        reset_input = parse_reset_input(args.reset)
+        reset_input = parse_smi_device_input(args.reset)
         pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
     # Handle ubb reset without backend
