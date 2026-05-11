@@ -7,9 +7,9 @@ from typing import List, Tuple
 
 from pyluwen import pci_scan
 from tt_umd import PCIDevice
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_smi.tt_smi_utils import get_dev_id_from_bdf
-from tt_smi.tt_smi_reset import (
+from tt_smi.backend import TTSMIBackend
+from tt_smi.utils import get_dev_id_from_bdf
+from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
 )

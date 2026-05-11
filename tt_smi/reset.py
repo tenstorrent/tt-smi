@@ -17,7 +17,7 @@ from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
-from tt_smi.tt_smi_utils import get_dev_id_from_bdf
+from tt_smi.utils import get_dev_id_from_bdf
 from tt_smi.constants import get_default_discovery_options
 from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 from pyluwen import (

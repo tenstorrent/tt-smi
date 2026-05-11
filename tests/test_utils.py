@@ -3,7 +3,7 @@
 
 import pytest
 
-from tt_smi.tt_smi_utils import (
+from tt_smi.utils import (
     get_board_type,
     convert_signed_16_16_to_float,
     hex_to_semver_gddr_fw,

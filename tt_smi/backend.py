@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from pyluwen import PciChip
-from tt_smi.tt_smi_utils import (
+from tt_smi.utils import (
     LOG_FOLDER,
     hex_to_date,
     hex_to_semver_eth,

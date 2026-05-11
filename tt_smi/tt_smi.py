@@ -21,14 +21,14 @@ from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 from tt_tools_common.utils_common.system_utils import get_driver_version
 
 from tt_smi import constants
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_smi.tt_smi_utils import check_is_galaxy, is_vm
-from tt_smi.tt_smi_reset import (
+from tt_smi.backend import TTSMIBackend
+from tt_smi.utils import check_is_galaxy, is_vm
+from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
 )
 from tt_smi.device_input import parse_smi_device_input
-from tt_smi.tt_smi_frontend import TTSMI
+from tt_smi.frontend import TTSMI
 
 
 def parse_args():
