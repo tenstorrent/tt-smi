@@ -25,8 +25,8 @@ from tt_tools_common.ui_common.widgets import (
 from tt_tools_common.utils_common.system_utils import get_host_compatibility_info
 
 from . import constants
-from .tt_smi_backend import TTSMIBackend
-from .tt_smi_utils import hex_to_semver_eth, hex_to_semver_m3_fw
+from .backend import TTSMIBackend
+from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
 
 TextualKeyBindings = List[Tuple[str, str, str]]
 

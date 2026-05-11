@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple, Union
 
 from pyluwen import pci_scan, PciChip
 from tt_umd import PCIDevice, TopologyDiscovery, TTDevice, TopologyDiscoveryOptions
-from tt_smi.tt_smi_backend import TTSMIBackend
+from tt_smi.backend import TTSMIBackend
 from tt_smi.constants import get_default_discovery_options
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 
