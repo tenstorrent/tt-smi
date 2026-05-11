@@ -36,6 +36,8 @@ dependencies = [
   'tomli',
 ]
 
+optional-dependencies.ttdal = ["ttdal"]
+
 optional-dependencies.dev = [
   "black == 24.10.0; python_version >= '3.9'",
   "black == 24.8.0; python_version == '3.8'",
@@ -91,6 +93,9 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 # UV configuration for faster dependency management
+[tool.uv.sources]
+ttdal = { path = "../tt-dal/bind/py", editable = true }
+
 [dependency-groups]
 dev = [
   "black == 24.10.0; python_version >= '3.9'",
