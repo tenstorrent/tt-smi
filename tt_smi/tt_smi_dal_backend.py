@@ -138,6 +138,10 @@ class TTDalBackend(TTSMIBackend):
         # Wrap descriptors so the frontend's device.is_remote() calls work.
         dal_devices = {i: _DalDevice(dev) for i, dev in enumerate(self.devs)}
 
+        # Tracks devices whose last telemetry poll failed (session dead / mid-reset).
+        # Checked by the frontend via hasattr to colour the row red.
+        self.recovering: set = set()
+
         # use_umd=False (no cluster_descriptor) keeps the luwen code paths
         # active everywhere except the methods we explicitly override.
         super().__init__(
@@ -389,8 +393,9 @@ class TTDalBackend(TTSMIBackend):
             try:
                 self.smbus_telem_info[i] = self.get_smbus_board_info(i)
                 self.device_telemetrys[i] = self.get_chip_telemetry(i)
+                self.recovering.discard(i)
             except Exception:
-                pass
+                self.recovering.add(i)
 
     # ------------------------------------------------------------------
     # Snapshot helpers — drop is_remote() dependency

@@ -163,10 +163,17 @@ class TTSMI(App):
     def format_telemetry_rows(self) -> List[List[Text]]:
         """Format telemetry rows"""
         all_rows = []
+        recovering = getattr(self.backend, "recovering", set())
         for board_num in self.backend.devices:
             device_row = [
                 Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
             ]
+
+            if board_num in recovering:
+                for _ in constants.TELEM_LIST:
+                    device_row.append(Text("···", style=self.text_theme["attention"], justify="center"))
+                all_rows.append(device_row)
+                continue
 
             for telem in constants.TELEM_LIST:
                 val = self.backend.device_telemetrys[board_num][telem]
