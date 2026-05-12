@@ -104,6 +104,7 @@ jobs:
             --collect-all tt_tools_common \
             --collect-all tt_umd \
             --collect-all pyluwen \
+            --add-data "tt_smi/tt_smi_style.css:tt_smi" \
             /tmp/pybuild/bin/tt-smi
 
       - name: Smoke test (no Tenstorrent hardware required)
