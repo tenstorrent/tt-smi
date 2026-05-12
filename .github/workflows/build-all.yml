@@ -33,18 +33,20 @@ jobs:
           echo "What started this ref: ${{ github.ref }}"
           echo "What started this sha: ${{ github.sha }}"
           echo "Did we get a ref pass in? ${{ inputs.ref }}"
-  builddebian:
-    needs:
-      - build_all_depends
-    name: Build Ubuntu / Debian
-    uses: ./.github/workflows/build-debian.yml
-    with:
-      ref: ${{ inputs.ref }}
-      MAJOR:  ${{ inputs.MAJOR }}
-      MINOR:  ${{ inputs.MINOR }}
-      PATCH:  ${{ inputs.PATCH }}
-      NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
-    secrets: inherit
+  
+  # We're not building Debian packages anymore, but leaving this here for reference.
+  # builddebian:
+  #   needs:
+  #     - build_all_depends
+  #   name: Build Ubuntu / Debian
+  #   uses: ./.github/workflows/build-debian.yml
+  #   with:
+  #     ref: ${{ inputs.ref }}
+  #     MAJOR:  ${{ inputs.MAJOR }}
+  #     MINOR:  ${{ inputs.MINOR }}
+  #     PATCH:  ${{ inputs.PATCH }}
+  #     NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
+  #   secrets: inherit
   buildpypi:
     needs:
       - build_all_depends
