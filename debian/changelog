@@ -1,3 +1,14 @@
+tt-smi (5.1.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * add the missing css file to data
+  * Sunset the debian build for tt-smi
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.1.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 12 May 2026 22:15:47 +0000
+
 tt-smi (5.1.0) noble; urgency=medium
 
   [ Aleksa Markovic ]
