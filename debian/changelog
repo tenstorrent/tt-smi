@@ -1,3 +1,13 @@
+tt-smi (5.2.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Update UMD from 0.9.4 -> 0.9.5
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.2.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 14 May 2026 17:23:48 +0000
+
 tt-smi (5.1.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
