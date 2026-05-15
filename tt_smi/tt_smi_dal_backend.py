@@ -393,6 +393,7 @@ class TTDalBackend(TTSMIBackend):
             try:
                 self.smbus_telem_info[i] = self.get_smbus_board_info(i)
                 self.device_telemetrys[i] = self.get_chip_telemetry(i)
+                self.chip_limits[i] = self.get_chip_limits(i)
                 self.recovering.discard(i)
             except Exception:
                 self.recovering.add(i)
