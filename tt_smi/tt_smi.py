@@ -18,7 +18,7 @@ from importlib.metadata import version
 from tt_umd import TopologyDiscovery
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-from tt_tools_common.utils_common.system_utils import get_driver_version
+from tt_smi.utils import get_driver_version
 
 from tt_smi import constants
 from tt_smi.backend import TTSMIBackend

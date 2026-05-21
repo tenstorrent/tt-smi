@@ -7,7 +7,20 @@ from tt_smi.utils import (
     get_board_type,
     convert_signed_16_16_to_float,
     hex_to_semver_gddr_fw,
+    is_driver_version_at_least,
 )
+
+class TestDriverVersion:
+    def test_is_driver_version_at_least(self):
+        assert is_driver_version_at_least("1.34.0", "1.34.0")
+        assert is_driver_version_at_least("2.0.0", "1.34.0")
+        assert not is_driver_version_at_least("1.34.0", "1.35.0")
+        assert is_driver_version_at_least("2.7.1-pre", "2.7.0")
+
+    def test_is_driver_version_at_least_no_driver(self):
+        with pytest.raises(ValueError, match="No Tenstorrent driver"):
+            is_driver_version_at_least(None, "2.0.0")
+
 
 class TestGetBoardType:
     @pytest.mark.parametrize(
