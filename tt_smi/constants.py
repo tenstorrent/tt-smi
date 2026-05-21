@@ -130,6 +130,7 @@ LIMITS = [
     "therm_trip_l1_limit",
     "thm_limit",
     "bus_peak_limit",
+    "fan_rpm_limit",
 ]
 
 # leaving this intact for the snapshot version of the firmware list 
@@ -205,7 +206,7 @@ TELEMETRY_TABLE_HEADER = [
     "AICLK (MHz)",
     "Core Power (W)",
     "Core Temp (°C)",
-    "Fan Speed (%)",
+    "Fan Speed (RPM)",
     "Heartbeat",
 ]
 
