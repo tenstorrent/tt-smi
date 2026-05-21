@@ -4,7 +4,6 @@
 """Textual TUI: layout, tables, telemetry worker, and Rich formatting for TT-SMI."""
 
 import time
-from importlib.resources import files
 from importlib.metadata import version
 from typing import List, Tuple, Union
 
@@ -15,18 +14,17 @@ from textual.widgets import Footer, TabbedContent
 from textual.containers import Container, Vertical
 from textual.worker import get_current_worker, Worker, WorkerState
 
-from tt_tools_common.ui_common.themes import create_tt_tools_theme
-from tt_tools_common.ui_common.widgets import (
+from . import constants
+from .backend import TTSMIBackend
+from .ui_utils import (
     TTHeader,
     TTDataTable,
     TTHostCompatibilityMenu,
     TTHelperMenuBox,
+    create_tt_tools_theme,
+    get_common_style_css_path,
 )
-from tt_tools_common.utils_common.system_utils import get_host_compatibility_info
-
-from . import constants
-from .backend import TTSMIBackend
-from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
+from .utils import get_host_compatibility_info, hex_to_semver_eth, hex_to_semver_m3_fw
 
 TextualKeyBindings = List[Tuple[str, str, str]]
 
@@ -44,16 +42,7 @@ class TTSMI(App):
         ("3", "tab_three", "Firmware tab"),
     ]
 
-    try:
-        common_style_file_path = files("tt_tools_common.ui_common").joinpath(
-            "common_style.css"
-        )
-    except Exception:
-        raise Exception(
-            "Cannot find common_style.css file, please make sure tt_tools_common lib is installed correctly."
-        )
-
-    CSS_PATH = [f"{common_style_file_path}", "tt_smi_style.css"]
+    CSS_PATH = [str(get_common_style_css_path()), "tt_smi_style.css"]
 
     def __init__(
         self,
