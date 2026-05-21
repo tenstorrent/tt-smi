@@ -11,13 +11,19 @@ Device-selection parsing for ``-r`` / ``--reset`` lives in
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
-from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
-from tt_smi.utils import get_dev_id_from_bdf
+from tt_smi.utils import (
+    get_dev_id_from_bdf,
+    get_driver_version,
+    is_driver_version_at_least,
+    IoctlResetFlags,
+    reset_device_ioctl,
+)
 from tt_smi.constants import get_default_discovery_options
 from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 from pyluwen import (
@@ -34,6 +40,45 @@ from tt_umd import (
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
 )
+
+MINIMUM_DRIVER_VERSION_GALAXY_SECONDARY_BUS_RESET = "2.7.0"
+
+
+def should_use_secondary_bus_reset(is_galaxy: bool) -> bool:
+    """
+    Whether to issue secondary bus reset (RESET_PCIE_LINK IOCTL) before ASIC reset.
+
+    Non-Galaxy systems always use secondary bus reset. Galaxy systems use it only
+    when KMD is >= 2.7.0.
+    """
+    if not is_galaxy:
+        return True
+    driver_version = get_driver_version()
+    if driver_version is None:
+        return False
+    return is_driver_version_at_least(
+        driver_version, MINIMUM_DRIVER_VERSION_GALAXY_SECONDARY_BUS_RESET
+    )
+
+
+def parallel_reset_device_ioctl(device_ids: List[int], flag: int) -> List[int]:
+    """
+    Issue reset ioctl on each device in parallel.
+
+    Returns interface IDs where the ioctl did not complete successfully.
+    """
+    if not device_ids:
+        return []
+
+    def ioctl_one(interface_id: int) -> tuple[int, bool]:
+        return interface_id, reset_device_ioctl(interface_id, flag)
+
+    failed: List[int] = []
+    with ThreadPoolExecutor(max_workers=len(device_ids)) as pool:
+        for interface_id, ok in pool.map(ioctl_one, device_ids):
+            if not ok:
+                failed.append(interface_id)
+    return failed
 
 
 def timed_wait(seconds):
@@ -132,7 +177,7 @@ def umd_pci_warm_reset(
             "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
             CMD_LINE_COLOR.ENDC,
         )
-    secondary_bus_reset = not is_galaxy
+    secondary_bus_reset = should_use_secondary_bus_reset(is_galaxy)
 
     reset_indices = reset_input.value
     if reset_input.type == SmiDeviceTargetKind.ALL:
@@ -219,7 +264,7 @@ def luwen_pci_reset(
             CMD_LINE_COLOR.ENDC,
         )
 
-    secondary_bus_reset = not is_galaxy
+    secondary_bus_reset = should_use_secondary_bus_reset(is_galaxy)
     if reset_wh_pci_idx:
         WHChipReset().full_lds_reset(
             pci_interfaces=reset_wh_pci_idx, secondary_bus_reset=secondary_bus_reset
@@ -310,23 +355,39 @@ def glx_6u_trays_reset(
         CMD_LINE_COLOR.ENDC,
     )
 
-    # Issue USER_RESET ioctl on all devices before IPMI reset
     if use_umd:
-        user_reset_ids = list(PCIDevice.enumerate_devices())
+        device_ids = list(PCIDevice.enumerate_devices())
     else:
-        user_reset_ids = pci_scan()
-    print(
-        CMD_LINE_COLOR.BLUE,
-        f"Issuing USER_RESET on {len(user_reset_ids)} devices before IPMI reset...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    for interface_id in user_reset_ids:
-        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.USER_RESET):
+        device_ids = pci_scan()
+
+    if should_use_secondary_bus_reset(True):
+        print(
+            CMD_LINE_COLOR.BLUE,
+            f"Issuing RESET_PCIE_LINK on {len(device_ids)} devices before IPMI reset...",
+            CMD_LINE_COLOR.ENDC,
+        )
+        for interface_id in parallel_reset_device_ioctl(
+            device_ids, IoctlResetFlags.RESET_PCIE_LINK
+        ):
             print(
                 CMD_LINE_COLOR.YELLOW,
-                f"Warning: USER_RESET did not complete for device {interface_id}. Continuing...",
+                f"Warning: Secondary bus reset not completed for device /dev/tenstorrent/{interface_id}. Continuing...",
                 CMD_LINE_COLOR.ENDC,
             )
+
+    print(
+        CMD_LINE_COLOR.BLUE,
+        f"Issuing USER_RESET on {len(device_ids)} devices before IPMI reset...",
+        CMD_LINE_COLOR.ENDC,
+    )
+    for interface_id in parallel_reset_device_ioctl(
+        device_ids, IoctlResetFlags.USER_RESET
+    ):
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"Warning: USER_RESET did not complete for device /dev/tenstorrent/{interface_id}. Continuing...",
+            CMD_LINE_COLOR.ENDC,
+        )
 
     # IPMI reset
     if use_umd:
@@ -334,6 +395,7 @@ def glx_6u_trays_reset(
     else:
         run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
     timed_wait(30)
+    # This function waits for all 32 chips to reappear on the bus.
     run_ubb_wait_for_driver_load()
 
     # Issue POST_RESET ioctl on all devices after they reappear
@@ -346,14 +408,17 @@ def glx_6u_trays_reset(
         f"Issuing POST_RESET on {len(post_reset_ids)} devices after IPMI reset...",
         CMD_LINE_COLOR.ENDC,
     )
-    for interface_id in post_reset_ids:
-        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.POST_RESET):
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error: POST_RESET failed for device {interface_id}.",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
+    post_reset_failed = parallel_reset_device_ioctl(
+        post_reset_ids, IoctlResetFlags.POST_RESET
+    )
+    for interface_id in post_reset_failed:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Error: POST_RESET failed for device /dev/tenstorrent/{interface_id}.",
+            CMD_LINE_COLOR.ENDC,
+        )
+    if post_reset_failed:
+        sys.exit(1)
 
     print(
         CMD_LINE_COLOR.PURPLE,
@@ -368,9 +433,18 @@ def glx_6u_trays_reset(
         )
         sys.exit(0)
     try:
-        chips = detect_chips_with_callback(
-            local_only=True, ignore_ethernet=True, print_status=print_status
-        )
+        if use_umd:
+            options = get_default_discovery_options()
+            options.discover_remote_devices = False
+            options.wait_on_ethernet_link_training = False
+            _, devices = TopologyDiscovery.discover(options=options)
+            chip_count = len(devices)
+        else:
+            os.environ["RUST_BACKTRACE"] = "full"
+            chips = detect_chips_with_callback(
+                local_only=True, ignore_ethernet=True, print_status=print_status
+            )
+            chip_count = len(chips)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -381,7 +455,7 @@ def glx_6u_trays_reset(
 
     print(
         CMD_LINE_COLOR.GREEN,
-        f"Re-initialized {len(chips)} boards after reset. Exiting...",
+        f"Re-initialized {chip_count} boards after reset. Exiting...",
         CMD_LINE_COLOR.ENDC,
     )
     sys.exit(0)
