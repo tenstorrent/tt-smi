@@ -139,9 +139,18 @@ To bring up the tt-smi GUI run
 ```
 $ tt-smi
 ```
-This is the default mode where the user can view device information, telemetry, and firmware versions.
+This is the default mode where the user can view device information, telemetry, firmware versions, and (when UMD is in use) the chip-to-chip ethernet topology.
 
 ![tt-smi](images/tt_smi.png)
+
+The TUI has four tabs:
+
+| Key | Tab | Notes |
+| --- | --- | --- |
+| `1` | Device information | bus id, board type, board id, coords, DRAM, PCIe link |
+| `2` | Telemetry | voltage, current, AICLK, power, ASIC temperature, fan, heartbeat (refreshes ~10 Hz) |
+| `3` | Firmware versions | bundle, CM, ETH, DM app, GDDR firmware versions |
+| `4` | Topology | per-device ethernet links and a topology diagram (UMD only) |
 
 ### Keyboard Shortcuts
 All GUI keyboard shortcuts can be found in the help menu that user can bring up by pressing the `h` key or clicking the `help` button on the footer.
@@ -288,6 +297,96 @@ Gathering Information ━━━━━━━━━━━━━━━━━━━�
 │ 4           │ 0x40        │ 24,25,26,27,28,29,30,31 │
 └─────────────┴─────────────┴─────────────────────────┘
 ```
+
+## Topology
+
+TT-SMI can report the chip-to-chip ethernet topology of all detected Tenstorrent
+devices, either inside the TUI (tab `4`) or from the command line via the
+`--topology` flag.
+
+The topology view is built from the UMD `ClusterDescriptor`, so it is **only
+available when running with the UMD backend** (the default). If you pass
+`--use_luwen`, the topology view is disabled.
+
+### CLI usage
+
+`--topology` accepts one of three output formats. When the flag is given
+without a value, the default is `table`:
+
+| Invocation | Output |
+| --- | --- |
+| `tt-smi --topology`         | Rich table with one row per chip / ethernet link |
+| `tt-smi --topology table`   | Same as above |
+| `tt-smi --topology json`    | Machine-readable JSON dump (one entry per device) |
+| `tt-smi --topology diagram` | Unicode topology diagram — auto-selects `single` / `pair` / ring / adjacency listing |
+
+Examples:
+
+```
+$ tt-smi --topology
+            Device Topology (chip-to-chip ethernet)
+┏━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┓
+┃ # ┃ Board ┃ Attach ┃ Eth Ch ┃ -> Chip ┃ -> Ch ┃    Link     ┃
+┡━━━╇━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━┩
+│ 0 │ p150b │  PCIe  │   0    │    1    │   8   │   active    │
+│   │       │        │   1    │    1    │   9   │   active    │
+│ 1 │ p150b │  PCIe  │   8    │    0    │   0   │   active    │
+│   │       │        │   9    │    0    │   1   │   active    │
+└───┴───────┴────────┴────────┴─────────┴───────┴─────────────┘
+```
+
+```
+$ tt-smi --topology diagram
+             ┌── 4ch        ──┐
+             │   (ch 0-3)     │
+            [0]              [1]
+             │                │
+4ch          │                │    4ch
+(ch 8-11)    │                │    (ch 4-7)
+             │                │
+            [3]              [2]
+             │   (ch 12-15)   │
+             └── 4ch        ──┘
+```
+
+The diagram automatically picks the most readable layout based on the detected
+shape:
+
+- **1 chip**: shows the chip token with a "single device" annotation
+- **2 chips**: a two-row pair (`[a] ── 4ch ── [b]` plus a channel-range line)
+- **3 chips**: a compact triangle
+- **4 chips (ring)**: the boxed diagram shown above
+- **5+ chip ring**: a ring listing `[0] → [1] → … → [0]` followed by per-edge entries
+- **other shapes**: a per-chip adjacency listing as a graceful fallback
+
+Each edge label is split into two lines:
+- The first line shows the **channel count** (e.g. `4ch`).
+- The second line shows the **channel range** (e.g. `(ch 4-7)`), with a
+  `n/n up` warn suffix when some channels are down. For example, `4ch` /
+  `(ch 0-3) 2/4 up` means four channels exist but only two are up.
+
+```
+$ tt-smi --topology json | jq '."0".links[0]'
+{
+  "eth_ch": 0,
+  "rchip": 1,
+  "rchan": 8,
+  "active": true
+}
+```
+
+If you pipe the JSON or diagram output to a non-TTY (for example into `jq` or a
+log file), the output is the plain rendering with no terminal styling.
+
+### TUI tab 4
+
+In the TUI, switch to the topology tab with the `4` key. The left pane shows
+the topology diagram (same renderer as `--topology diagram`); the right pane
+shows the per-link table. Both update once on mount; they do not refresh while
+the TUI is running because the cluster topology is static for a given session.
+
+If you launch tt-smi with `--use_luwen`, the topology tab and `--topology`
+flag both report that they require UMD mode and exit; no topology is rendered.
 
 ## Snapshots
 

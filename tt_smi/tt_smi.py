@@ -98,6 +98,18 @@ def parse_args():
         dest="reset",
     )
     parser.add_argument(
+        "--topology",
+        nargs="?",
+        const="table",
+        default=None,
+        choices=["table", "json", "diagram"],
+        help=(
+            "Print chip-to-chip ethernet topology and exit. "
+            "Format: 'table' (default when flag is bare), 'json', or 'diagram'. "
+            "Requires UMD backend (not compatible with --use_luwen)."
+        ),
+    )
+    parser.add_argument(
         "--snapshot_no_tty",
         default=False,
         action="store_true",
@@ -185,6 +197,15 @@ def tt_smi_main(backend: TTSMIBackend, args):
         sys.exit(0)
     if args.snapshot or args.filename == "-":  # If we pass '-s' or '-f -"
         backend.print_logs_to_stdout(pretty=backend.pretty_output)
+        sys.exit(0)
+    if args.topology is not None:
+        if not backend.use_umd:
+            print(
+                f"{CMD_LINE_COLOR.RED}Topology requires UMD mode "
+                f"(disabled with --use_luwen).{CMD_LINE_COLOR.ENDC}"
+            )
+            sys.exit(1)
+        backend.print_topology_to_stdout(fmt=args.topology, pretty=backend.pretty_output)
         sys.exit(0)
     if args.filename is not False:  # The default is None, which is falsy
         file = backend.save_logs_to_file(args.filename)

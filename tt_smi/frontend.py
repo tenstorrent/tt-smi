@@ -11,8 +11,8 @@ from typing import List, Tuple, Union
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
-from textual.widgets import Footer, TabbedContent
-from textual.containers import Container, Vertical
+from textual.widgets import Footer, Static, TabbedContent
+from textual.containers import Container, Horizontal, Vertical
 from textual.worker import get_current_worker, Worker, WorkerState
 
 from tt_tools_common.ui_common.themes import create_tt_tools_theme
@@ -42,6 +42,7 @@ class TTSMI(App):
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
+        ("4", "tab_four", "Topology tab"),
     ]
 
     try:
@@ -91,7 +92,7 @@ class TTSMI(App):
                     data=get_host_compatibility_info(),
                 )
             with TabbedContent(
-                "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
+                "Information (1)", "Telemetry (2)", "FW Version (3)", "Topology (4)", id="tab_container"
             ):
                 yield TTDataTable(
                     title="Device Information",
@@ -111,6 +112,16 @@ class TTSMI(App):
                     header=constants.FIRMWARES_TABLE_HEADER,
                     header_height=2,
                 )
+                yield Horizontal(
+                    Static("", id="tt_smi_topology_diagram", classes="topology-diagram"),
+                    TTDataTable(
+                        title="Device Topology",
+                        id="tt_smi_topology",
+                        header=constants.TOPOLOGY_TABLE_HEADER,
+                        header_height=2,
+                    ),
+                    id="topology_layout",
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -126,6 +137,29 @@ class TTSMI(App):
         firmware_table = self.get_widget_by_id(id="tt_smi_firmware")
         firmware_table.dt.cursor_type = "none"
         firmware_table.dt.add_rows(self.format_firmware_rows())
+
+        topology_table = self.get_widget_by_id(id="tt_smi_topology")
+        topology_table.dt.cursor_type = "none"
+        topology_table.dt.add_rows(self.format_topology_rows())
+        try:
+            diagram_widget = self.get_widget_by_id(id="tt_smi_topology_diagram")
+            title = self.backend.topology_kind_label()
+            rendered = self.backend.render_topology_diagram_rich(theme=self.text_theme)
+            diagram_widget.border_title = title
+            diagram_widget.update(rendered)
+            # Dynamic width: size the diagram pane to actual content width
+            # (longest rendered line) plus border title width plus chrome
+            # (border 2 + padding 4). The CSS bounds (#tt_smi_topology_diagram
+            # min-width: 24 / max-width: 100) clamp the final value.
+            plain_lines = rendered.plain.split("\n")
+            content_w = max((len(line) for line in plain_lines), default=0)
+            # Border title needs ``─ title ─`` framing inside the border, so
+            # reserve title length + 2 dashes worth of breathing room.
+            title_w = len(title) + 2
+            chrome = 6  # border (2) + horizontal padding (2 each side)
+            diagram_widget.styles.width = max(content_w, title_w) + chrome
+        except NoMatches:
+            pass
 
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
@@ -282,6 +316,47 @@ class TTSMI(App):
         ]
         cur_symbol = int(input_secs) % len(symbols)
         return symbols[cur_symbol]
+
+    def format_topology_rows(self) -> List[List[Text]]:
+        """Format device topology rows (chip-to-chip ethernet + attach type)"""
+        thm = self.text_theme
+        all_rows = []
+        if not self.backend.use_umd:
+            # Pad to TOPOLOGY_TABLE_HEADER's 7 columns so TTDataTable does not
+            # error on a row-length mismatch.
+            msg = Text("Topology requires UMD mode (disabled with --use_luwen)",
+                       style=thm["attention"])
+            empty = Text("")
+            return [[msg, empty, empty, empty, empty, empty, empty]]
+        for i in self.backend.devices:
+            t = self.backend.get_topology_info(i)
+            head = [
+                Text(f"{i}", style=thm["yellow_bold"], justify="center"),
+                Text(str(t.get("board", "?")), style=thm["text_green"], justify="center"),
+                Text(t.get("attach", "?") + (" R" if t.get("is_remote") else ""),
+                     style=thm["text_green"], justify="center"),
+            ]
+            links = t.get("links", [])
+            if not links:
+                note = "error" if t.get("error") else "no eth link"
+                all_rows.append(head + [
+                    Text("-", justify="center"),
+                    Text("-", justify="center"),
+                    Text("-", justify="center"),
+                    Text(note, style=thm["gray"], justify="center"),
+                ])
+                continue
+            for n, lk in enumerate(links):
+                prefix = head if n == 0 else [Text(""), Text(""), Text("")]
+                all_rows.append(prefix + [
+                    Text(str(lk["eth_ch"]), justify="center"),
+                    Text(str(lk["rchip"]), style=thm["yellow_bold"], justify="center"),
+                    Text(str(lk["rchan"]), justify="center"),
+                    Text("active" if lk["active"] else "down",
+                         style=thm["text_green"] if lk["active"] else thm["attention"],
+                         justify="center"),
+                ])
+        return all_rows
 
     def format_device_info_rows(self):
         """Format device info rows"""
@@ -505,6 +580,10 @@ class TTSMI(App):
     def action_tab_three(self) -> None:
         """Switch to read-only tab"""
         self.query_one(TabbedContent).active = "tab-3"
+
+    def action_tab_four(self) -> None:
+        """Switch to topology tab"""
+        self.query_one(TabbedContent).active = "tab-4"
 
     def action_help(self) -> None:
         """Pop up the help menu"""

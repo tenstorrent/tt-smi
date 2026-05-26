@@ -4,6 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 */
 
 $green: #1eb57d;
+$yellow: #ffd10a;
 
 #app_grid {
   layout: grid;
@@ -109,4 +110,50 @@ TTTestOutput {
   background: $surface;
   color: white;
 
+}
+
+#topology_layout {
+  layout: horizontal;
+  height: 1fr;
+  width: 1fr;
+  /* Shared horizontal scrollbar across the diagram pane and the topology
+     table. When the inner content exceeds the available terminal width the
+     whole row (diagram + table) scrolls horizontally as one unit. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#tt_smi_topology_diagram {
+  padding: 1 2;
+  /* Width is set DYNAMICALLY at mount time by frontend.on_mount() based on
+     the rendered diagram's actual content width + border title width + chrome
+     (border 2 + padding 4). CSS provides safety bounds only:
+     - min-width 24: enough to render the longest border title
+       ("Topology · single chip" = 22 chars) plus framing.
+     - max-width 100: avoid monopolizing wide terminals when the diagram is
+       a long ring listing or adjacency dump. */
+  min-width: 24;
+  max-width: 100;
+  height: 1fr;
+  border: solid $green;
+  /* Match TTDataTable border-title color (defined in tt_tools_common's
+     common_style.css as ``* { border-title-color: $yellow; }``) so the
+     topology diagram pane title looks consistent with the Device
+     Information / Telemetry / Firmware / Topology table titles in the
+     other tabs. */
+  border-title-color: $yellow;
+  border-title-style: bold;
+  border-title-align: left;
+  background: $surface;
+  content-align: left middle;
+  overflow-y: auto;
+}
+
+#tt_smi_topology {
+  /* Reserve enough width for the 7-column TOPOLOGY_TABLE_HEADER plus a few
+     wide rows; the parent's overflow-x kicks in if the terminal is narrower
+     than diagram + table combined. */
+  width: 1fr;
+  min-width: 80;
+  height: 1fr;
 }
