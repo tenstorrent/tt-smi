@@ -414,18 +414,35 @@ class TTSMIBackend:
         return processes
 
     @staticmethod
-    def _get_cmdline(pid):
+    def _sanitize_proc_bytes(raw: bytes) -> str:
+        """Replace NUL/LF with spaces and backslash-escape non-printable bytes.
+
+        /proc fields are not guaranteed to be valid in any text encoding — the
+        kernel only guarantees NUL-termination — so we read binary and escape.
+        """
+        out = []
+        for b in raw:
+            if b == 0x00 or b == 0x0A:
+                out.append(" ")
+            elif 0x20 <= b <= 0x7E:
+                out.append(chr(b))
+            else:
+                out.append(f"\\x{b:02x}")
+        return "".join(out).strip()
+
+    @classmethod
+    def _get_cmdline(cls, pid):
         """Read command line for a process."""
         try:
-            with open(f"/proc/{pid}/cmdline") as f:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
                 raw = f.read()
             if raw:
-                return raw.replace("\0", " ").replace("\n", " ").strip()
+                return cls._sanitize_proc_bytes(raw)
         except OSError:
             pass
         try:
-            with open(f"/proc/{pid}/comm") as f:
-                return f.read().strip()
+            with open(f"/proc/{pid}/comm", "rb") as f:
+                return cls._sanitize_proc_bytes(f.read())
         except OSError:
             return "?"
 
