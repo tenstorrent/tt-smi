@@ -183,7 +183,7 @@ class TTSMIBackend:
             self.log.device_info[i].limits = self.chip_limits[i]
 
         self.update_processes()
-        self.log.processes = self.device_processes
+        self.log.processes = [log.DeviceProcess(**p) for p in self.device_processes]
 
         return self.log.get_clean_json_string()
 

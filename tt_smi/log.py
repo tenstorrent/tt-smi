@@ -265,12 +265,20 @@ class TTSMIDeviceLog(ElasticModel):
 
 
 @optional
+class DeviceProcess(ElasticModel):
+    pid: int
+    user: str
+    device: int
+    cmdline: str
+
+
+@optional
 class TTSMILog(ElasticModel):
     time: datetime.datetime
     host_info: HostInfo
     host_sw_vers: HostSWVersions
     device_info: List[TTSMIDeviceLog]
-    processes: List[dict]
+    processes: List[DeviceProcess]
 
     def get_clean_json_string(self):
         """Returns a cleaned json string"""
