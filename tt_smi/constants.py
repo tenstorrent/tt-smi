@@ -8,11 +8,13 @@ from tt_umd import (
     TopologyDiscoveryOptions,
 )
 
-SMBUS_TELEMETRY_OPTIONS = TopologyDiscoveryOptions()
-SMBUS_TELEMETRY_OPTIONS.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
-SMBUS_TELEMETRY_OPTIONS.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
+def get_default_discovery_options():
+    options = TopologyDiscoveryOptions()
+    options.eth_fw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+    options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
+    options.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
+    options.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
+    return options
 
 SMBUS_TELEMETRY_LIST = [
     "BOARD_ID",
@@ -97,6 +99,7 @@ BH_TELEMETRY_LIST = [
     "TAG_DDR_SPEED",
     "TAG_ETH_FW_VERSION",
     "TAG_DDR_FW_VERSION",
+    "GDDR_FW_VERSION",  # TAG_GDDR_FW_VERSION for UMD(telemetry tag 25); BH GDDR/MRISC FW
     "TAG_BM_APP_FW_VERSION",
     "TAG_BM_BL_FW_VERSION",
     "TAG_FLASH_BUNDLE_VERSION",
@@ -127,6 +130,7 @@ LIMITS = [
     "therm_trip_l1_limit",
     "thm_limit",
     "bus_peak_limit",
+    "fan_rpm_limit",
 ]
 
 # leaving this intact for the snapshot version of the firmware list 
@@ -139,6 +143,7 @@ FW_LIST_SNAPSHOT = [
     "eth_fw",
     "dm_bl_fw",
     "dm_app_fw",
+    "gddr_fw",
 ]
 
 FW_LIST_GUI = [
@@ -146,6 +151,7 @@ FW_LIST_GUI = [
     "cm_fw",
     "eth_fw",
     "dm_app_fw",
+    "gddr_fw",
 ]
 
 DEV_INFO_LIST = [
@@ -200,7 +206,7 @@ TELEMETRY_TABLE_HEADER = [
     "AICLK (MHz)",
     "Core Power (W)",
     "Core Temp (°C)",
-    "Fan Speed (%)",
+    "Fan Speed (RPM)",
     "Heartbeat",
 ]
 
@@ -210,6 +216,7 @@ FIRMWARES_TABLE_HEADER = [
     "CM FW Version",
     "ETH FW Version",
     "DM App Version",
+    "GDDR FW Version",
 ]
 
 PROCESSES_TABLE_HEADER = [

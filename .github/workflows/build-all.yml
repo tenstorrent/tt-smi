@@ -1,5 +1,7 @@
 name: Build All
 run-name: Build All
+permissions:
+  contents: read
 on:
   workflow_dispatch:
   workflow_call:
@@ -31,22 +33,33 @@ jobs:
           echo "What started this ref: ${{ github.ref }}"
           echo "What started this sha: ${{ github.sha }}"
           echo "Did we get a ref pass in? ${{ inputs.ref }}"
-  builddebian:
-    needs:
-      - build_all_depends
-    name: Build Ubuntu / Debian
-    uses: ./.github/workflows/build-debian.yml
-    with:
-      ref: ${{ inputs.ref }}
-      MAJOR:  ${{ inputs.MAJOR }}
-      MINOR:  ${{ inputs.MINOR }}
-      PATCH:  ${{ inputs.PATCH }}
-      NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
-    secrets: inherit
+  
+  # We're not building Debian packages anymore, but leaving this here for reference.
+  # builddebian:
+  #   needs:
+  #     - build_all_depends
+  #   name: Build Ubuntu / Debian
+  #   uses: ./.github/workflows/build-debian.yml
+  #   with:
+  #     ref: ${{ inputs.ref }}
+  #     MAJOR:  ${{ inputs.MAJOR }}
+  #     MINOR:  ${{ inputs.MINOR }}
+  #     PATCH:  ${{ inputs.PATCH }}
+  #     NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
+  #   secrets: inherit
   buildpypi:
     needs:
       - build_all_depends
     uses: ./.github/workflows/build-pypi.yml
+    with:
+      ref: ${{ inputs.ref }}
+    secrets: inherit
+  buildpyinstaller:
+    needs:
+      - build_all_depends
+      - buildpypi
+    name: Build PyInstaller binary
+    uses: ./.github/workflows/build-pyinstaller.yml
     with:
       ref: ${{ inputs.ref }}
     secrets: inherit

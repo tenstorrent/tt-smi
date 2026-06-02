@@ -3,7 +3,11 @@
 
 import pytest
 
-from tt_smi.tt_smi_utils import get_board_type, convert_signed_16_16_to_float
+from tt_smi.utils import (
+    get_board_type,
+    convert_signed_16_16_to_float,
+    hex_to_semver_gddr_fw,
+)
 
 class TestGetBoardType:
     @pytest.mark.parametrize(
@@ -78,3 +82,19 @@ class TestDataFormatting:
     def test_convert_signed_16_16_to_float(self, raw, expected):
         """Test converting signed 16.16 fixed-point number to float."""
         assert convert_signed_16_16_to_float(raw) == pytest.approx(expected)
+
+
+class TestHexToSemverGddrFw:
+    """BH GDDR/MRISC FW: major = high 16 bits, minor = low 16 bits; display major.minor."""
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            (0x2000F, "2.15"),
+            (0x0002000F, "2.15"),
+            (0x0, "N/A"),
+            (0xFFFFFFFF, "N/A"),
+        ],
+    )
+    def test_hex_to_semver_gddr_fw(self, raw, expected):
+        assert hex_to_semver_gddr_fw(raw) == expected

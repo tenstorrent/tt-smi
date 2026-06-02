@@ -21,14 +21,14 @@ from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 from tt_tools_common.utils_common.system_utils import get_driver_version
 
 from tt_smi import constants
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_smi.tt_smi_utils import check_is_galaxy, is_vm
-from tt_smi.tt_smi_reset import (
+from tt_smi.backend import TTSMIBackend
+from tt_smi.utils import check_is_galaxy, is_vm
+from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
-    parse_reset_input,
 )
-from tt_smi.tt_smi_frontend import TTSMI
+from tt_smi.device_input import parse_smi_device_input
+from tt_smi.frontend import TTSMI
 
 
 def parse_args():
@@ -232,7 +232,7 @@ def main():
 
     # Handle reset first, without setting up backend
     if args.reset is not None:
-        reset_input = parse_reset_input(args.reset)
+        reset_input = parse_smi_device_input(args.reset)
         pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
     # Handle ubb reset without backend
@@ -292,21 +292,16 @@ def main():
         # All went well - exit
         sys.exit(0)
     if args.glx_reset_tray is not None:
-        # Reset a specific tray on the galaxy
-        try:
-            tray_num_bitmask = hex(1 << (int(args.glx_reset_tray) - 1))
-            glx_6u_trays_reset(reinit=not(args.no_reinit), ubb_num=tray_num_bitmask, dev_num="0xFF", op_mode="0x0", reset_time="0xF", print_status=is_tty, use_umd=not args.use_luwen)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error in resetting galaxy 6u tray {args.glx_reset_tray}!\n{e}\n Exiting...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Galaxy 6U tray reset is no longer supported. Please use tt-smi -glx_reset to reset all chips or tt-smi -r.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
 
     try:
         if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.SMBUS_TELEMETRY_OPTIONS)
+            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.get_default_discovery_options())
         else:
             cluster_descriptor = None
             devices = dict(enumerate(detect_chips_with_callback(

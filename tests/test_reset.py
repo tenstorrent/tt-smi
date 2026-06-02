@@ -7,131 +7,153 @@ from typing import List, Tuple
 
 from pyluwen import pci_scan
 from tt_umd import PCIDevice
-from tt_smi.tt_smi_backend import TTSMIBackend
-from tt_smi.tt_smi_utils import get_dev_id_from_bdf
-from tt_smi.tt_smi_reset import (
-    _classify_reset_token,
-    parse_reset_input,
+from tt_smi.backend import TTSMIBackend
+from tt_smi.utils import get_dev_id_from_bdf
+from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
-    ResetInput,
-    ResetType,
+)
+from tt_smi.device_input import (
+    classify_single_input,
+    parse_smi_device_input,
+    SmiDeviceInput,
+    SmiDeviceTargetKind,
 )
 
 NUM_RESETS_STRESS_TEST = 10
 
 
 class TestParseResetInput:
-    """Unit tests for reset target parsing (no hardware)."""
+    """Unit tests for device-selection parsing used by ``tt-smi -r`` (no hardware)."""
 
-    # --- _classify_reset_token: UMD logical IDs (ints as strings) ---
+    # --- classify_single_input: UMD logical IDs (ints as strings) ---
 
     def test_classify_umd_logical_id_single(self):
-        assert _classify_reset_token("0") == ("int", 0)
-        assert _classify_reset_token(" 42 ") == ("int", 42)
-        assert _classify_reset_token("-1") == ("int", -1)
+        assert classify_single_input("0") == (SmiDeviceTargetKind.UMD_LOGICAL_ID, 0)
+        assert classify_single_input(" 42 ") == (SmiDeviceTargetKind.UMD_LOGICAL_ID, 42)
+        assert classify_single_input("-1") == (SmiDeviceTargetKind.UMD_LOGICAL_ID, -1)
 
     # --- PCI BDF ---
 
     def test_classify_pci_bdf(self):
-        assert _classify_reset_token("0000:0a:00.0") == ("bdf", "0000:0a:00.0")
-        assert _classify_reset_token("ABCD:EF:01.2") == ("bdf", "ABCD:EF:01.2")
+        assert classify_single_input("0000:0a:00.0") == (
+            SmiDeviceTargetKind.PCI_BDF,
+            "0000:0a:00.0",
+        )
+        assert classify_single_input("ABCD:EF:01.2") == (
+            SmiDeviceTargetKind.PCI_BDF,
+            "ABCD:EF:01.2",
+        )
 
     def test_classify_bdf_rejects_short_domain(self):
-        with pytest.raises(ValueError, match="Invalid reset target"):
-            _classify_reset_token("0a:00.0")
+        with pytest.raises(ValueError, match="Invalid device target"):
+            classify_single_input("0a:00.0")
 
     # --- /dev/tenstorrent/<id> ---
 
     def test_classify_dev_tenstorrent_path(self):
-        assert _classify_reset_token("/dev/tenstorrent/0") == ("dev_path", 0)
-        assert _classify_reset_token("/dev/tenstorrent/12") == ("dev_path", 12)
+        assert classify_single_input("/dev/tenstorrent/0") == (
+            SmiDeviceTargetKind.DEV_TENSTORRENT_ID,
+            0,
+        )
+        assert classify_single_input("/dev/tenstorrent/12") == (
+            SmiDeviceTargetKind.DEV_TENSTORRENT_ID,
+            12,
+        )
 
     def test_classify_dev_path_rejects_non_numeric_suffix(self):
         with pytest.raises(ValueError, match="Invalid path"):
-            _classify_reset_token("/dev/tenstorrent/abc")
+            classify_single_input("/dev/tenstorrent/abc")
 
     def test_classify_dev_path_case_sensitive_prefix(self):
         """Only lowercase /dev/tenstorrent/ is accepted (not a filesystem path check)."""
-        with pytest.raises(ValueError, match="Invalid reset target"):
-            _classify_reset_token("/dev/Tenstorrent/0")
+        with pytest.raises(ValueError, match="Invalid device target"):
+            classify_single_input("/dev/Tenstorrent/0")
 
-    # --- invalid / special tokens ---
+    # --- invalid / special inputs ---
 
-    def test_classify_empty_token(self):
-        with pytest.raises(ValueError, match="Empty token"):
-            _classify_reset_token("")
+    def test_classify_empty_input(self):
+        with pytest.raises(ValueError, match="Empty input"):
+            classify_single_input("")
 
     def test_classify_all_is_reserved(self):
         with pytest.raises(ValueError, match="only argument"):
-            _classify_reset_token("all")
+            classify_single_input("all")
 
     def test_classify_garbage(self):
-        with pytest.raises(ValueError, match="Invalid reset target"):
-            _classify_reset_token("not-a-target")
+        with pytest.raises(ValueError, match="Invalid device target"):
+            classify_single_input("not-a-target")
 
-    # --- parse_reset_input: ALL ---
+    # --- parse_smi_device_input: ALL ---
 
     def test_parse_all_empty_or_none(self):
-        assert parse_reset_input(None) == ResetInput(type=ResetType.ALL, value=None)
-        assert parse_reset_input([]) == ResetInput(type=ResetType.ALL, value=None)
+        assert parse_smi_device_input(None) == SmiDeviceInput(
+            type=SmiDeviceTargetKind.ALL, value=None
+        )
+        assert parse_smi_device_input([]) == SmiDeviceInput(
+            type=SmiDeviceTargetKind.ALL, value=None
+        )
 
     def test_parse_all_explicit(self):
-        assert parse_reset_input(["all"]) == ResetInput(type=ResetType.ALL, value=None)
-        assert parse_reset_input([" ALL "]) == ResetInput(type=ResetType.ALL, value=None)
+        assert parse_smi_device_input(["all"]) == SmiDeviceInput(
+            type=SmiDeviceTargetKind.ALL, value=None
+        )
+        assert parse_smi_device_input([" ALL "]) == SmiDeviceInput(
+            type=SmiDeviceTargetKind.ALL, value=None
+        )
 
-    # --- parse_reset_input: homogeneous types ---
+    # --- parse_smi_device_input: homogeneous types ---
 
     def test_parse_umd_logical_ids_sorted_deduped(self):
-        r = parse_reset_input(["2", "0", "1", "0"])
-        assert r.type == ResetType.UMD_LOGICAL_ID
+        r = parse_smi_device_input(["2", "0", "1", "0"])
+        assert r.type == SmiDeviceTargetKind.UMD_LOGICAL_ID
         assert r.value == [0, 1, 2]
 
     def test_parse_umd_comma_separated_in_one_arg(self):
-        r = parse_reset_input(["0, 1 ,2"])
-        assert r.type == ResetType.UMD_LOGICAL_ID
+        r = parse_smi_device_input(["0, 1 ,2"])
+        assert r.type == SmiDeviceTargetKind.UMD_LOGICAL_ID
         assert r.value == [0, 1, 2]
 
     def test_parse_pci_bdf_list(self):
-        r = parse_reset_input(["0000:0a:00.0", "0000:0b:00.0"])
-        assert r.type == ResetType.PCI_BDF
+        r = parse_smi_device_input(["0000:0a:00.0", "0000:0b:00.0"])
+        assert r.type == SmiDeviceTargetKind.PCI_BDF
         assert r.value == ["0000:0a:00.0", "0000:0b:00.0"]
 
     def test_parse_pci_bdf_comma_separated(self):
-        r = parse_reset_input(["0000:0a:00.0,0000:0b:00.0"])
-        assert r.type == ResetType.PCI_BDF
+        r = parse_smi_device_input(["0000:0a:00.0,0000:0b:00.0"])
+        assert r.type == SmiDeviceTargetKind.PCI_BDF
         assert r.value == ["0000:0a:00.0", "0000:0b:00.0"]
 
     def test_parse_dev_tenstorrent_ids_sorted(self):
-        r = parse_reset_input(["/dev/tenstorrent/2", "/dev/tenstorrent/0"])
-        assert r.type == ResetType.DEV_TENSTORRENT_ID
+        r = parse_smi_device_input(["/dev/tenstorrent/2", "/dev/tenstorrent/0"])
+        assert r.type == SmiDeviceTargetKind.DEV_TENSTORRENT_ID
         assert r.value == [0, 2]
 
     def test_parse_dev_tenstorrent_comma_separated(self):
-        r = parse_reset_input(["/dev/tenstorrent/1,/dev/tenstorrent/0"])
-        assert r.type == ResetType.DEV_TENSTORRENT_ID
+        r = parse_smi_device_input(["/dev/tenstorrent/1,/dev/tenstorrent/0"])
+        assert r.type == SmiDeviceTargetKind.DEV_TENSTORRENT_ID
         assert r.value == [0, 1]
 
-    # --- parse_reset_input: mixed types -> exit 1 ---
+    # --- parse_smi_device_input: mixed kinds -> exit 1 ---
 
     def test_parse_mixed_int_and_bdf_exits(self):
         with pytest.raises(SystemExit) as exc:
-            parse_reset_input(["0", "0000:0a:00.0"])
+            parse_smi_device_input(["0", "0000:0a:00.0"])
         assert exc.value.code == 1
 
     def test_parse_mixed_int_and_dev_path_exits(self):
         with pytest.raises(SystemExit) as exc:
-            parse_reset_input(["0", "/dev/tenstorrent/0"])
+            parse_smi_device_input(["0", "/dev/tenstorrent/0"])
         assert exc.value.code == 1
 
     def test_parse_mixed_bdf_and_dev_path_exits(self):
         with pytest.raises(SystemExit) as exc:
-            parse_reset_input(["0000:0a:00.0", "/dev/tenstorrent/0"])
+            parse_smi_device_input(["0000:0a:00.0", "/dev/tenstorrent/0"])
         assert exc.value.code == 1
 
-    def test_parse_invalid_token_exits(self):
+    def test_parse_invalid_input_exits(self):
         with pytest.raises(SystemExit) as exc:
-            parse_reset_input(["bogus"])
+            parse_smi_device_input(["bogus"])
         assert exc.value.code == 1
 
 
@@ -151,9 +173,9 @@ class TestPciDriverReset:
         detected before and after.
         """
         pci_indices, use_umd = reset_test_config
-        # Match `tt-smi -r` / `tt-smi -r all`: reset all devices (ResetInput), not a raw index list.
+        # Match `tt-smi -r` / `tt-smi -r all`: reset all devices (SmiDeviceInput), not a raw index list.
         pci_board_reset(
-            ResetInput(type=ResetType.ALL, value=None),
+            SmiDeviceInput(type=SmiDeviceTargetKind.ALL, value=None),
             reinit=True,
             use_umd=use_umd,
         )
@@ -174,7 +196,7 @@ class TestPciDriverReset:
             pytest.skip("No device with UMD logical ID 0")
 
         pci_board_reset(
-            ResetInput(type=ResetType.UMD_LOGICAL_ID, value=[0]),
+            SmiDeviceInput(type=SmiDeviceTargetKind.UMD_LOGICAL_ID, value=[0]),
             reinit=True,
             use_umd=True,
         )
@@ -197,7 +219,7 @@ class TestPciDriverReset:
             pytest.skip("No local PCI BDF for first device (remote)")
         dev_id = get_dev_id_from_bdf(bdf)
         pci_board_reset(
-            ResetInput(type=ResetType.DEV_TENSTORRENT_ID, value=[dev_id]),
+            SmiDeviceInput(type=SmiDeviceTargetKind.DEV_TENSTORRENT_ID, value=[dev_id]),
             reinit=True,
             use_umd=use_umd,
         )
@@ -219,7 +241,7 @@ class TestPciDriverReset:
         if bdf == "N/A":
             pytest.skip("No local PCI BDF for first device (remote)")
         pci_board_reset(
-            ResetInput(type=ResetType.PCI_BDF, value=[bdf]),
+            SmiDeviceInput(type=SmiDeviceTargetKind.PCI_BDF, value=[bdf]),
             reinit=True,
             use_umd=use_umd,
         )
@@ -236,7 +258,7 @@ class TestPciDriverReset:
         pci_indices, use_umd = reset_test_config
         for _ in range(NUM_RESETS_STRESS_TEST):
             pci_board_reset(
-                ResetInput(type=ResetType.ALL, value=None),
+                SmiDeviceInput(type=SmiDeviceTargetKind.ALL, value=None),
                 reinit=True,
                 use_umd=use_umd,
             )

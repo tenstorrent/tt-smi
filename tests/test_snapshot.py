@@ -121,6 +121,7 @@ class TestSnapshot:
             assert "eth_fw" in firmwares
             assert "dm_bl_fw" in firmwares
             assert "dm_app_fw" in firmwares
+            assert "gddr_fw" in firmwares
 
     def test_limits_fields(self, snapshot):
         """Test if fields are present in limits."""

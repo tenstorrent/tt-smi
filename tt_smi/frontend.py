@@ -25,8 +25,8 @@ from tt_tools_common.ui_common.widgets import (
 from tt_tools_common.utils_common.system_utils import get_host_compatibility_info
 
 from . import constants
-from .tt_smi_backend import TTSMIBackend
-from .tt_smi_utils import hex_to_semver_eth, hex_to_semver_m3_fw
+from .backend import TTSMIBackend
+from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
 
 TextualKeyBindings = List[Tuple[str, str, str]]
 
@@ -290,15 +290,16 @@ class TTSMI(App):
                         )
                     )
                 elif telem == "fan_speed":
+                    max_rpm = self.backend.chip_limits[board_num]["fan_rpm_limit"]
                     device_row.append(
                         Text(
-                            f"{val}" if 0 < float(val) <= 100 else "N/A",
-                            style=self.text_theme["text_green"] if 0 < float(val) <= 100 else self.text_theme["gray"],
+                            f"{val}" if int(val) > 0 else "N/A",
+                            style=self.text_theme["text_green"] if int(val) > 0 else self.text_theme["gray"],
                             justify="center",
                         )
                         + Text(
-                            f"/ 100",
-                            style=self.text_theme["yellow_bold"],
+                            f"/ {max_rpm}" if max_rpm else "/ ---",
+                            style=self.text_theme["yellow_bold"] if max_rpm else self.text_theme["gray"],
                             justify="center",
                         )
                     )

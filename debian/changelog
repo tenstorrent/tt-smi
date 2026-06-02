@@ -1,3 +1,68 @@
+tt-smi (5.2.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Update UMD from 0.9.4 -> 0.9.5
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.2.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 14 May 2026 17:23:48 +0000
+
+tt-smi (5.1.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * add the missing css file to data
+  * Sunset the debian build for tt-smi
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.1.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 12 May 2026 22:15:47 +0000
+
+tt-smi (5.1.0) noble; urgency=medium
+
+  [ Aleksa Markovic ]
+  * Fix eth_train_skip option in UMD backend
+  * even better
+  * copilot review
+
+  [ Samridhi Bansal ]
+  * Add GDDR FW version to FW table
+  * Make the pyinstaller binaries actual release artifacts
+  * Remove the deb packages from the release, but they are still part of the build all workflow
+  * Move the reset parsing logic to its own file
+  * Rename files to not have unnecessary tt_smi_ prefix
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 11 May 2026 16:19:57 +0000
+
+tt-smi (5.0.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Fix for pull request finding 'CodeQL / Workflow does not contain permissions'
+  * Added github workflow to create pyinstaller binary
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.0.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 24 Apr 2026 11:37:22 +0000
+
+tt-smi (5.0.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add USER_RESET ioctl before and POST_RESET ioctl after IPMI reset
+  * Remove support for -glx_reset_tray
+
+  [ Samridhi Bansal ]
+  * Separate out all the frontend formatting logic into its own file
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.0.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 01 Apr 2026 21:09:01 +0000
+
 tt-smi (4.2.0) noble; urgency=medium
 
   [ Sungjoon Moon ]

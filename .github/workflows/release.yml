@@ -320,27 +320,18 @@ jobs:
               "commit_template": "- #{{TITLE}} (#{{MERGE_SHA}}) by @#{{AUTHOR}}"
             }
 
-      - name: Find the deb & whl files
+      - name: Find whl files
         run: |
-          find ${GITHUB_WORKSPACE} -type f -iname \*.deb -o -iname \*.whl -exec ls -lah {} \;
+          find ${GITHUB_WORKSPACE} -type f -iname \*.whl -exec ls -lah {} \;
           find /home/runner/work/${{ env.project_name }}/${{ env.project_name }}/ -exec ls -lah {} \;
 
-      - name: Deb file renames so they don't overlap
+      - name: Unique names for PyInstaller binaries
         run: |
-          for x in $( \
-            find ${GITHUB_WORKSPACE} -type f -iname \*.deb | \
-            grep -v "artifacts-ubuntu" \
-          )
-          do
-            want="$( \
-              echo "${x}" | \
-              xargs dirname | \
-              tr "/" "\n" | \
-              tail -n 1 \
-              )"
-            mv -v \
-              "${x}" \
-              "$( echo "${x}" | xargs dirname )/${want}"
+          set -euxo pipefail
+          shopt -s nullglob
+          for d in "${GITHUB_WORKSPACE}"/tt-smi-*-ubuntu-*; do
+            [[ -d "${d}" && -f "${d}/tt-smi" ]] || continue
+            mv -v "${d}/tt-smi" "${d}/$(basename "${d}")"
           done
 
       - name: Create GitHub Release
@@ -349,9 +340,8 @@ jobs:
         with:
           tag_name: v${{ needs.versionchange.outputs.package_version_new }}
           files: |
-            ${{ github.workspace }}/${{ env.project_name }}*/*.deb
-            ${{ github.workspace }}/[!artifacts-]*/*.deb
             ${{ github.workspace }}/*/*.whl
+            ${{ github.workspace }}/tt-smi-*-ubuntu-*/tt-smi-*-ubuntu-*
           body: ${{ steps.build_changelog.outputs.changelog }}
           draft: false
           prerelease: false

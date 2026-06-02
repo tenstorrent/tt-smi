@@ -23,11 +23,12 @@ from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from pyluwen import PciChip
-from tt_smi.tt_smi_utils import (
+from tt_smi.utils import (
     LOG_FOLDER,
     hex_to_date,
     hex_to_semver_eth,
     hex_to_semver_m3_fw,
+    hex_to_semver_gddr_fw,
     hex_to_semver_eth_wh,
     get_board_type,
     convert_signed_16_16_to_float,
@@ -674,7 +675,7 @@ class TTSMIBackend:
         )
         timer_heartbeat = int(self.smbus_telem_info[board_num]["TIMER_HEARTBEAT"], 16) // 6 # Watchdog heartbeat, ~2 per second
         fan_speed = (
-            min(int(self.smbus_telem_info[board_num]["FAN_RPM"], 16), 5000) / 50 # RPM to percent conversion
+            int(self.smbus_telem_info[board_num]["FAN_RPM"], 16) & 0xFFFF
             if self.smbus_telem_info[board_num]["FAN_RPM"] is not None
             else 0
         )
@@ -685,7 +686,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
-            "fan_speed": f"{fan_speed:3.0f}",
+            "fan_speed": f"{fan_speed}",
             "heartbeat": f"{timer_heartbeat}",
         }
         return chip_telemetry
@@ -704,7 +705,10 @@ class TTSMIBackend:
         aiclk = int(self.smbus_telem_info[board_num]["AICLK"], 16) & 0xFFFF
         arc3_heartbeat = int(self.smbus_telem_info[board_num]["ARC3_HEALTH"], 16) // 5 # Watchdog heartbeat, ~2 per second
         if self.smbus_telem_info[board_num]["FAN_SPEED"] is not None:
-            fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16)
+            if self.devices[board_num].is_remote():
+                fan_speed = (int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) >> 16) & 0xFFFF
+            else:
+                fan_speed = int(self.smbus_telem_info[board_num]["FAN_SPEED"], 16) & 0xFFFF
         else:
             fan_speed = 0
 
@@ -714,7 +718,7 @@ class TTSMIBackend:
             "power": f"{power:5.1f}",
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
-            "fan_speed": f"{fan_speed:3.0f}",
+            "fan_speed": f"{fan_speed}",
             "heartbeat": f"{arc3_heartbeat}"
         }
 
@@ -896,4 +900,14 @@ class TTSMIBackend:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
+            elif field == "gddr_fw":
+                if self.use_umd:
+                    val = self.smbus_telem_info[board_num].get("GDDR_FW_VERSION")
+                else:
+                    # TODO: Need to add GDDR FW tag into luwen
+                    val = None
+                if val is None or not self.is_blackhole(board_num):
+                    fw_versions[field] = "N/A"
+                else:
+                    fw_versions[field] = hex_to_semver_gddr_fw(int(val, 16))
         return fw_versions
