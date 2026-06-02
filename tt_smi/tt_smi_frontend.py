@@ -142,8 +142,6 @@ class TTSMI(App):
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
-        self.dispatch_telem_thread()
-
     def update_telem_table(self) -> None:
         """Update telemetry table"""
         try:
