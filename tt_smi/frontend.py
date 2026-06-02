@@ -161,7 +161,10 @@ class TTSMI(App):
             proc_table = self.get_widget_by_id(id="tt_smi_processes")
             self.backend.update_processes()
             rows = self.format_process_rows()
-            proc_table.update_data(rows)
+            # TTDataTable.update_data doesn't shrink the table when rows go
+            # away, so exited processes would stick around. Clear and re-add.
+            proc_table.dt.clear()
+            proc_table.dt.add_rows(rows)
         except NoMatches:
             pass
 
