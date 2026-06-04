@@ -20,7 +20,7 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.ui_utils import CMD_LINE_COLOR
 from pyluwen import PciChip
 from tt_smi.utils import (
     LOG_FOLDER,
@@ -32,8 +32,10 @@ from tt_smi.utils import (
     get_board_type,
     convert_signed_16_16_to_float,
     dict_from_public_attrs,
+    get_host_info,
     get_host_software_versions,
-    get_fw_bundle_version
+    get_fw_bundle_version,
+    init_logging,
 )
 from tt_umd import (
     TTDevice,
@@ -43,11 +45,6 @@ from tt_umd import (
     SmBusArcTelemetryReader,
     ARCH,
 )
-from tt_tools_common.utils_common.system_utils import (
-    get_host_info,
-)
-from tt_tools_common.utils_common.tools_utils import init_logging
-
 class TTSMIBackend:
     """
     TT-SMI backend class that encompasses all chip objects on host.

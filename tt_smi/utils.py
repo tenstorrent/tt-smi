@@ -8,14 +8,190 @@ Utility functions and constants for tt-smi (hex conversion, board type, logging 
 import os
 import sys
 import glob
+import fcntl
+import struct
+import platform
+from enum import IntEnum
 from importlib.metadata import version
+from typing import Dict, Tuple, Union
 
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+import distro
+import psutil
+
+from tt_smi.ui_utils import CMD_LINE_COLOR
 
 from tt_smi import constants
 
 
 LOG_FOLDER = os.path.expanduser("~/tt_smi_logs/")
+
+TENSTORRENT_IOCTL_MAGIC = 0xFA
+TENSTORRENT_IOCTL_RESET_DEVICE = (TENSTORRENT_IOCTL_MAGIC << 8) | 6
+
+
+class IoctlResetFlags(IntEnum):
+    RESTORE_STATE = 0
+    RESET_PCIE_LINK = 1
+    CONFIG_WRITE = 2
+    USER_RESET = 3
+    ASIC_RESET = 4
+    ASIC_DMC_RESET = 5
+    POST_RESET = 6
+
+
+def reset_device_ioctl(interface_id: int, flags: int) -> bool:
+    """
+    Issue TENSTORRENT_IOCTL_RESET_DEVICE on /dev/tenstorrent/{interface_id}.
+
+    Returns True if the driver reports success (result == 0).
+    """
+    dev_path = f"/dev/tenstorrent/{interface_id}"
+    # O_APPEND signals to KMD 2.6.0+ that we are power-aware, skipping power state
+    # initialization that could worsen a hung device.
+    dev_fd = os.open(dev_path, os.O_RDWR | os.O_CLOEXEC | os.O_APPEND)
+    try:
+        reset_device_in_struct = "II"
+        reset_device_out_struct = "II"
+        reset_device_struct = reset_device_in_struct + reset_device_out_struct
+
+        input_size_bytes = struct.calcsize(reset_device_in_struct)
+        output_size_bytes = struct.calcsize(reset_device_out_struct)
+
+        reset_device_buf = bytearray(
+            struct.pack(reset_device_struct, output_size_bytes, flags, 0, 0)
+        )
+        fcntl.ioctl(dev_fd, TENSTORRENT_IOCTL_RESET_DEVICE, reset_device_buf)
+
+        output_buf = reset_device_buf[input_size_bytes:]
+        _, result = struct.unpack(reset_device_out_struct, output_buf)
+        return result == 0
+    finally:
+        os.close(dev_fd)
+
+
+def get_driver_version() -> Union[str, None]:
+    """Return the installed Tenstorrent KMD version from sysfs, or None if unavailable."""
+    try:
+        with open("/sys/module/tenstorrent/version", "r", encoding="utf-8") as f:
+            return f.readline().rstrip()
+    except OSError:
+        return None
+
+
+def _parse_version_string(version_str: str) -> Tuple[int, int, int]:
+    """
+    Parse a version string into (major, minor, patch).
+
+    Handles SemVer-like formats including pre-release identifiers and build metadata,
+    e.g. "1.34", "1.34.0", "1.34.1-alpha", "1.2.3+build456", "1.4.0-rc1+build42".
+    """
+    if not version_str:
+        raise ValueError("Version string cannot be empty")
+
+    core_version_str = version_str.split("+")[0]
+    main_version_part = core_version_str.split("-")[0]
+    parts = main_version_part.split(".")
+
+    if not parts or not parts[0]:
+        raise ValueError(f"Invalid version format: {version_str}")
+
+    try:
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+        patch = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError as e:
+        raise ValueError(f"Version parts must be integers: {version_str}") from e
+
+    return major, minor, patch
+
+
+def is_driver_version_at_least(current_version: str, minimum_version: str) -> bool:
+    """Return True if current_version >= minimum_version."""
+    if current_version is None:
+        raise ValueError(
+            "No Tenstorrent driver detected! Please install the driver using tt-kmd: "
+            "https://github.com/tenstorrent/tt-kmd"
+        )
+
+    return _parse_version_string(current_version) >= _parse_version_string(
+        minimum_version
+    )
+
+
+def get_size(size_bytes: int, suffix: str = "B") -> str:
+    """Scale bytes to human-readable size (e.g. 1253656 -> '1.20MB')."""
+    factor = 1024
+    for unit in ["", "K", "M", "G", "T", "P"]:
+        if size_bytes < factor:
+            return f"{size_bytes:.2f} {unit}{suffix}"
+        size_bytes /= factor
+    return "N/A"
+
+
+def get_host_info() -> dict:
+    """Return host OS, distro, kernel, memory, Python, and TT-KMD driver info."""
+    uname = platform.uname()
+    svmem = psutil.virtual_memory()
+    driver_version = get_driver_version()
+
+    return {
+        "OS": uname.system,
+        "Distro": distro.name(pretty=True),
+        "Kernel": uname.release,
+        "Hostname": uname.node,
+        "Platform": uname.machine,
+        "Python": platform.python_version(),
+        "Memory": get_size(svmem.total),
+        "Driver": "TT-KMD " + (driver_version or ""),
+    }
+
+
+def get_host_compatibility_info() -> Dict[str, Union[str, Tuple]]:
+    """
+    Return host info with system compatibility notes.
+
+    Values are str if compatible, or (current, recommended) if not.
+    """
+    host_info = get_host_info()
+    checklist = {}
+    full_os = f"{host_info['OS']} ({host_info['Platform']})"
+
+    if host_info["OS"] == "Linux":
+        checklist["OS"] = full_os
+    else:
+        checklist["OS"] = (full_os, "Linux (x86_64)")
+
+    if distro.id() == "ubuntu":
+        distro_version = float(".".join(distro.version_parts()[:2]))
+        if distro_version >= 22:
+            checklist["Distro"] = host_info["Distro"]
+        else:
+            checklist["Distro"] = (host_info["Distro"], "22.04 or 24.04")
+    else:
+        checklist["Distro"] = (host_info["Distro"], "Ubuntu 22.04 or 24.04")
+
+    checklist["Kernel"] = host_info["Kernel"]
+    checklist["Hostname"] = host_info["Hostname"]
+    checklist["Python"] = host_info["Python"]
+
+    if psutil.virtual_memory().total >= 32 * 1e9:
+        checklist["Memory"] = host_info["Memory"]
+    else:
+        checklist["Memory"] = (host_info["Memory"], "32GB+")
+
+    if get_driver_version():
+        checklist["Driver"] = host_info["Driver"]
+    else:
+        checklist["Driver"] = (host_info["Driver"], "TT-KMD v1.27+")
+
+    return checklist
+
+
+def init_logging(log_folder: str) -> None:
+    """Create log folder if it does not exist."""
+    if not os.path.isdir(log_folder):
+        os.mkdir(log_folder)
+
 
 def hex_to_date(hexdate: int, include_time=True):
     """Converts a date given in hex from format 0xYMDDHHMM to string YYYY-MM-DD HH:MM"""

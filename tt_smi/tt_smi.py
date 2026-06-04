@@ -16,13 +16,11 @@ import argparse
 from importlib.metadata import version
 
 from tt_umd import TopologyDiscovery
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.ui_utils import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
-from tt_tools_common.utils_common.system_utils import get_driver_version
-
 from tt_smi import constants
 from tt_smi.backend import TTSMIBackend
-from tt_smi.utils import check_is_galaxy, is_vm
+from tt_smi.utils import check_is_galaxy, get_driver_version, is_vm
 from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,

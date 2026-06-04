@@ -6,8 +6,71 @@ import pytest
 from tt_smi.utils import (
     get_board_type,
     convert_signed_16_16_to_float,
+    get_size,
+    get_host_info,
+    get_host_compatibility_info,
+    init_logging,
     hex_to_semver_gddr_fw,
+    is_driver_version_at_least,
 )
+
+class TestDriverVersion:
+    def test_is_driver_version_at_least(self):
+        assert is_driver_version_at_least("1.34.0", "1.34.0")
+        assert is_driver_version_at_least("2.0.0", "1.34.0")
+        assert not is_driver_version_at_least("1.34.0", "1.35.0")
+        assert is_driver_version_at_least("2.7.1-pre", "2.7.0")
+
+    def test_is_driver_version_at_least_no_driver(self):
+        with pytest.raises(ValueError, match="No Tenstorrent driver"):
+            is_driver_version_at_least(None, "2.0.0")
+
+
+class TestGetSize:
+    def test_get_size_bytes(self):
+        assert get_size(500) == "500.00 B"
+        assert get_size(1253656) == "1.20 MB"
+
+    def test_get_size_zero(self):
+        assert get_size(0) == "0.00 B"
+
+
+class TestGetHostInfo:
+    def test_get_host_info_keys(self):
+        info = get_host_info()
+        assert set(info.keys()) == {
+            "OS",
+            "Distro",
+            "Kernel",
+            "Hostname",
+            "Platform",
+            "Python",
+            "Memory",
+            "Driver",
+        }
+        assert info["Driver"].startswith("TT-KMD ")
+
+
+class TestGetHostCompatibilityInfo:
+    def test_get_host_compatibility_info_keys(self):
+        info = get_host_compatibility_info()
+        assert set(info.keys()) == {
+            "OS",
+            "Distro",
+            "Kernel",
+            "Hostname",
+            "Python",
+            "Memory",
+            "Driver",
+        }
+
+
+class TestInitLogging:
+    def test_init_logging_creates_folder(self, tmp_path):
+        log_dir = tmp_path / "tt_smi_logs"
+        init_logging(str(log_dir))
+        assert log_dir.is_dir()
+
 
 class TestGetBoardType:
     @pytest.mark.parametrize(

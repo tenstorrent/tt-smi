@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
   'distro>=1.8.0',
+  'psutil>=5.9.0',
   'elasticsearch>=8.11.0',
   'pydantic>=1.2',
   'tt_tools_common~=1.6.0',

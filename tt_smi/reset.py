@@ -13,11 +13,10 @@ import sys
 import time
 from typing import List
 
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.ui_utils import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
-from tt_tools_common.reset_common.chip_reset import ChipReset, IoctlResetFlags
-from tt_smi.utils import get_dev_id_from_bdf
+from tt_smi.utils import get_dev_id_from_bdf, IoctlResetFlags, reset_device_ioctl
 from tt_smi.constants import get_default_discovery_options
 from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 from pyluwen import (
@@ -321,7 +320,7 @@ def glx_6u_trays_reset(
         CMD_LINE_COLOR.ENDC,
     )
     for interface_id in user_reset_ids:
-        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.USER_RESET):
+        if not reset_device_ioctl(interface_id, IoctlResetFlags.USER_RESET):
             print(
                 CMD_LINE_COLOR.YELLOW,
                 f"Warning: USER_RESET did not complete for device {interface_id}. Continuing...",
@@ -347,7 +346,7 @@ def glx_6u_trays_reset(
         CMD_LINE_COLOR.ENDC,
     )
     for interface_id in post_reset_ids:
-        if not ChipReset().reset_device_ioctl(interface_id, IoctlResetFlags.POST_RESET):
+        if not reset_device_ioctl(interface_id, IoctlResetFlags.POST_RESET):
             print(
                 CMD_LINE_COLOR.RED,
                 f"Error: POST_RESET failed for device {interface_id}.",

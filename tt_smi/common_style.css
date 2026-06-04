@@ -1,0 +1,225 @@
+/*
+SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
+SPDX-License-Identifier: Apache-2.0
+*/
+
+/* TT COLOURS */
+$red: #f04f5e;
+$green: #1eb57d;
+$yellow: #ffd10a;
+$purple: #786bb0;
+$orange: darkorange;
+$gray: ansi_bright_black;
+
+/* Principal style */
+* {
+  color: $yellow;
+  scrollbar-color: $yellow;
+  scrollbar-color-active: white;
+  scrollbar-color-hover: white;
+  scrollbar-background: $green;
+  scrollbar-background-active: $green;
+  scrollbar-background-hover: $green;
+  border-title-align: left;
+  border-title-color: $yellow;
+  border-title-style: bold;
+}
+
+/* Header and footer style */
+
+TTHeader,
+TTFooter {
+  height: 3;
+  text-style: bold;
+  outline: solid $green;
+}
+
+TTHeader {
+  dock: top;
+}
+
+TTFooter {
+  dock: bottom;
+}
+
+/* DataTable style */
+
+DataTable {
+  padding: 1 2;
+  color: $green;
+  border: solid $green;
+  height: 1fr;
+  text-align: center;
+}
+
+DataTable>.datatable--header {
+  text-style: bold;
+  text-align: center;
+  background: white 0%;
+  /* Make transparent */
+}
+
+DataTable>.datatable--cursor {
+  background: $yellow;
+  color: black;
+}
+
+DataTable>.datatable--fixed-cursor {
+  background: $yellow;
+  color: white;
+}
+
+DataTable>.datatable--header-cursor {
+  background: $yellow;
+  color: white;
+}
+
+DataTable>.datatable--header-hover {
+  background: 0%;
+  color: white 0%;
+}
+
+DataTable>.datatable--hover {
+  background: $yellow 60%;
+  color: white;
+}
+
+/* TTMenu Style */
+
+TTMenu,
+TTCompatibilityMenu,
+TTHostCompatibilityMenu {
+  padding: 1 1;
+  border: solid $green;
+  color: $green;
+}
+/*
+/*
+TTCompatibilityMenu {
+  height: 9;
+}
+*/
+
+/* TTConfirmBox Style */
+
+TTConfirmBox {
+  align: center middle;
+}
+
+#dialog {
+  padding: 1 2;
+  grid-size: 2;
+  grid-gutter: 1 2;
+  grid-rows: 1fr 3;
+  width: 30%;
+  height: 25%;
+  border: solid $green;
+  background: $surface;
+}
+
+#question {
+  column-span: 2;
+  height: 1fr;
+  width: 1fr;
+  content-align: center middle;
+}
+
+Button {
+  width: 100%;
+  background: $yellow;
+  color: white;
+}
+
+Button:hover,
+Button:focus {
+  background: $red;
+  color: white;
+  text-style: bold;
+}
+
+Footer {
+  background: $green;
+  color: white;
+  dock: bottom;
+  text-style: bold;
+  height: 1;
+}
+
+Footer>.footer--highlight {
+  background: $accent-darken-1;
+}
+
+Footer>.footer--highlight-key {
+  background: $yellow;
+  text-style: bold;
+  color: white;
+}
+
+Footer>.footer--key {
+  text-style: bold;
+  background: $accent-darken-2;
+}
+
+
+Input>.input--placeholder {
+  color: gray;
+}
+
+TabPane {
+  width: 100%;
+  /* Enable scrolling on tabs */
+  overflow: auto hidden;
+}
+
+/* Help Menu box styling*/
+TTHelperMenuBox {
+  align: center middle;
+}
+
+#help_menu_box {
+  padding: 1 2;
+  width: 110;
+  height: 30;
+  border: solid $green;
+  background: $surface;
+  color: white;
+
+}
+
+MarkdownH1 {
+  background: $accent-darken-2;
+  border: wide $background;
+  content-align: center middle;
+  padding: 1;
+  text-style: bold;
+  color: white;
+}
+
+MarkdownTableContent {
+  width: 100%;
+  height: auto;
+
+}
+
+MarkdownTableContent>.markdown-table--header {
+  text-style: bold;
+}
+
+Switch>.switch--slider {
+  color: $red;
+  background: red 12%;
+}
+
+
+Switch.-on>.switch--slider {
+  color: $green;
+  background: $green 15%;
+}
+
+TTHealthMenu,
+TTTextMenu,
+TTTestOutput {
+  padding: 1 2;
+  border: solid $green;
+  color: $green;
+}
