@@ -52,20 +52,21 @@ source "$HOME/.cargo/env"
 
 ## Installation (for users)
 
-tt-smi is available on pypi and can be installed using pip (on Python v3.10 and up).
+tt-smi is available on PyPI. We recommend running it with [`uvx`](https://docs.astral.sh/uv/guides/tools/), which ensures you always run the latest released version.
+
+Install `uv` if you don't already have it:
 
 ```
-pip install tt-smi
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### (Optional) Virtual environment
-If you aren't doing a system-level install, install in a virtual environment.
+Then run tt-smi:
 
 ```
-python -m venv .venv
-source .venv/bin/activate
-pip install tt-smi
+uvx tt-smi@latest
 ```
+
+Pass tt-smi flags after the package spec, e.g. `uvx tt-smi@latest -s`.
 
 ## Installation (for developers)
 
@@ -77,16 +78,17 @@ cd tt-smi
 ```
 
 ### Install
+
 ```
-pip install .
+uv sync
 ```
-or for users who would like to edit the code without re-building, install tt-smi in editable mode.
-```
-pip install --editable .
-```
+
+This creates a `.venv` and installs tt-smi in editable mode along with its dependencies. Run the local build with `uv run tt-smi`, or activate the venv (`source .venv/bin/activate`) and use `tt-smi` directly.
+
 Recommended: install the pre-commit hooks so there is auto-formatting for all files on commit.
+
 ```
-pre-commit install
+uv run pre-commit install
 ```
 
 # Usage
