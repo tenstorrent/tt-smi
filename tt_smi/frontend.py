@@ -6,12 +6,13 @@
 import time
 from importlib.resources import files
 from importlib.metadata import version
-from typing import List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
+from rich.style import Style
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
-from textual.widgets import Footer, TabbedContent
+from textual.widgets import Footer, ProgressBar, Static, TabbedContent
 from textual.containers import Container, Vertical
 from textual.worker import get_current_worker, Worker, WorkerState
 
@@ -26,7 +27,127 @@ from tt_tools_common.utils_common.system_utils import get_host_compatibility_inf
 
 from . import constants
 from .backend import TTSMIBackend
+from .latest_releases import (
+    DEFAULT_MAX_ATTEMPTS,
+    RELEASE_SPECS,
+    ReleaseSpec,
+    fetch_all,
+    get_installed_all,
+    version_tuple,
+)
 from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
+
+
+class LatestReleasesBox(Container):
+    """Sidebar box showing the latest published version of each tt-stack package.
+
+    Renders a ProgressBar while fetches are in-flight, then swaps to a list of
+    versions. If every fetch fails (e.g. no internet), the list stays empty
+    and the box just shows its border + title.
+    """
+
+    def __init__(self, id: str, title: str) -> None:
+        super().__init__(id=id)
+        self._base_title = title
+        self.border_title = title
+        self._versions: Dict[str, Optional[str]] = {}
+        # Specs in this dict are "checkable" (we know how to ask the host).
+        # Absence means "not checkable" → no glyph. Value of None means
+        # "checkable but not installed in PATH" → ✗.
+        self._installed: Dict[str, Optional[str]] = {}
+        self._key_width = max(len(s.name) for s in RELEASE_SPECS) + 1
+
+    def compose(self) -> ComposeResult:
+        yield ProgressBar(
+            total=len(RELEASE_SPECS), show_eta=False, id="latest_releases_progress"
+        )
+        yield Static("", id="latest_releases_list")
+
+    def on_mount(self) -> None:
+        self.query_one("#latest_releases_list", Static).display = False
+
+    def record(self, spec: ReleaseSpec, version: Optional[str]) -> None:
+        """One fetch completed. Stash the result and advance the progress bar."""
+        self._versions[spec.name] = version
+        self.query_one("#latest_releases_progress", ProgressBar).advance(1)
+
+    def set_installed(self, installed: Dict[str, Optional[str]]) -> None:
+        """Record installed-version lookups for the checkable specs."""
+        self._installed = installed
+
+    def set_attempt(self, attempt: int, max_attempts: int) -> None:
+        """Surface a retry indicator in the border title (e.g. 'attempt 2/3')."""
+        self.border_title = f"{self._base_title} (attempt {attempt}/{max_attempts})"
+        self.styles.border_title_color = "yellow"
+        # border_title is reactive and calls refresh(), but the Container
+        # chrome doesn't always redraw on its own — force it.
+        self.refresh()
+
+    def finalize(self) -> None:
+        """All fetches done. Swap the progress bar out for the version list."""
+        self.border_title = self._base_title
+        self.styles.border_title_color = None
+        self.query_one("#latest_releases_progress", ProgressBar).display = False
+        list_widget = self.query_one("#latest_releases_list", Static)
+        if any(v is not None for v in self._versions.values()):
+            list_widget.update(self._render_versions())
+        else:
+            list_widget.update(self._render_error())
+        list_widget.display = True
+        self.refresh()
+
+    def _row_status(
+        self, spec_name: str, latest: Optional[str]
+    ) -> Tuple[str, Optional[Style], str, Optional[Style]]:
+        """Return (glyph, glyph_style, value_text, value_style) for one row.
+
+        The value column shows "installed → latest" for the outdated case so
+        users see exactly what bump is available; everything else just shows
+        the latest version (or "—" if it's unknown).
+        """
+        muted = Style(color="grey50")
+        if spec_name not in self._installed:
+            # Not checkable on this host.
+            if latest is None:
+                return ("", None, "—", muted)
+            return ("", None, latest, None)
+
+        installed = self._installed[spec_name]
+        if installed is None:
+            # Checkable but not installed.
+            if latest is None:
+                return ("✗", Style(color="red"), "—", muted)
+            return ("✗", Style(color="red"), latest, None)
+
+        if latest is None:
+            # We have installed but couldn't fetch latest.
+            return ("", None, "—", muted)
+
+        if version_tuple(installed) >= version_tuple(latest):
+            return ("✓", Style(color="green"), latest, None)
+
+        return ("↑", Style(color="yellow"), f"{installed} → {latest}", Style(color="yellow"))
+
+    def _render_versions(self) -> Text:
+        text = Text()
+        for spec in RELEASE_SPECS:
+            ver = self._versions.get(spec.name)
+            glyph, glyph_style, val_text, val_style = self._row_status(spec.name, ver)
+            leader = Text(f"{glyph} " if glyph else "  ", style=glyph_style)
+            key = Text(
+                f"{spec.name.ljust(self._key_width)}: ",
+                style=Style(color="#ffd10a", bold=True),
+            )
+            val = Text(f"{val_text}\n", style=val_style)
+            text.append_text(leader).append_text(key).append_text(val)
+        text.rstrip()
+        return text
+
+    def _render_error(self) -> Text:
+        return Text(
+            "Failed to fetch latest releases.\nCheck your network connection.",
+            style=Style(color="red"),
+        )
 
 TextualKeyBindings = List[Tuple[str, str, str]]
 
@@ -85,10 +206,24 @@ class TTSMI(App):
         yield TTHeader(self.app_name, self.app_version)
         with Container(id="app_grid"):
             with Vertical(id="left_col"):
-                yield TTHostCompatibilityMenu(
+                host_data = get_host_compatibility_info()
+                host_info_widget = TTHostCompatibilityMenu(
                     id="host_info",
                     title="Host Info",
-                    data=get_host_compatibility_info(),
+                    data=host_data,
+                )
+                # TTHostCompatibilityMenu is a Container that draws via render()
+                # rather than child widgets, so textual's height: auto collapses
+                # to 0 and the default height: 1fr stretches it to fill the
+                # column. Pin to actual content height: one row per entry (two
+                # for tuple-valued entries that show a recommendation), plus 2
+                # border + 2 padding.
+                content_rows = sum(2 if isinstance(v, tuple) else 1 for v in host_data.values())
+                host_info_widget.styles.height = content_rows + 4
+                yield host_info_widget
+                yield LatestReleasesBox(
+                    id="latest_releases",
+                    title="Latest Releases",
                 )
             with TabbedContent(
                 "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
@@ -129,6 +264,31 @@ class TTSMI(App):
 
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
+
+        self.run_worker(
+            self.fetch_latest_releases,
+            thread=True,
+            exit_on_error=False,
+            name="latest_releases_thread",
+        )
+
+    def fetch_latest_releases(self) -> None:
+        """Worker: fetch latest GitHub release tags and push them to the box."""
+        try:
+            box = self.query_one("#latest_releases", LatestReleasesBox)
+        except NoMatches:
+            return
+
+        def on_done(spec: ReleaseSpec, version: Optional[str]) -> None:
+            self.call_from_thread(box.record, spec, version)
+
+        def on_attempt(attempt: int) -> None:
+            self.call_from_thread(box.set_attempt, attempt, DEFAULT_MAX_ATTEMPTS)
+
+        fetch_all(timeout=5.0, on_done=on_done, on_attempt=on_attempt)
+        installed = get_installed_all()
+        self.call_from_thread(box.set_installed, installed)
+        self.call_from_thread(box.finalize)
 
     def update_telem_table(self) -> None:
         """Update telemetry table"""

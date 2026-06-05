@@ -59,6 +59,23 @@ TTTestOutput {
   color: $green;
 }
 
+LatestReleasesBox {
+  padding: 1 1;
+  border: solid $green;
+  color: $green;
+  height: auto;
+}
+
+LatestReleasesBox ProgressBar {
+  width: 100%;
+  height: 1;
+}
+
+LatestReleasesBox Static {
+  width: 100%;
+  height: auto;
+}
+
 #settings_menu_box {
   padding: 1 1;
   grid-size: 2 5;
