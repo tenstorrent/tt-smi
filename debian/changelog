@@ -1,3 +1,22 @@
+tt-smi (5.3.0) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Display fan RPM instead of fan speed as percentage
+  * Add support for reporting n300d and n150d fan RPM
+  * Add fan RPM limits from fan datasheets
+
+  [ Samridhi Bansal ]
+  * Moved driver version checking and reset ioctl functionality from tt-tools-common to tt-smi
+  * Added secondary bus reset check post kmd 2.7.0 on galaxys
+
+  [ Zakhary Kaplan ]
+  * Switch README install instructions to uv
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.3.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 12 Jun 2026 15:32:57 +0000
+
 tt-smi (5.2.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
