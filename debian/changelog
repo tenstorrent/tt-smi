@@ -1,3 +1,13 @@
+tt-smi (5.3.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Add updated p100 dram training check
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 5.3.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 02 Jul 2026 21:21:35 +0000
+
 tt-smi (5.3.0) noble; urgency=medium
 
   [ Petra Alexson ]
