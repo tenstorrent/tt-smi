@@ -8,6 +8,7 @@ from tt_smi.utils import (
     convert_signed_16_16_to_float,
     hex_to_semver_gddr_fw,
     is_driver_version_at_least,
+    p100_dram_training_passed,
 )
 
 class TestDriverVersion:
@@ -111,3 +112,45 @@ class TestHexToSemverGddrFw:
     )
     def test_hex_to_semver_gddr_fw(self, raw, expected):
         assert hex_to_semver_gddr_fw(raw) == expected
+
+
+def _p100_dram_status(*, harvested: int = None, fail_training: int = None, fail_bist: int = None) -> int:
+    """Build DDR_STATUS for P100 tests: all channels pass except optional overrides."""
+    status = 0x55555555
+    if harvested is not None:
+        status &= ~((1 << (2 * harvested)) | (1 << (16 + 2 * harvested)))
+    if fail_training is not None:
+        status |= 1 << (2 * fail_training + 1)
+        status &= ~(1 << (2 * fail_training))
+    if fail_bist is not None:
+        status |= 1 << (17 + 2 * fail_bist)
+        status &= ~(1 << (16 + 2 * fail_bist))
+    return status
+
+
+class TestP100DramTrainingPassed:
+    @pytest.mark.parametrize(
+        "dram_status,expected",
+        [
+            # 7 active channels + GDDR 2 harvested (real P100 example)
+            (0x55455545, True),
+            # Harvested slot can be any of the 8 channels
+            (_p100_dram_status(harvested=0), True),
+            (_p100_dram_status(harvested=7), True),
+            # All 8 channels trained — valid for non-P100, not the P100 7+1 layout
+            (0x55555555, False),
+            # Two harvested channels
+            (0x54455545, False),
+            (_p100_dram_status(harvested=0, fail_training=1), False),
+            # Training error on an active channel
+            (_p100_dram_status(harvested=2, fail_training=0), False),
+            # BIST failure on an active channel
+            (_p100_dram_status(harvested=2, fail_bist=5), False),
+            # Partial pass: training complete but BIST never ran
+            (0x55455555, False),
+            # No harvested channel (incomplete training on one slot)
+            (0x55455540, False),
+        ],
+    )
+    def test_p100_dram_training_passed(self, dram_status, expected):
+        assert p100_dram_training_passed(dram_status) is expected

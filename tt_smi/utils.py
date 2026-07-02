@@ -176,6 +176,54 @@ def hex_to_semver_gddr_fw(raw: int) -> str:
     return f"{major}.{minor}"
 
 
+def p100_dram_training_passed(dram_status: int) -> bool:
+    """
+    Check if DRAM training passed for P100.
+
+    P100 may ship with one harvested GDDR channel (any of the 8). Pass when
+    exactly 7 channels report training+BIST success (0b01 in each 2-bit field),
+    and one channel reports all status bits clear (0b00 — absent/harvested slot).
+    """
+    passing_channels = 0
+    harvested_channels = 0
+
+    for channel in range(8):
+        # Per-channel DDR_STATUS layout (FW 19.7.3.0+):
+        #   bits [2i+1:2i]     - [training error | training complete]
+        #   bits [17+2i:16+2i] - [BIST failed    | BIST complete]
+        #
+        # 0b01 = success, 0b10 = failure, 0b00 = not run (harvested on P100)
+        training_complete = bool(dram_status & (1 << (2 * channel)))
+        training_error = bool(dram_status & (1 << (2 * channel + 1)))
+        bist_complete = bool(dram_status & (1 << (16 + 2 * channel)))
+        bist_failed = bool(dram_status & (1 << (17 + 2 * channel)))
+
+        if (
+            training_complete
+            and not training_error
+            and bist_complete
+            and not bist_failed
+        ):
+            # Active channel: trained and passed BIST (0b01 / 0b01).
+            passing_channels += 1
+        elif (
+            not training_complete
+            and not training_error
+            and not bist_complete
+            and not bist_failed
+        ):
+            # Harvested channel: firmware never ran training/BIST (0b00 / 0b00).
+            harvested_channels += 1
+            if harvested_channels > 1:
+                return False
+        else:
+            # Real failure: error/fail bit set, or partial/incomplete state.
+            return False
+
+    # P100 expects 7 active GDDR channels and 1 harvested slot.
+    return passing_channels == 7 and harvested_channels == 1
+
+
 def get_board_type(board_id: str) -> str:
     """
     Get board type from board ID string.
