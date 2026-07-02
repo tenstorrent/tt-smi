@@ -10,15 +10,17 @@ This is the backend of tt-smi.
 import os
 import re
 import sys
+import json
 import time
 import datetime
 from tt_smi import log
 from pathlib import Path
 from rich.table import Table
+from rich.text import Text
 from tt_smi import constants
 from rich import get_console
 from rich.syntax import Syntax
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from rich.progress import track
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from pyluwen import PciChip
@@ -103,7 +105,43 @@ class TTSMIBackend:
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
-    
+
+    def get_topology_info(self, device_idx):
+        """Per-device interconnect topology from the UMD ClusterDescriptor.
+
+        Returns {} when running without UMD (--use_luwen), since the cluster
+        descriptor (and thus chip-to-chip ethernet link data) is only produced
+        by TopologyDiscovery. The full map is built once and cached.
+        """
+        if not self.use_umd:
+            return {}
+        if not hasattr(self, "_topology_infos"):
+            cd = self.umd_cluster_descriptor
+            eth = cd.get_ethernet_connections()
+            mmio = cd.get_chips_with_mmio()
+            self._topology_infos = {}
+            for i in self.devices:
+                try:
+                    active = set(cd.get_active_eth_channels(i))
+                    links = []
+                    for chan, (rchip, rchan) in eth.get(i, {}).items():
+                        links.append({
+                            "eth_ch": chan,
+                            "rchip": rchip,
+                            "rchan": rchan,
+                            "active": chan in active,
+                        })
+                    self._topology_infos[i] = {
+                        "board": cd.get_board_type(i),
+                        "attach": "PCIe" if cd.is_chip_mmio_capable(i) else "ETH",
+                        "is_remote": cd.is_chip_remote(i),
+                        "mmio_via": mmio.get(i),
+                        "links": sorted(links, key=lambda d: d["eth_ch"]),
+                    }
+                except Exception as e:
+                    self._topology_infos[i] = {"error": str(e), "links": []}
+        return self._topology_infos.get(device_idx, {})
+
     def is_blackhole(self, device_idx) -> bool:
         return (self.devices[device_idx].as_bh() if not self.use_umd
                 else self.devices[device_idx].get_arch() == ARCH.BLACKHOLE)
@@ -327,6 +365,617 @@ class TTSMIBackend:
                 f"0x{ubb_bus_ids[tray_num]:02x}",
                 f"{','.join(map(str, tray_to_devices[tray_num]))}",
             )
+        console.print(table)
+
+    def _aggregate_topology(self) -> Dict[int, Dict[int, Dict[str, Any]]]:
+        """Group per-chip links by remote chip. Returns {chip: {neighbor: stats}}.
+
+        Each stats dict has: n_active, n_total, channels (sorted list of eth_ch),
+        all_active (bool).
+        """
+        if not self.use_umd:
+            return {}
+        adj: Dict[int, Dict[int, Dict[str, Any]]] = {}
+        for i in self.devices:
+            t = self.get_topology_info(i)
+            per_neighbor: Dict[int, Dict[str, Any]] = {}
+            for lk in t.get("links", []):
+                rchip = lk["rchip"]
+                slot = per_neighbor.setdefault(rchip, {"channels": [], "active": []})
+                slot["channels"].append(lk["eth_ch"])
+                slot["active"].append(bool(lk["active"]))
+            adj[i] = {}
+            for rchip, slot in per_neighbor.items():
+                chans = sorted(slot["channels"])
+                n_active = sum(slot["active"])
+                n_total = len(chans)
+                adj[i][rchip] = {
+                    "n_active": n_active,
+                    "n_total": n_total,
+                    "channels": chans,
+                    "all_active": (n_active == n_total),
+                }
+        return adj
+
+    def _classify_topology(self, adj: Dict[int, Dict[int, Dict[str, Any]]]) -> str:
+        """Detect formal topology shape. Returns one of:
+        'single', 'pair', 'ring', 'unknown'.
+        """
+        n = len(adj)
+        if n <= 1:
+            return "single"
+        if n == 2:
+            return "pair"
+        # Ring detection: every chip has exactly 2 distinct neighbors AND the
+        # neighbor graph forms a single cycle covering all chips.
+        if not all(len(neighbors) == 2 for neighbors in adj.values()):
+            return "unknown"
+        start = next(iter(adj))
+        visited = [start]
+        prev = None
+        cur = start
+        while True:
+            neighbors = list(adj[cur].keys())
+            if prev is None:
+                nxt = neighbors[0]
+            else:
+                nexts = [x for x in neighbors if x != prev]
+                if len(nexts) != 1:
+                    return "unknown"
+                nxt = nexts[0]
+            if nxt == start:
+                break
+            if nxt in visited:
+                return "unknown"
+            visited.append(nxt)
+            prev, cur = cur, nxt
+            if len(visited) > n:
+                return "unknown"
+        return "ring" if len(visited) == n else "unknown"
+
+    def _channel_range_str(self, channels: List[int]) -> str:
+        """Compress sorted channel list into 'a-b' or 'a,b,c' form."""
+        if not channels:
+            return ""
+        chans = sorted(channels)
+        # Detect contiguous run
+        if chans[-1] - chans[0] + 1 == len(chans):
+            return f"{chans[0]}-{chans[-1]}" if len(chans) > 1 else f"{chans[0]}"
+        return ",".join(str(c) for c in chans)
+
+    def _diagram_styles(self, theme: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Resolve diagram color styles. Prefers caller-provided theme keys
+        (matching tt_tools_common's create_tt_tools_theme), falls back to
+        Rich-native styles so CLI use without a theme stays consistent.
+        """
+        if theme is None:
+            return {
+                "chip": "bright_yellow bold",
+                "channel": "green",
+                "range": "dim",
+                "warn": "yellow",
+                "frame": "dim",
+                "muted": "dim",
+            }
+        return {
+            "chip": theme.get("yellow_bold", "bright_yellow bold"),
+            "channel": theme.get("text_green", "green"),
+            "range": theme.get("gray", "dim"),
+            "warn": theme.get("attention", "yellow"),
+            "frame": theme.get("gray", "dim"),
+            "muted": theme.get("gray", "dim"),
+        }
+
+    def _edge_label_lines(self, adj: Dict[int, Dict[int, Dict[str, Any]]],
+                          a: int, b: int, styles: Dict[str, Any]) -> Tuple[Text, Text]:
+        """Return (count_line, range_line) for a 2-row edge label.
+
+        Line 1 carries the channel count (e.g. ``4ch``).
+        Line 2 carries the channel range (e.g. ``(ch 4-7)``) and an optional
+        warn suffix (``3/4 up``) when some channels are down.
+        """
+        s = adj[a][b]
+        ch = self._channel_range_str(s["channels"])
+        count_line = Text(f"{s['n_total']}ch", style=styles["channel"])
+        range_line = Text(f"(ch {ch})", style=styles["range"])
+        if not s["all_active"]:
+            range_line.append(f" {s['n_active']}/{s['n_total']} up", style=styles["warn"])
+        return (count_line, range_line)
+
+    def _edge_label_text(self, adj: Dict[int, Dict[int, Dict[str, Any]]],
+                         a: int, b: int, styles: Dict[str, Any]) -> Text:
+        """Build a styled 2-row edge label (count and range on separate lines).
+
+        Renders as::
+
+            4ch
+            (ch 4-7)
+
+        or, when some channels are down::
+
+            4ch
+            (ch 4-7) 3/4 up
+
+        Used by inline diagram contexts (pair, 5+ ring listing, adjacency
+        listing, 3-chip triangle bottom edge). The 4-chip ring renderer uses
+        :meth:`_edge_label_lines` directly so each line can be placed
+        independently inside the box geometry.
+        """
+        count_line, range_line = self._edge_label_lines(adj, a, b, styles)
+        t = Text()
+        t.append(count_line)
+        t.append("\n")
+        t.append(range_line)
+        return t
+
+    def _chip_token(self, i: int, styles: Dict[str, Any]) -> Text:
+        """Styled chip marker like '[0]'."""
+        t = Text()
+        t.append("[", style=styles["frame"])
+        t.append(str(i), style=styles["chip"])
+        t.append("]", style=styles["frame"])
+        return t
+
+    def _ring_walk_order(self, adj: Dict[int, Dict[int, Dict[str, Any]]]) -> List[int]:
+        """Deterministic ring traversal starting at min chip ID, smaller neighbor first."""
+        start = min(adj.keys())
+        order = [start]
+        prev = None
+        cur = start
+        # Safety bound: classify_topology already validated the ring shape, but
+        # guard against malformed input so a degenerate adj cannot infinite-loop.
+        n_nodes = len(adj)
+        while len(order) <= n_nodes:
+            neighbors = sorted(adj[cur].keys())
+            if prev is None:
+                nxt = neighbors[0]
+            else:
+                nxt = next((x for x in neighbors if x != prev), None)
+                if nxt is None:
+                    break
+            if nxt == start:
+                break
+            order.append(nxt)
+            prev, cur = cur, nxt
+        return order
+
+    def _join_lines(self, lines: List[Text]) -> Text:
+        out = Text()
+        for i, line in enumerate(lines):
+            if i:
+                out.append("\n")
+            out.append(line)
+        return out
+
+    def _render_ring(self, adj: Dict[int, Dict[int, Dict[str, Any]]],
+                     styles: Dict[str, Any]) -> Text:
+        """Render a ring topology. 4-chip uses a box diagram with side labels
+        centered on the side ``│`` columns (mirroring how the top label sits
+        between ``┌──`` and ``──┐``); 3-chip uses a triangle; 5+ chip rings
+        fall back to a compact ring listing.
+        """
+        order = self._ring_walk_order(adj)
+        n = len(order)
+
+        if n == 4:
+            a, b, c, d = order
+            # 2-line labels (count, range) for each edge
+            ab_count, ab_range = self._edge_label_lines(adj, a, b, styles)  # top
+            bc_count, bc_range = self._edge_label_lines(adj, b, c, styles)  # right side
+            cd_count, cd_range = self._edge_label_lines(adj, c, d, styles)  # bottom
+            da_count, da_range = self._edge_label_lines(adj, d, a, styles)  # left side
+
+            # ── Geometry ────────────────────────────────────────────────
+            # Top/bottom labels live INSIDE the box → drive ``internal_w``.
+            top_label_w = max(
+                len(ab_count.plain), len(ab_range.plain),
+                len(cd_count.plain), len(cd_range.plain),
+            )
+            # Side labels live OUTSIDE the box, centered on the ``│`` column.
+            # They no longer constrain box width, but they DO constrain the
+            # outer indent (left labels extend left of bar_left) and may force
+            # the box to widen so left/right labels don't collide in the middle.
+            side_l_w = max(len(da_count.plain), len(da_range.plain))
+            side_r_w = max(len(bc_count.plain), len(bc_range.plain))
+            min_side_gap = 2  # min spacing between left side label and right side label
+
+            # ``internal_w`` = column count between the two │ bars (excludes bars).
+            # - Top edges: ``── `` + label + `` ──`` = 6 + top_label_w
+            # - Side rows: left label is LEFT-leaning (extra char outside box on
+            #   the left) and right label is RIGHT-leaning (extra char outside
+            #   box on the right). This keeps both labels' OUTSIDE extent equal
+            #   so the diagram is left/right mirror-symmetric. Inside extent
+            #   from each bar is ``(label_w - 1) // 2`` columns in both cases.
+            left_interior = max(0, (side_l_w - 1) // 2)
+            right_interior = max(0, (side_r_w - 1) // 2)
+            internal_w = max(
+                top_label_w + 6,
+                left_interior + right_interior + min_side_gap,
+            )
+            box_w = internal_w + 2  # add the two │ bars
+
+            # Outer indent: must accommodate the leftward extent of left-side
+            # labels (``side_l_w // 2`` columns to the left of bar_left).
+            indent = max(8, side_l_w // 2 + 2)
+
+            bar_left = indent              # column of the left │ / ┌
+            bar_right = indent + box_w - 1 # column of the right │ / ┐
+
+            def _centered(label: Text, area_w: int) -> Tuple[int, int]:
+                """Return (left_pad, right_pad) needed to center ``label`` within ``area_w``."""
+                pad = area_w - len(label.plain)
+                if pad <= 0:
+                    return (0, 0)
+                left = pad // 2
+                return (left, pad - left)
+
+            def corner_row(label_line: Text, corner_l: str, corner_r: str) -> Text:
+                """``<indent>┌── label ──┐`` (top) or ``<indent>└── label ──┘`` (bottom)
+                with the label centered inside the box.
+                """
+                # Area available for the label between "── " and " ──":
+                # internal_w - "── " (3) - " ──" (3) = internal_w - 6
+                area = internal_w - 6
+                left_pad, right_pad = _centered(label_line, area)
+                row = Text(" " * indent)
+                row.append(corner_l, style=styles["frame"])
+                row.append("── ", style=styles["frame"])
+                if left_pad:
+                    row.append(" " * left_pad)
+                row.append(label_line)
+                if right_pad:
+                    row.append(" " * right_pad)
+                row.append(" ──", style=styles["frame"])
+                row.append(corner_r, style=styles["frame"])
+                return row
+
+            def edge_inner_row(label_line: Text) -> Text:
+                """``<indent>│   label   │`` — second row of the top/bottom edge label,
+                centered inside the box.
+                """
+                left_pad, right_pad = _centered(label_line, internal_w)
+                row = Text(" " * indent)
+                row.append("│", style=styles["frame"])
+                if left_pad:
+                    row.append(" " * left_pad)
+                row.append(label_line)
+                if right_pad:
+                    row.append(" " * right_pad)
+                row.append("│", style=styles["frame"])
+                return row
+
+            def chip_row(left: int, right: int) -> Text:
+                """Place chip tokens so each token's visual centre sits on the
+                corresponding │ column. For even-width tokens (e.g. ``[10]``),
+                the LEFT token is left-leaning (extra char outside box) and the
+                RIGHT token is right-leaning (extra char outside box) for
+                mirror symmetry. Odd-width tokens (e.g. ``[0]``) are perfectly
+                centered.
+                """
+                left_token = self._chip_token(left, styles)
+                right_token = self._chip_token(right, styles)
+                l_w = len(left_token.plain)
+                r_w = len(right_token.plain)
+                left_start = bar_left - l_w // 2
+                right_start = bar_right - (r_w - 1) // 2
+                row = Text(" " * max(0, left_start))
+                row.append(left_token)
+                end_left = left_start + l_w
+                gap = right_start - end_left
+                row.append(" " * max(1, gap))
+                row.append(right_token)
+                return row
+
+            def bar_row() -> Text:
+                row = Text(" " * bar_left)
+                row.append("│", style=styles["frame"])
+                row.append(" " * (box_w - 2))
+                row.append("│", style=styles["frame"])
+                return row
+
+            def side_label_row(left_label: Text, right_label: Text) -> Text:
+                """Place ``left_label`` on the left ``│`` column and
+                ``right_label`` on the right ``│`` column, breaking the bars
+                on this row (mirror of how the top label breaks ``──`` between
+                ``┌──`` and ``──┐``). For even-width labels the LEFT label is
+                left-leaning (extra char outside box on the left) and the
+                RIGHT label is right-leaning (extra char outside box on the
+                right) so both sides have equal OUTSIDE extent — keeping the
+                diagram left/right mirror-symmetric.
+                """
+                l_w = len(left_label.plain)
+                r_w = len(right_label.plain)
+                left_start = bar_left - l_w // 2
+                right_start = bar_right - (r_w - 1) // 2
+                row = Text(" " * max(0, left_start))
+                row.append(left_label)
+                end_left = left_start + l_w
+                gap = right_start - end_left
+                row.append(" " * max(1, gap))
+                row.append(right_label)
+                return row
+
+            lines = [
+                corner_row(ab_count, "┌", "┐"),  # top edge — count
+                edge_inner_row(ab_range),         # top edge — range continuation
+                chip_row(a, b),
+                bar_row(),
+                bar_row(),
+                side_label_row(da_count, bc_count),   # side count, centered on │ columns
+                side_label_row(da_range, bc_range),   # side range, centered on │ columns
+                bar_row(),
+                bar_row(),
+                chip_row(d, c),
+                edge_inner_row(cd_range),         # bottom edge — range above corner
+                corner_row(cd_count, "└", "┘"),  # bottom edge — count on corner row
+            ]
+            return self._join_lines(lines)
+
+        if n == 3:
+            a, b, c = order
+            ab_count, ab_range = self._edge_label_lines(adj, a, b, styles)
+            bc_count, bc_range = self._edge_label_lines(adj, b, c, styles)
+            ca_count, ca_range = self._edge_label_lines(adj, c, a, styles)
+            # Compact 3-chip triangle. Side labels (ca, ab) span two rows each
+            # so columns stay aligned; the bottom edge label sits beneath the
+            # connecting line.
+            ca_w = max(len(ca_count.plain), len(ca_range.plain))
+            lines: List[Text] = []
+            # Apex chip
+            row_apex = Text("        ")
+            row_apex.append(self._chip_token(a, styles))
+            lines.append(row_apex)
+            lines.append(Text("       / \\", style=styles["frame"]))
+            # Side labels — count row then range row
+            row_sides_count = Text("    ")
+            row_sides_count.append(ca_count)
+            row_sides_count.append(" " * (ca_w - len(ca_count.plain) + 3))
+            row_sides_count.append(ab_count)
+            lines.append(row_sides_count)
+            row_sides_range = Text("    ")
+            row_sides_range.append(ca_range)
+            row_sides_range.append(" " * (ca_w - len(ca_range.plain) + 3))
+            row_sides_range.append(ab_range)
+            lines.append(row_sides_range)
+            # Bottom row: chip ── count_label ── chip
+            row_bottom = Text()
+            row_bottom.append(self._chip_token(b, styles))
+            row_bottom.append(Text(" ── ", style=styles["frame"]))
+            row_bottom.append(bc_count)
+            row_bottom.append(Text(" ── ", style=styles["frame"]))
+            row_bottom.append(self._chip_token(c, styles))
+            lines.append(row_bottom)
+            # Range of bottom edge sits centered under the count label.
+            b_token_w = len(self._chip_token(b, styles).plain)
+            row_bottom_range = Text(" " * (b_token_w + 4))  # past "[b] ── "
+            row_bottom_range.append(bc_range)
+            lines.append(row_bottom_range)
+            return self._join_lines(lines)
+
+        # n >= 5: compact ring listing
+        title = Text(f"Ring of {n} chips:\n", style=styles["muted"])
+        chips_text = Text()
+        for idx, x in enumerate(order + [order[0]]):
+            if idx:
+                chips_text.append(" → ", style=styles["frame"])
+            chips_text.append(self._chip_token(x, styles))
+        body_lines: List[Text] = []
+        for a, b in zip(order, order[1:] + [order[0]]):
+            count, rng = self._edge_label_lines(adj, a, b, styles)
+            a_token = self._chip_token(a, styles)
+            # Row 1: ``  [a] ── count ── [b]``
+            row_main = Text("  ")
+            row_main.append(a_token)
+            row_main.append(" ── ", style=styles["frame"])
+            row_main.append(count)
+            row_main.append(" ── ", style=styles["frame"])
+            row_main.append(self._chip_token(b, styles))
+            body_lines.append(row_main)
+            # Row 2: range, aligned under the count column.
+            indent_w = 2 + len(a_token.plain) + 4  # 2 leading + [a] + " ── "
+            row_range = Text(" " * indent_w)
+            row_range.append(rng)
+            body_lines.append(row_range)
+        out = Text()
+        out.append(title)
+        out.append("  ")
+        out.append(chips_text)
+        for line in body_lines:
+            out.append("\n")
+            out.append(line)
+        return out
+
+    def _render_pair(self, adj: Dict[int, Dict[int, Dict[str, Any]]],
+                     styles: Dict[str, Any]) -> Text:
+        """Render a 2-chip topology (two rows: chips + count edge, then range)."""
+        a, b = sorted(adj.keys())
+        s = adj[a].get(b)
+        a_token = self._chip_token(a, styles)
+        b_token = self._chip_token(b, styles)
+        if not s:
+            row = Text("   ")
+            row.append(a_token)
+            row.append("   ")
+            row.append(b_token)
+            row.append("  (no inter-chip links discovered)", style=styles["muted"])
+            return row
+        count, rng = self._edge_label_lines(adj, a, b, styles)
+        # Row 1: ``   [a] ── count ── [b]``
+        row_main = Text("   ")
+        row_main.append(a_token)
+        row_main.append(" ── ", style=styles["frame"])
+        row_main.append(count)
+        row_main.append(" ── ", style=styles["frame"])
+        row_main.append(b_token)
+        # Row 2: range, aligned under the count column.
+        indent_w = 3 + len(a_token.plain) + 4  # 3 leading + [a] + " ── "
+        row_range = Text(" " * indent_w)
+        row_range.append(rng)
+        return self._join_lines([row_main, row_range])
+
+    def _render_adjacency_list(self, adj: Dict[int, Dict[int, Dict[str, Any]]],
+                               styles: Dict[str, Any]) -> Text:
+        """Fallback: per-chip neighbor listing (two rows per neighbor entry)."""
+        lines: List[Text] = []
+        for i in sorted(adj.keys()):
+            neighbors = adj[i]
+            header = Text()
+            header.append(self._chip_token(i, styles))
+            if not neighbors:
+                header.append("  (no eth links)", style=styles["muted"])
+                lines.append(header)
+                continue
+            header.append(" neighbors:", style=styles["muted"])
+            lines.append(header)
+            for rchip in sorted(neighbors.keys()):
+                count, rng = self._edge_label_lines(adj, i, rchip, styles)
+                rchip_token = self._chip_token(rchip, styles)
+                # Row 1: ``  → [rchip] : count``
+                row_main = Text("  → ", style=styles["frame"])
+                row_main.append(rchip_token)
+                row_main.append(" : ", style=styles["muted"])
+                row_main.append(count)
+                lines.append(row_main)
+                # Row 2: range, aligned under count column.
+                indent_w = 4 + len(rchip_token.plain) + 3  # "  → " + [rchip] + " : "
+                row_range = Text(" " * indent_w)
+                row_range.append(rng)
+                lines.append(row_range)
+        return self._join_lines(lines)
+
+    def render_topology_diagram_rich(self, theme: Optional[Dict[str, Any]] = None) -> Text:
+        """Return a styled (Rich) multi-line topology diagram.
+
+        Auto-detects ring / pair / single topologies; falls back to a per-chip
+        adjacency listing for unrecognized shapes. Colors follow the supplied
+        text theme (tt_tools_common keys) when given, otherwise defaults to
+        Rich's standard palette.
+        """
+        styles = self._diagram_styles(theme)
+        if not self.use_umd:
+            return Text("(topology diagram requires UMD mode; disabled with --use_luwen)",
+                        style=styles["muted"])
+        for i in self.devices:
+            self.get_topology_info(i)
+        adj = self._aggregate_topology()
+        if not adj:
+            return Text("(no devices detected)", style=styles["muted"])
+        kind = self._classify_topology(adj)
+        if kind == "single":
+            row = Text()
+            row.append(self._chip_token(next(iter(adj)), styles))
+            row.append("  (single device, no inter-chip links)", style=styles["muted"])
+            return row
+        if kind == "pair":
+            return self._render_pair(adj, styles)
+        if kind == "ring":
+            return self._render_ring(adj, styles)
+        return self._render_adjacency_list(adj, styles)
+
+    def render_topology_diagram(self) -> str:
+        """Plain-text version of the topology diagram (no ANSI styling).
+
+        Convenience wrapper for piping/scripts; equivalent to
+        `render_topology_diagram_rich().plain`.
+        """
+        return self.render_topology_diagram_rich().plain
+
+    def topology_kind_label(self) -> str:
+        """Short human-readable summary of the current topology, suitable for
+        a panel/border title. Reflects device count and detected shape.
+        """
+        if not self.use_umd:
+            return "Topology"
+        for i in self.devices:
+            self.get_topology_info(i)
+        adj = self._aggregate_topology()
+        if not adj:
+            return "Topology"
+        n = len(adj)
+        kind = self._classify_topology(adj)
+        if kind == "single":
+            return "Topology · single chip"
+        if kind == "pair":
+            return "Topology · pair"
+        if kind == "ring":
+            return f"Topology · ring of {n}"
+        return f"Topology · {n} chips"
+
+    def print_topology_to_stdout(self, fmt: str = "table", pretty: bool = True) -> None:
+        """Print chip-to-chip ethernet topology to stdout.
+
+        Args:
+            fmt: "table" for a rich.Table render, "json" for a JSON dump,
+                 "diagram" for a unicode topology diagram.
+            pretty: When fmt=="json", syntax-highlight via rich.Syntax (TTY only).
+
+        Requires UMD backend; caller must guard with `self.use_umd`.
+        """
+        if not self.use_umd:
+            raise RuntimeError(
+                "print_topology_to_stdout requires UMD backend (disabled with --use_luwen)"
+            )
+
+        # Force-populate the cached topology map for every device
+        for i in self.devices:
+            self.get_topology_info(i)
+
+        if fmt == "diagram":
+            console = get_console()
+            console.print(self.render_topology_diagram_rich())
+            return
+
+        if fmt == "json":
+            payload: Dict[int, Dict[str, Any]] = {}
+            for i in self.devices:
+                t = self.get_topology_info(i)
+                entry: Dict[str, Any] = {
+                    "board": str(t.get("board")) if t.get("board") is not None else None,
+                    "attach": t.get("attach"),
+                    "is_remote": t.get("is_remote"),
+                    "mmio_via": t.get("mmio_via"),
+                    "links": t.get("links", []),
+                }
+                if "error" in t:
+                    entry["error"] = t["error"]
+                payload[i] = entry
+            out = json.dumps(payload, indent=2, default=str)
+            if pretty:
+                console = get_console()
+                console.print(Syntax(out, "json", background_color="default"))
+            else:
+                print(out)
+            return
+
+        if fmt != "table":
+            raise ValueError(f"Unsupported topology format: {fmt!r} (expected 'table' or 'json')")
+
+        console = get_console()
+        table = Table(title="Device Topology (chip-to-chip ethernet)")
+        for col in constants.TOPOLOGY_TABLE_HEADER:
+            table.add_column(col, justify="center")
+
+        for i in self.devices:
+            t = self.get_topology_info(i)
+            board = str(t.get("board", "?"))
+            attach = t.get("attach", "?") + (" R" if t.get("is_remote") else "")
+            links = t.get("links", [])
+            if not links:
+                note = "error" if t.get("error") else "no eth link"
+                table.add_row(f"{i}", board, attach, "-", "-", "-", note)
+                continue
+            for n, lk in enumerate(links):
+                state = "active" if lk["active"] else "down"
+                if n == 0:
+                    table.add_row(
+                        f"{i}", board, attach,
+                        str(lk["eth_ch"]), str(lk["rchip"]), str(lk["rchan"]), state,
+                    )
+                else:
+                    table.add_row(
+                        "", "", "",
+                        str(lk["eth_ch"]), str(lk["rchip"]), str(lk["rchan"]), state,
+                    )
         console.print(table)
 
     def get_smbus_board_info(self, board_num: int) -> Dict:

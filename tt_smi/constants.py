@@ -219,11 +219,14 @@ FIRMWARES_TABLE_HEADER = [
     "GDDR FW Version",
 ]
 
-PCI_PROPERTIES = [
-    "current_link_speed",
-    "max_link_speed",
-    "current_link_width",
-    "max_link_width",
+TOPOLOGY_TABLE_HEADER = [
+    "#",
+    "Board",
+    "Attach",
+    "Eth Ch",
+    "-> Chip",
+    "-> Ch",
+    "Link",
 ]
 
 # HELP MARKDOWN DOCUMENT
@@ -244,5 +247,6 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |   Go to device(s) info tab  |        1        |          Switch to tab with device info         |
 |   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
 |   Go to device(s) firmware tab     |        3        |          Switch to tab with all the fw versions on the board(s)          |
+|   Go to device(s) topology tab     |        4        |          Switch to tab with chip-to-chip ethernet topology (UMD only)          |
 
 """
