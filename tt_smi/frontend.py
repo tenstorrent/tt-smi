@@ -42,6 +42,7 @@ class TTSMI(App):
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
         ("3", "tab_three", "Firmware tab"),
+        ("4", "tab_four", "Processes tab"),
     ]
 
     try:
@@ -75,6 +76,7 @@ class TTSMI(App):
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
         self.telem_worker = None
+        self.process_worker = None
 
         if key_bindings:
             self.BINDINGS += key_bindings
@@ -91,7 +93,7 @@ class TTSMI(App):
                     data=get_host_compatibility_info(),
                 )
             with TabbedContent(
-                "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
+                "Information (1)", "Telemetry (2)", "FW Version (3)", "Processes (4)", id="tab_container"
             ):
                 yield TTDataTable(
                     title="Device Information",
@@ -111,6 +113,12 @@ class TTSMI(App):
                     header=constants.FIRMWARES_TABLE_HEADER,
                     header_height=2,
                 )
+                yield TTDataTable(
+                    title="Device Processes",
+                    id="tt_smi_processes",
+                    header=constants.PROCESSES_TABLE_HEADER,
+                    header_height=2,
+                )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -127,6 +135,11 @@ class TTSMI(App):
         firmware_table.dt.cursor_type = "none"
         firmware_table.dt.add_rows(self.format_firmware_rows())
 
+        proc_table = self.get_widget_by_id(id="tt_smi_processes")
+        proc_table.dt.cursor_type = "none"
+        self.backend.update_processes()
+        proc_table.dt.add_rows(self.format_process_rows())
+
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
@@ -141,6 +154,37 @@ class TTSMI(App):
         # but the thread keeps running, so we need to ignore that exception.
         except NoMatches:
             pass
+
+    def update_process_table(self) -> None:
+        """Update process table"""
+        try:
+            proc_table = self.get_widget_by_id(id="tt_smi_processes")
+            self.backend.update_processes()
+            rows = self.format_process_rows()
+            # TTDataTable.update_data doesn't shrink the table when rows go
+            # away, so exited processes would stick around. Clear and re-add.
+            proc_table.dt.clear()
+            proc_table.dt.add_rows(rows)
+        except NoMatches:
+            pass
+
+    def format_process_rows(self) -> List[List[Text]]:
+        """Format process rows"""
+        all_rows = []
+        for proc in self.backend.device_processes:
+            row = [
+                Text(f"{proc['pid']}", style=self.text_theme["yellow_bold"], justify="center"),
+                Text(f"{proc['user']}", style=self.text_theme["text_green"], justify="left"),
+                Text(f"{proc['device']}", style=self.text_theme["text_green"], justify="center"),
+                Text(f"{proc['cmdline']}", style=self.text_theme["text_green"], justify="left"),
+            ]
+            all_rows.append(row)
+        if not all_rows:
+            ncols = len(constants.PROCESSES_TABLE_HEADER)
+            empty = [Text("", justify="center") for _ in range(ncols)]
+            empty[0] = Text("No processes found", style=self.text_theme["gray"], justify="center")
+            all_rows.append(empty)
+        return all_rows
 
     def format_firmware_rows(self):
         """Format firmware rows"""
@@ -506,6 +550,10 @@ class TTSMI(App):
         """Switch to read-only tab"""
         self.query_one(TabbedContent).active = "tab-3"
 
+    def action_tab_four(self) -> None:
+        """Switch to processes tab"""
+        self.query_one(TabbedContent).active = "tab-4"
+
     def action_help(self) -> None:
         """Pop up the help menu"""
         tt_confirm_box = TTHelperMenuBox(
@@ -530,17 +578,41 @@ class TTSMI(App):
                 name="telem_thread",
             )
 
+    def update_processes(self) -> None:
+        """Worker function that continuously updates the process list"""
+        worker = get_current_worker()
+        while not worker.is_cancelled:
+            self.call_from_thread(self.update_process_table)
+            time.sleep(constants.GUI_INTERVAL_TIME)
+
+    def dispatch_process_thread(self) -> None:
+        """Start the process update thread if not already running"""
+        if self.process_worker is None or self.process_worker.is_finished:
+            self.process_worker = self.run_worker(
+                self.update_processes,
+                thread=True,
+                exit_on_error=False,
+                name="process_thread",
+            )
+
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         """This function runs every time a tab is activated"""
         tab_id = self.query_one(TabbedContent).active
 
-        if tab_id == "tab-2":  # Telemetry tab
-            # Dispatch the telemetry thread
+        if tab_id == "tab-2":
             self.dispatch_telem_thread()
+        elif tab_id == "tab-4":
+            self.dispatch_process_thread()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
-        """Handle worker state change. Here we just use it to catch telem_thread errors."""
-        if event.worker.name == "telem_thread" and event.state == WorkerState.ERROR:
+        """Handle worker state change. Here we just use it to catch worker errors."""
+        if event.state != WorkerState.ERROR:
+            return
+        if event.worker.name == "telem_thread":
             error = event.worker.error
             exit_message = Text(f"Error when attempting to fetch telemetry: {error}", style="red")
+            self.exit(message=exit_message)
+        elif event.worker.name == "process_thread":
+            error = event.worker.error
+            exit_message = Text(f"Error when attempting to fetch processes: {error}", style="red")
             self.exit(message=exit_message)
