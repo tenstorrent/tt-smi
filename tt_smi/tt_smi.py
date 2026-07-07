@@ -83,6 +83,12 @@ def parse_args():
         help="Run in compact mode, hiding the sidebar and other static elements",
     )
     parser.add_argument(
+        "--offline",
+        default=False,
+        action="store_true",
+        help="Do not access the network; hides the Latest Releases box",
+    )
+    parser.add_argument(
         "-r",
         "--reset",
         metavar="TARGETS",
@@ -202,6 +208,7 @@ def tt_smi_main(backend: TTSMIBackend, args):
         snapshot=args.snapshot,
         result_filename=args.filename,
         show_sidebar=not args.compact,
+        offline=args.offline,
     )
     tt_smi_app.run()
 
