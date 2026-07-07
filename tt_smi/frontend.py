@@ -51,9 +51,9 @@ class LatestReleasesBox(Container):
         self._base_title = title
         self.border_title = title
         self._versions: Dict[str, Optional[str]] = {}
-        # Specs in this dict are "checkable" (we know how to ask the host).
-        # Absence means "not checkable" → no glyph. Value of None means
-        # "checkable but not installed in PATH" → ✗.
+        # Specs in this dict are "checkable" (we know how to ask the host);
+        # a None value means "not installed". A status glyph only renders
+        # when an installed version is known.
         self._installed: Dict[str, Optional[str]] = {}
         self._key_width = max(len(s.name) for s in RELEASE_SPECS) + 1
 
@@ -106,18 +106,12 @@ class LatestReleasesBox(Container):
         the latest version (or "—" if it's unknown).
         """
         muted = Style(color="grey50")
-        if spec_name not in self._installed:
-            # Not checkable on this host.
+        installed = self._installed.get(spec_name)
+        if installed is None:
+            # Not checkable on this host, or not installed: no status glyph.
             if latest is None:
                 return ("", None, "—", muted)
             return ("", None, latest, None)
-
-        installed = self._installed[spec_name]
-        if installed is None:
-            # Checkable but not installed.
-            if latest is None:
-                return ("✗", Style(color="red"), "—", muted)
-            return ("✗", Style(color="red"), latest, None)
 
         if latest is None:
             # We have installed but couldn't fetch latest.
