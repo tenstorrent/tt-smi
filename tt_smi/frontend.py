@@ -185,6 +185,7 @@ class TTSMI(App):
         backend: TTSMIBackend = None,
         snapshot: bool = False,
         show_sidebar: bool = True,
+        offline: bool = False,
     ) -> None:
         """Initialize the textual app."""
         super().__init__()
@@ -193,6 +194,7 @@ class TTSMI(App):
         self.backend = backend
         self.snapshot = snapshot
         self.show_sidebar = show_sidebar
+        self.offline = offline
         self.result_filename = result_filename
         self.text_theme = create_tt_tools_theme()
         self.telem_worker = None
@@ -221,10 +223,11 @@ class TTSMI(App):
                 content_rows = sum(2 if isinstance(v, tuple) else 1 for v in host_data.values())
                 host_info_widget.styles.height = content_rows + 4
                 yield host_info_widget
-                yield LatestReleasesBox(
-                    id="latest_releases",
-                    title="Latest Releases",
-                )
+                if not self.offline:
+                    yield LatestReleasesBox(
+                        id="latest_releases",
+                        title="Latest Releases",
+                    )
             with TabbedContent(
                 "Information (1)", "Telemetry (2)", "FW Version (3)", id="tab_container"
             ):
@@ -265,12 +268,13 @@ class TTSMI(App):
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
-        self.run_worker(
-            self.fetch_latest_releases,
-            thread=True,
-            exit_on_error=False,
-            name="latest_releases_thread",
-        )
+        if not self.offline:
+            self.run_worker(
+                self.fetch_latest_releases,
+                thread=True,
+                exit_on_error=False,
+                name="latest_releases_thread",
+            )
 
     def fetch_latest_releases(self) -> None:
         """Worker: fetch latest GitHub release tags and push them to the box."""
