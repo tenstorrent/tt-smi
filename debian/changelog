@@ -1,3 +1,26 @@
+tt-smi (6.0.0) noble; urgency=medium
+
+  [ Sungjoon Moon ]
+  * Add process listing tab
+  * Include processes in snapshot output
+
+  [ Zakhary Kaplan ]
+  * Keep telemetry worker lazy
+  * Give process polling its own worker
+  * Type TTSMILog.processes as List[DeviceProcess]
+  * Read /proc fields in binary mode and escape non-printable bytes
+  * Remove exited processes from the process table
+  * Add Latest Releases sidebar box
+  * Add --offline flag to disable network access
+  * Drop the red glyph for not-installed packages
+  * feat(reset): drop galaxy `-r` support hint
+  * feat(reset): remove galaxy `-glx_reset_tray`
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.0.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 15 Jul 2026 18:46:53 +0000
+
 tt-smi (5.3.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
