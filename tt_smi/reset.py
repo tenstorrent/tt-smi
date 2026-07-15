@@ -170,13 +170,6 @@ def umd_pci_warm_reset(
         if info.subsystem_id in {0x35, 0x47}:
             is_galaxy = True
             break
-    if is_galaxy:
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
-            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
-            CMD_LINE_COLOR.ENDC,
-        )
     secondary_bus_reset = should_use_secondary_bus_reset(is_galaxy)
 
     reset_indices = reset_input.value
@@ -256,14 +249,6 @@ def luwen_pci_reset(
             del chip
 
     is_galaxy = board_types <= {0x35, 0x47}
-    if is_galaxy:
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            "CPLD FW v1.16 or higher is required to use tt-smi -r on Galaxy systems.",
-            "If tt-smi -r fails, please continue to use tt-smi -glx_reset instead and contact your system administrator to request a CPLD update.",
-            CMD_LINE_COLOR.ENDC,
-        )
-
     secondary_bus_reset = should_use_secondary_bus_reset(is_galaxy)
     if reset_wh_pci_idx:
         WHChipReset().full_lds_reset(
