@@ -126,14 +126,6 @@ def parse_args():
         dest="glx_reset_auto",
     )
     parser.add_argument(
-        "-glx_reset_tray",
-        "--galaxy_6u_reset_tray",
-        choices=["1", "2", "3", "4",],
-        default=None,
-        help="Reset a specific tray on the galaxy",
-        dest="glx_reset_tray",
-    )
-    parser.add_argument(
         "-glx_list_tray_to_device",
         "--galaxy_6u_list_tray_to_device",
         default=False,
@@ -293,13 +285,6 @@ def main():
 
         # All went well - exit
         sys.exit(0)
-    if args.glx_reset_tray is not None:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Galaxy 6U tray reset is no longer supported. Please use tt-smi -glx_reset to reset all chips or tt-smi -r.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
 
     try:
         if not args.use_luwen:
