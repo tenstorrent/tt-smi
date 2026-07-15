@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Reset-related functions for tt-smi: PCI board reset, galaxy 6U tray reset, and helpers.
+Reset-related functions for tt-smi: PCI board reset and helpers.
 
 Device-selection parsing for ``-r`` / ``--reset`` lives in
 :mod:`tt_smi.device_input`; this module focuses on the reset mechanism itself.
@@ -10,8 +10,6 @@ Device-selection parsing for ``-r`` / ``--reset`` lives in
 
 import os
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -21,16 +19,12 @@ from tt_smi.utils import (
     get_dev_id_from_bdf,
     get_driver_version,
     is_driver_version_at_least,
-    IoctlResetFlags,
-    reset_device_ioctl,
 )
 from tt_smi.constants import get_default_discovery_options
 from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 from pyluwen import (
     PciChip,
     pci_scan,
-    run_wh_ubb_ipmi_reset,
-    run_ubb_wait_for_driver_load,
 )
 from tt_umd import (
     WarmReset,
@@ -60,36 +54,6 @@ def should_use_secondary_bus_reset(is_galaxy: bool) -> bool:
         driver_version, MINIMUM_DRIVER_VERSION_GALAXY_SECONDARY_BUS_RESET
     )
 
-
-def parallel_reset_device_ioctl(device_ids: List[int], flag: int) -> List[int]:
-    """
-    Issue reset ioctl on each device in parallel.
-
-    Returns interface IDs where the ioctl did not complete successfully.
-    """
-    if not device_ids:
-        return []
-
-    def ioctl_one(interface_id: int) -> tuple[int, bool]:
-        return interface_id, reset_device_ioctl(interface_id, flag)
-
-    failed: List[int] = []
-    with ThreadPoolExecutor(max_workers=len(device_ids)) as pool:
-        for interface_id, ok in pool.map(ioctl_one, device_ids):
-            if not ok:
-                failed.append(interface_id)
-    return failed
-
-
-def timed_wait(seconds):
-    print("\033[93mWaiting for {} seconds: 0\033[0m".format(seconds), end='')
-    sys.stdout.flush()
-
-    for i in range(1, seconds + 1):
-        time.sleep(1)
-        print("\r\033[93mWaiting for {} seconds: {}\033[0m".format(seconds, i), end='')
-        sys.stdout.flush()
-    print()
 
 # Keep this function for now, but it's not used anywhere in the codebase. 
 # It is the check that is used in Funtest for Galaxy systems and we might need to reference it later.
@@ -129,33 +93,6 @@ def check_wh_galaxy_eth_link_status(devices):
                 CMD_LINE_COLOR.ENDC,
             )
         raise Exception("WH Galaxy Ethernet link errors detected!")
-
-def umd_ubb_wait_for_driver_load():
-    """
-    Wait for the driver to reload for UMD, try 100 times.
-    Similar to luwen's ubb_wait_for_driver_load but uses PCIDevice.enumerate_devices.
-    """
-    attempts = 0
-    expected_chip_count = 32
-
-    while attempts < 100:
-        device_count = 0
-        try:
-            devices = PCIDevice.enumerate_devices()
-            device_count = len(devices)
-            if device_count == expected_chip_count:
-                print(f"Driver loaded with {device_count} devices")
-                return
-        except Exception:
-            pass
-
-        print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
-        time.sleep(1)
-        attempts += 1
-
-    raise Exception(
-        f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up"
-    )
 
 def umd_pci_warm_reset(
     reset_input: SmiDeviceInput,
@@ -297,150 +234,3 @@ def pci_board_reset(
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
-
-
-def glx_6u_trays_reset(
-    reinit: bool = True,
-    ubb_num: str = "0xF",
-    dev_num: str = "0xFF",
-    op_mode: str = "0x0",
-    reset_time: str = "0xF",
-    print_status: bool = True,
-    use_umd: bool = False,
-):
-    """
-    Reset the WH asics on the galaxy systems with the following steps:
-    1. Perform USER_RESET ioctl on all chips
-    2. Reset the trays with ipmi command (or UMD warm reset)
-    3. Wait for 30s
-    4. Perform POST_RESET ioctl on all chips
-    5. Reinit all chips
-
-    Args:
-        reinit: Whether to reinitialize the chips after reset.
-        ubb_num: The UBB number to reset. 0x0~0xF (bit map)
-        dev_num: The device number to reset. 0x0~0xFF(bit map)
-        op_mode: The operation mode to use.
-        reset_time: The reset time to use. resolution 10ms (ex. 0xF => 15 => 150ms)
-        print_status: Whether to print out animations while detecting chips.
-        use_umd: Whether to use UMD (WarmReset.ubb_warm_reset) or pyluwen (run_wh_ubb_ipmi_reset)
-    """
-    # First, check if we're trying to do anything other than a full reset
-    if ubb_num != "0xF" or dev_num != "0xFF" or op_mode != "0x0" or reset_time != "0xF":
-        print(
-            CMD_LINE_COLOR.RED,
-            "Error: Galaxy 6U IPMI reset only supports full Galaxy reset ",
-            "(ubb_num=0xF, dev_num=0xFF, op_mode=0x0, reset_time=0xF)",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-    print(
-        CMD_LINE_COLOR.PURPLE,
-        "Resetting WH Galaxy trays with reset command...",
-        CMD_LINE_COLOR.ENDC,
-    )
-
-    if use_umd:
-        device_ids = list(PCIDevice.enumerate_devices())
-    else:
-        device_ids = pci_scan()
-
-    if should_use_secondary_bus_reset(True):
-        print(
-            CMD_LINE_COLOR.BLUE,
-            f"Issuing RESET_PCIE_LINK on {len(device_ids)} devices before IPMI reset...",
-            CMD_LINE_COLOR.ENDC,
-        )
-        for interface_id in parallel_reset_device_ioctl(
-            device_ids, IoctlResetFlags.RESET_PCIE_LINK
-        ):
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                f"Warning: Secondary bus reset not completed for device /dev/tenstorrent/{interface_id}. Continuing...",
-                CMD_LINE_COLOR.ENDC,
-            )
-
-    print(
-        CMD_LINE_COLOR.BLUE,
-        f"Issuing USER_RESET on {len(device_ids)} devices before IPMI reset...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    for interface_id in parallel_reset_device_ioctl(
-        device_ids, IoctlResetFlags.USER_RESET
-    ):
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"Warning: USER_RESET did not complete for device /dev/tenstorrent/{interface_id}. Continuing...",
-            CMD_LINE_COLOR.ENDC,
-        )
-
-    # IPMI reset
-    if use_umd:
-        WarmReset.ubb_warm_reset(timeout_s=100.0)
-    else:
-        run_wh_ubb_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
-    timed_wait(30)
-    # This function waits for all 32 chips to reappear on the bus.
-    run_ubb_wait_for_driver_load()
-
-    # Issue POST_RESET ioctl on all devices after they reappear
-    if use_umd:
-        post_reset_ids = list(PCIDevice.enumerate_devices())
-    else:
-        post_reset_ids = pci_scan()
-    print(
-        CMD_LINE_COLOR.BLUE,
-        f"Issuing POST_RESET on {len(post_reset_ids)} devices after IPMI reset...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    post_reset_failed = parallel_reset_device_ioctl(
-        post_reset_ids, IoctlResetFlags.POST_RESET
-    )
-    for interface_id in post_reset_failed:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Error: POST_RESET failed for device /dev/tenstorrent/{interface_id}.",
-            CMD_LINE_COLOR.ENDC,
-        )
-    if post_reset_failed:
-        sys.exit(1)
-
-    print(
-        CMD_LINE_COLOR.PURPLE,
-        "Re-initializing boards after reset....",
-        CMD_LINE_COLOR.ENDC,
-    )
-    if not reinit:
-        print(
-            CMD_LINE_COLOR.GREEN,
-            "Exiting after galaxy reset without re-initializing chips.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(0)
-    try:
-        if use_umd:
-            options = get_default_discovery_options()
-            options.discover_remote_devices = False
-            options.wait_on_ethernet_link_training = False
-            _, devices = TopologyDiscovery.discover(options=options)
-            chip_count = len(devices)
-        else:
-            os.environ["RUST_BACKTRACE"] = "full"
-            chips = detect_chips_with_callback(
-                local_only=True, ignore_ethernet=True, print_status=print_status
-            )
-            chip_count = len(chips)
-    except Exception as e:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Error when re-initializing chips!\n {e}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-
-    print(
-        CMD_LINE_COLOR.GREEN,
-        f"Re-initialized {chip_count} boards after reset. Exiting...",
-        CMD_LINE_COLOR.ENDC,
-    )
-    sys.exit(0)

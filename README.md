@@ -96,7 +96,7 @@ uv run pre-commit install
 tt-smi can be used as a GUI (`tt-smi`) or CLI (`tt-smi -s`) to display system information and Tenstorrent device telemetry, and it can be used to reset Tenstorrent devices (`tt-smi -r`).
 
 ```
-tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit]
+tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_list_tray_to_device] [--no_reinit]
 ```
 
 ## Getting Help
@@ -105,7 +105,7 @@ Running tt-smi with the ```-h, --help``` flag displays the help text.
 
 ```
 $ tt-smi -h
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_reset_tray {1,2,3,4}] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
 
 Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
 interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
@@ -122,12 +122,6 @@ options:
   -r [TARGETS ...], --reset [TARGETS ...]
                         Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or /dev/tenstorrent/<id>. Use -ls to list devices. Omit targets or use "all" to reset all devices. Do not mix types in one command.
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
-  -glx_reset, --galaxy_6u_trays_reset
-                        Reset all the ASICs on the galaxy host
-  -glx_reset_auto, --galaxy_6u_trays_reset_auto
-                        Reset all ASICs on the galaxy host, but do auto retries up to 3 times if reset fails
-  -glx_reset_tray {1,2,3,4}, --galaxy_6u_reset_tray {1,2,3,4}
-                        Reset a specific tray on the galaxy
   -glx_list_tray_to_device, --galaxy_6u_list_tray_to_device
                         List the mapping of devices to trays on the galaxy
   --no_reinit           Don't detect devices post reset
@@ -247,34 +241,9 @@ By default, the reset command will re-initialize the boards after reset. Use the
 
 ## Galaxy resets
 
-There are several options available for resetting Galaxy 6U trays.
-  - Use the `-r/--reset` argument and treat it like any other pcie card. Warning - Needs CPLD FW v1.16 or higher. 
-  - glx_reset: resets the galaxy, informs users if an Ethernet failure has been detected
-  - glx_reset_auto: same as -glx_reset, but resets up to 3 times if an Ethernet failure has been detected
-  - glx_reset_tray <tray_num>: performs reset on one galaxy tray. Tray number has to be between 1-4
+Use the `-r/--reset` argument on Galaxy systems and treat them like any other pcie card. Warning - Needs CPLD FW v1.16 or higher.
 
-### Full galaxy reset
-```
-tt-smi -glx_reset
- Resetting WH Galaxy trays with reset command...
-Executing command: sudo ipmitool raw 0x30 0x8B 0xF 0xFF 0x0 0xF
-Waiting for 30 seconds: 30
-Driver loaded
- Re-initializing boards after reset....
- Detected Chips: 32
- Re-initialized 32 boards after reset. Exiting...
-```
-### Tray reset
-```
-tt-smi -glx_reset_tray 3 --no_reinit
- Resetting WH Galaxy trays with reset command...
-Executing command: sudo ipmitool raw 0x30 0x8B 0x4 0xFF 0x0 0xF
-Waiting for 30 seconds: 30
-Driver loaded
- Re-initializing boards after reset....
- Exiting after galaxy reset without re-initializing chips.
-```
-To identify the correct tray number for resetting specific devices, users can run `tt-smi -glx_list_tray_to_device / --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate tray for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
+To identify the tray for specific devices, users can run `tt-smi -glx_list_tray_to_device / --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate devices for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
 
 ```
 $ tt-sml -glx_list_tray_to_device

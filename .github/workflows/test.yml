@@ -66,4 +66,4 @@ jobs:
 
       - name: Run hardware tests
         run: |
-          pytest tests/ -v -m requires_hardware -m "not requires_galaxy"
+          pytest tests/ -v -m requires_hardware

@@ -23,10 +23,7 @@ from tt_smi.utils import get_driver_version
 from tt_smi import constants
 from tt_smi.backend import TTSMIBackend
 from tt_smi.utils import check_is_galaxy, is_vm
-from tt_smi.reset import (
-    pci_board_reset,
-    glx_6u_trays_reset,
-)
+from tt_smi.reset import pci_board_reset
 from tt_smi.device_input import parse_smi_device_input
 from tt_smi.frontend import TTSMI
 
@@ -108,30 +105,6 @@ def parse_args():
         default=False,
         action="store_true",
         help="Force no-tty behavior in the snapshot to stdout",
-    )
-    parser.add_argument(
-        "-glx_reset",
-        "--galaxy_6u_trays_reset",
-        default=False,
-        action="store_true",
-        help="Reset all the ASICs on the galaxy host",
-        dest="glx_reset",
-    )
-    parser.add_argument(
-        "-glx_reset_auto",
-        "--galaxy_6u_trays_reset_auto",
-        default=False,
-        action="store_true",
-        help="Reset all ASICs on the galaxy host, but do auto retries up to 3 times if reset fails",
-        dest="glx_reset_auto",
-    )
-    parser.add_argument(
-        "-glx_reset_tray",
-        "--galaxy_6u_reset_tray",
-        choices=["1", "2", "3", "4",],
-        default=None,
-        help="Reset a specific tray on the galaxy",
-        dest="glx_reset_tray",
     )
     parser.add_argument(
         "-glx_list_tray_to_device",
@@ -242,69 +215,6 @@ def main():
         reset_input = parse_smi_device_input(args.reset)
         pci_board_reset(reset_input, reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         sys.exit(0)
-    # Handle ubb reset without backend
-    if args.glx_reset:
-        # Galaxy reset, without auto retries
-        try:
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                "Hint: tt-smi -r is now supported on Galaxy 6U.",
-                CMD_LINE_COLOR.ENDC,
-            )
-            # reinit has to be enabled to detect devices post reset
-            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
-        except Exception as e:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"Error in resetting galaxy 6u trays!\n{e}\n Exiting...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-    if args.glx_reset_auto:
-        # Galaxy reset with upto 3 auto retries
-        reset_try_number = 0
-        max_reset_try = 3
-        print(
-            CMD_LINE_COLOR.YELLOW,
-            f"This option will auto retry resetting galaxy 6u trays up to {max_reset_try} times if it fails.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        while reset_try_number < max_reset_try:
-            print(
-                CMD_LINE_COLOR.YELLOW,
-                f"Trying reset ({reset_try_number+1}/{max_reset_try})...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            try:
-                # Try to reset galaxy 6u trays
-                # reinit has to be enabled to detect devices post reset
-                glx_6u_trays_reset(reinit=True, print_status=is_tty, use_umd=not args.use_luwen)
-                break  # If reset was successful, break the loop
-            except Exception as e:
-                reset_try_number += 1
-                if reset_try_number < max_reset_try:
-                    print(
-                        CMD_LINE_COLOR.RED,
-                        f"Error in resetting galaxy 6u trays, resetting again...",
-                        CMD_LINE_COLOR.ENDC,
-                    )
-                else:
-                    print(
-                        CMD_LINE_COLOR.RED,
-                        f"Failed on last reset...exiting with error code 1",
-                        CMD_LINE_COLOR.ENDC,
-                    )
-                    sys.exit(1)
-
-        # All went well - exit
-        sys.exit(0)
-    if args.glx_reset_tray is not None:
-        print(
-            CMD_LINE_COLOR.RED,
-            f"Galaxy 6U tray reset is no longer supported. Please use tt-smi -glx_reset to reset all chips or tt-smi -r.",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
 
     try:
         if not args.use_luwen:
