@@ -1,3 +1,13 @@
+tt-smi (6.1.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Bump UMD 0.9.5 -> 0.9.8 to include updated messaging
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.1.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 24 Jul 2026 15:24:19 +0000
+
 tt-smi (6.0.0) noble; urgency=medium
 
   [ Sungjoon Moon ]
