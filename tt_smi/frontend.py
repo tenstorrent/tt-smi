@@ -422,6 +422,34 @@ class TTSMI(App):
                             justify="center",
                         )
                     )
+                elif telem == "board_power":
+                    max_board_power = self.backend.chip_limits[board_num]["board_power_limit"]
+                    if val == "N/A":
+                        device_row.append(
+                            Text(
+                                f"{val}",
+                                style=self.text_theme["gray"],
+                                justify="center",
+                            )
+                            + Text(
+                                f"/ {max_board_power}" if max_board_power else "/ ---",
+                                style=self.text_theme["yellow_bold"] if max_board_power else self.text_theme["gray"],
+                                justify="center",
+                            )
+                        )
+                    else:
+                        device_row.append(
+                            Text(
+                                f"{val}",
+                                style=self.text_theme["text_green"] if float(val) < float(max_board_power) else self.text_theme["attention"],
+                                justify="center",
+                            )
+                            + Text(
+                                f"/ {max_board_power}" if max_board_power else "/ ---",
+                                style=self.text_theme["yellow_bold"] if max_board_power else self.text_theme["gray"],
+                                justify="center",
+                            )
+                        )
                 elif telem == "aiclk":
                     asic_fmax = self.backend.chip_limits[board_num]["asic_fmax"]
                     device_row.append(

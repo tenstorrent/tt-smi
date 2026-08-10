@@ -104,6 +104,7 @@ class TestSnapshot:
             assert "voltage" in telemetry
             assert "current" in telemetry
             assert "power" in telemetry
+            assert "board_power" in telemetry
             assert "aiclk" in telemetry
             assert "asic_temperature" in telemetry
             assert "fan_speed" in telemetry
@@ -136,6 +137,7 @@ class TestSnapshot:
             assert "therm_trip_l1_limit" in limits
             assert "thm_limit" in limits
             assert "bus_peak_limit" in limits
+            assert "board_power_limit" in limits
 
     def test_snapshot_no_tty(self):
         """Test if the output from tt-smi -s --snapshot_no_tty can be parsed as json"""
