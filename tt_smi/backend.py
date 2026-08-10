@@ -351,6 +351,13 @@ class TTSMIBackend:
             for telem_key in tag_collection:
                 telem_value = hex(telem_reader.read_entry(telem_key.value)) if telem_reader.is_entry_available(telem_key.value) else None
                 smbus_telem_dict[telem_key.name] = telem_value
+            # UMD TelemetryTag omits TAG_INPUT_POWER (54); read it by tag id.
+            if telem_reader.is_entry_available(constants.TAG_INPUT_POWER):
+                smbus_telem_dict["INPUT_POWER"] = hex(
+                    telem_reader.read_entry(constants.TAG_INPUT_POWER)
+                )
+            else:
+                smbus_telem_dict["INPUT_POWER"] = None
             return smbus_telem_dict
         
         pyluwen_chip = self.devices[board_num]
@@ -665,6 +672,10 @@ class TTSMIBackend:
             if self.smbus_telem_info[board_num]["TDP"] is not None
             else 0
         )
+        input_power = self.smbus_telem_info[board_num].get("INPUT_POWER")
+        board_power = (
+            f"{int(input_power, 16):5.1f}" if input_power is not None else "N/A"
+        )
         asic_temperature = (
             (
                 convert_signed_16_16_to_float(
@@ -690,6 +701,7 @@ class TTSMIBackend:
             "voltage": f"{voltage:4.2f}",
             "current": f"{current:5.1f}",
             "power": f"{power:5.1f}",
+            "board_power": board_power,
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
             "fan_speed": f"{fan_speed}",
@@ -705,6 +717,10 @@ class TTSMIBackend:
         else:
             voltage = 10000
         power = int(self.smbus_telem_info[board_num]["TDP"], 16) & 0xFFFF
+        input_power = self.smbus_telem_info[board_num].get("INPUT_POWER")
+        board_power = (
+            f"{int(input_power, 16):5.1f}" if input_power is not None else "N/A"
+        )
         asic_temperature = (
             int(self.smbus_telem_info[board_num]["ASIC_TEMPERATURE"], 16) & 0xFFFF
         ) / 16
@@ -722,6 +738,7 @@ class TTSMIBackend:
             "voltage": f"{voltage:4.2f}",
             "current": f"{current:5.1f}",
             "power": f"{power:5.1f}",
+            "board_power": board_power,
             "aiclk": f"{aiclk:4.0f}",
             "asic_temperature": f"{asic_temperature:4.1f}",
             "fan_speed": f"{fan_speed}",
@@ -783,6 +800,11 @@ class TTSMIBackend:
             elif field == "thm_limit":
                 thm_limits = self.smbus_telem_info[board_num].get("THM_LIMITS")
                 chip_limits[field] = f"{int(thm_limits, 16) & 0xFFFF:2.0f}" if thm_limits else 0
+            elif field == "board_power_limit":
+                board_power_limit = self.smbus_telem_info[board_num].get("BOARD_POWER_LIMIT")
+                chip_limits[field] = (
+                    f"{int(board_power_limit, 16):3.0f}" if board_power_limit else 0
+                )
             else:
                 chip_limits[field] = 0
         return chip_limits
@@ -818,6 +840,11 @@ class TTSMIBackend:
                 else:
                     thm_limits = 0
                 chip_limits[field] = f"{int(thm_limits, 16):2.0f}" if thm_limits else 0
+            elif field == "board_power_limit":
+                board_power_limit = self.smbus_telem_info[board_num].get("BOARD_POWER_LIMIT")
+                chip_limits[field] = (
+                    f"{int(board_power_limit, 16):3.0f}" if board_power_limit else 0
+                )
             else:
                 chip_limits[field] = 0
         return chip_limits

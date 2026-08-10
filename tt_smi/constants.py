@@ -116,6 +116,7 @@ TELEM_LIST = [
     "current",
     "aiclk",
     "power",
+    "board_power",
     "asic_temperature",
     "fan_speed",
     "heartbeat",
@@ -131,7 +132,11 @@ LIMITS = [
     "thm_limit",
     "bus_peak_limit",
     "fan_rpm_limit",
+    "board_power_limit",
 ]
+
+# FW TAG_INPUT_POWER; missing from UMD TelemetryTag as of tt-umd 0.9.8
+TAG_INPUT_POWER = 54
 
 # leaving this intact for the snapshot version of the firmware list 
 # Don't want to break any automations we have around the snapshot
@@ -205,6 +210,7 @@ TELEMETRY_TABLE_HEADER = [
     "Core Current (A)",
     "AICLK (MHz)",
     "Core Power (W)",
+    "Board Power (W)",
     "Core Temp (°C)",
     "Fan Speed (RPM)",
     "Heartbeat",

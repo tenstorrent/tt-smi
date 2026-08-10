@@ -229,6 +229,7 @@ class Telemetry(ElasticModel):
     current: str
     aiclk: str
     power: str
+    board_power: str
     asic_temperature: str
 
 
