@@ -1,3 +1,13 @@
+tt-smi (6.2.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Add total board power to telemetry table and snapshot.
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.2.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 11 Aug 2026 15:32:05 +0000
+
 tt-smi (6.1.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
