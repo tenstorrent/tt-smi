@@ -148,6 +148,62 @@ All GUI keyboard shortcuts can be found in the help menu that user can bring up 
 
 ![help_menu](images/help.png)
 
+### GUI Field Reference
+
+The GUI has four tabs. Each row is one device (except the Processes tab, which lists host processes using Tenstorrent devices). Several Telemetry values are shown as `current / limit` when a firmware limit is available.
+
+#### Information (1)
+
+| Field | Description |
+|-------|-------------|
+| `#` | Logical device index used by TT-SMI for this session (same numbering as UMD Chip ID with the default backend). |
+| Bus ID | PCI bus/device/function (BDF) address of the device, for example `0000:01:00.0`. |
+| Board Type | Product / board series identifier (for example `p150a`, `n300`, `tt-galaxy-bh`). An `R` suffix means the chip is a remote (non-PCIe host) chip on a multi-chip board. |
+| Board ID | Unique board serial / board ID string read from the device. |
+| Coords | Ethernet mesh coordinates for Wormhole multi-chip systems, shown as `(x, y, rack, shelf)`. Shown as `N/A` on Blackhole. |
+| DRAM Trained | Whether on-board DRAM/GDDR completed training successfully (`Yes` / `No`). |
+| DRAM Speed | Trained DRAM/GDDR data rate (for example `16G`). |
+| Link Speed | Current PCIe link generation negotiated with the host (for example Gen4 / Gen5). |
+| Link Width | Current PCIe link width in lanes (for example `8` or `16`). |
+
+#### Telemetry (2)
+
+Live device metrics updated about every 100 ms. Where a limit applies, values appear as `measured / limit`.
+
+| Field | Description |
+|-------|-------------|
+| `#` | Logical device index for this row. |
+| Core Voltage (V) | ASIC core (VCORE) supply voltage in volts. Shown with the configured maximum VDD limit. |
+| Core Current (A) | ASIC core current draw in amperes. Shown with the thermal design current (TDC) limit. |
+| AICLK (MHz) | AI clock frequency in megahertz — the main compute clock. Shown with the maximum allowed AICLK. |
+| Core Power (W) | ASIC core power draw in watts. Shown with the thermal design power (TDP) limit. |
+| Board Power (W) | Total board input power from the host power supply, in watts. Shown with the board power limit. May be `N/A` if the firmware does not report input power. |
+| Core Temp (°C) | ASIC temperature in degrees Celsius. Shown with the thermal throttle / temperature limit. |
+| Fan Speed (RPM) | Cooling fan speed in revolutions per minute. Shown as `N/A` when the board has no controllable fan or fan telemetry is unavailable. |
+| Heartbeat | Animated indicator that firmware is alive and updating. The spinner advances while the on-device firmware heartbeat counter is increasing. |
+
+#### FW Version (3)
+
+| Field | Description |
+|-------|-------------|
+| `#` | Logical device index for this row. |
+| FW Bundle Version | Version of the full firmware package flashed to the board (the bundle that contains the component firmwares below). |
+| CM FW Version | Chip Management (CM / ARC) firmware version — the primary on-chip management firmware. |
+| ETH FW Version | Ethernet firmware version used for chip-to-chip and fabric Ethernet links. |
+| DM App Version | Device Management (DM) application firmware version — board management microcontroller application software. |
+| GDDR FW Version | GDDR memory controller firmware version (Blackhole). Shown as `N/A` on boards that do not report it. |
+
+#### Processes (4)
+
+Host processes currently holding open Tenstorrent device handles. Updated about every 100 ms.
+
+| Field | Description |
+|-------|-------------|
+| PID | Host process ID using the device. |
+| User | Username that owns the process. |
+| Device | Logical device index the process is using. |
+| Command | Process command line (or executable name) as reported by the host. |
+
 ## Listing devices
 
 Use **`tt-smi -ls`** or **`tt-smi --list`** to print a table of Tenstorrent devices and exit (no GUI). This is the easiest way to see **UMD Chip ID**, **PCI BDF**, and **`/dev/tenstorrent/<n>`** (shown as **PCI Dev ID**) for each board—use these values with `tt-smi -r` as described in [Resets](#resets).
