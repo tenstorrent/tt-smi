@@ -1,3 +1,16 @@
+tt-smi (6.2.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * chore: document GUI tab field meanings in README
+
+  [ Zakhary Kaplan ]
+  * build(deps): bump pyluwen to 0.9.0
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.2.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 14 Aug 2026 17:10:06 +0000
+
 tt-smi (6.2.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
