@@ -14,7 +14,7 @@ from enum import IntEnum
 from importlib.metadata import version
 from typing import Tuple, Union
 
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.colors import CMD_LINE_COLOR
 
 from tt_smi import constants
 

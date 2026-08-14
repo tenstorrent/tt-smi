@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Tuple, Union
 
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.colors import CMD_LINE_COLOR
 
 DEV_TENSTORRENT_PREFIX = "/dev/tenstorrent/"
 PCI_BDF_FULL_RE = re.compile(

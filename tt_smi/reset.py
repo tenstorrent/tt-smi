@@ -14,7 +14,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.colors import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_smi.utils import (
@@ -82,12 +82,12 @@ def parallel_reset_device_ioctl(device_ids: List[int], flag: int) -> List[int]:
 
 
 def timed_wait(seconds):
-    print("\033[93mWaiting for {} seconds: 0\033[0m".format(seconds), end='')
+    print("{}Waiting for {} seconds: 0{}".format(CMD_LINE_COLOR.YELLOW, seconds, CMD_LINE_COLOR.ENDC), end='')
     sys.stdout.flush()
 
     for i in range(1, seconds + 1):
         time.sleep(1)
-        print("\r\033[93mWaiting for {} seconds: {}\033[0m".format(seconds, i), end='')
+        print("\r{}Waiting for {} seconds: {}{}".format(CMD_LINE_COLOR.YELLOW, seconds, i, CMD_LINE_COLOR.ENDC), end='')
         sys.stdout.flush()
     print()
 
