@@ -48,6 +48,7 @@ class TestSnapshot:
             assert "smbus_telem" in device_info
             assert "board_info" in device_info
             assert "telemetry" in device_info
+            assert "gddr_telemetry" in device_info
             assert "firmwares" in device_info
             assert "limits" in device_info
 
@@ -109,6 +110,33 @@ class TestSnapshot:
             assert "asic_temperature" in telemetry
             assert "fan_speed" in telemetry
             assert "heartbeat" in telemetry
+
+    def test_gddr_telemetry_fields_present(self, snapshot):
+        """Test if fields are present in gddr_telemetry."""
+        channel_fields = (
+            "channel",
+            "enabled",
+            "training",
+            "bist",
+            "temp_top",
+            "temp_bottom",
+            "corr_rd",
+            "corr_wr",
+            "uncorr_rd",
+            "uncorr_wr",
+        )
+        device_infos = snapshot["device_info"]
+        for device_info in device_infos:
+            gddr = device_info["gddr_telemetry"]
+            assert "speed" in gddr
+            assert "max_temp" in gddr
+            assert "enabled_mask" in gddr
+            assert "channels" in gddr
+            assert isinstance(gddr["channels"], list)
+            assert len(gddr["channels"]) in (6, 8)
+            for ch in gddr["channels"]:
+                for field in channel_fields:
+                    assert field in ch
 
     def test_firmwares_fields_present(self, snapshot):
         """Test if fields are present in firmwares."""

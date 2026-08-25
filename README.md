@@ -150,7 +150,7 @@ All GUI keyboard shortcuts can be found in the help menu that user can bring up 
 
 ### GUI Field Reference
 
-The GUI has four tabs. Each row is one device (except the Processes tab, which lists host processes using Tenstorrent devices). Several Telemetry values are shown as `current / limit` when a firmware limit is available.
+The GUI has five tabs. Each row is one device (except the Processes tab, which lists host processes using Tenstorrent devices, and the GDDR Telemetry tab, which lists one row per GDDR channel). Several Telemetry values are shown as `current / limit` when a firmware limit is available.
 
 #### Information (1)
 
@@ -182,7 +182,26 @@ Live device metrics updated about every 100 ms. Where a limit applies, values ap
 | Fan Speed (RPM) | Cooling fan speed in revolutions per minute. Shown as `N/A` when the board has no controllable fan or fan telemetry is unavailable. |
 | Heartbeat | Animated indicator that firmware is alive and updating. The spinner advances while the on-device firmware heartbeat counter is increasing. |
 
-#### FW Version (3)
+#### GDDR Telemetry (3)
+
+Live per-channel GDDR metrics updated about every 100 ms. Blackhole reports temperatures, EDC error counts, training, and BIST for up to 8 channels. Wormhole reports training status for 6 channels; other fields show `N/A`. Harvested / disabled channels are marked `Enabled = N` with temperatures and errors as `N/A`.
+
+| Field | Description |
+|-------|-------------|
+| `#` | Logical device index for this row. |
+| Ch | GDDR channel index on that device (`0`–`7` on Blackhole, `0`–`5` on Wormhole). |
+| Enabled | Whether the channel is present and enabled (`Y` / `N`). |
+| Training | Channel training result (`Pass` / `Fail` / `N/A`). |
+| BIST | Built-in self-test result after training (`Pass` / `Fail` / `N/A`). Shown as `N/A` on firmware older than 19.7 and on Wormhole. |
+| Speed | Trained GDDR data rate (for example `16G`). Device-level; shown once per device. |
+| Top (°C) | Top DRAM die temperature in degrees Celsius. |
+| Bot (°C) | Bottom DRAM die temperature in degrees Celsius. |
+| Corr RD | Correctable EDC errors on read since reset (saturates at 255). Highlighted when non-zero. |
+| Corr WR | Correctable EDC errors on write since reset (saturates at 255). Highlighted when non-zero. |
+| Uncorr RD | Uncorrectable EDC error flag on read (`0` / `1`). Highlighted when set. |
+| Uncorr WR | Uncorrectable EDC error flag on write (`0` / `1`). Highlighted when set. |
+
+#### FW Version (4)
 
 | Field | Description |
 |-------|-------------|
@@ -193,7 +212,7 @@ Live device metrics updated about every 100 ms. Where a limit applies, values ap
 | DM App Version | Device Management (DM) application firmware version — board management microcontroller application software. |
 | GDDR FW Version | GDDR memory controller firmware version (Blackhole). Shown as `N/A` on boards that do not report it. |
 
-#### Processes (4)
+#### Processes (5)
 
 Host processes currently holding open Tenstorrent device handles. Updated about every 100 ms.
 

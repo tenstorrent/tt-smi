@@ -156,8 +156,9 @@ class TTSMI(App):
         ("c, C", "toggle_compact", "Toggle sidebar"),
         ("1", "tab_one", "Device info tab"),
         ("2", "tab_two", "Telemetry tab"),
-        ("3", "tab_three", "Firmware tab"),
-        ("4", "tab_four", "Processes tab"),
+        ("3", "tab_three", "GDDR telemetry tab"),
+        ("4", "tab_four", "Firmware tab"),
+        ("5", "tab_five", "Processes tab"),
     ]
 
     try:
@@ -225,7 +226,12 @@ class TTSMI(App):
                         title="Latest Releases",
                     )
             with TabbedContent(
-                "Information (1)", "Telemetry (2)", "FW Version (3)", "Processes (4)", id="tab_container"
+                "Information (1)",
+                "Telemetry (2)",
+                "GDDR Telemetry (3)",
+                "FW Version (4)",
+                "Processes (5)",
+                id="tab_container",
             ):
                 yield TTDataTable(
                     title="Device Information",
@@ -237,6 +243,12 @@ class TTSMI(App):
                     title="Device Telemetry",
                     id="tt_smi_telem",
                     header=constants.TELEMETRY_TABLE_HEADER,
+                    header_height=2,
+                )
+                yield TTDataTable(
+                    title="GDDR Telemetry",
+                    id="tt_smi_gddr_telem",
+                    header=constants.GDDR_TELEMETRY_TABLE_HEADER,
                     header_height=2,
                 )
                 yield TTDataTable(
@@ -272,6 +284,10 @@ class TTSMI(App):
         self.backend.update_processes()
         proc_table.dt.add_rows(self.format_process_rows())
 
+        gddr_table = self.get_widget_by_id(id="tt_smi_gddr_telem")
+        gddr_table.dt.cursor_type = "none"
+        gddr_table.dt.add_rows(self.format_gddr_telemetry_rows())
+
         left_sidebar = self.query_one("#left_col")
         left_sidebar.display = self.show_sidebar
 
@@ -302,14 +318,19 @@ class TTSMI(App):
         self.call_from_thread(box.finalize)
 
     def update_telem_table(self) -> None:
-        """Update telemetry table"""
+        """Update telemetry tables"""
+        self.backend.update_telem()
         try:
             telem_table = self.get_widget_by_id(id="tt_smi_telem")
-            self.backend.update_telem()
             rows = self.format_telemetry_rows()
             telem_table.update_data(rows)
         # When we bring up the help menu, the telem table is no longer visible,
         # but the thread keeps running, so we need to ignore that exception.
+        except NoMatches:
+            pass
+        try:
+            gddr_table = self.get_widget_by_id(id="tt_smi_gddr_telem")
+            gddr_table.update_data(self.format_gddr_telemetry_rows())
         except NoMatches:
             pass
 
@@ -497,6 +518,100 @@ class TTSMI(App):
                         Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                     )
             all_rows.append(device_row)
+        return all_rows
+
+    def _gddr_status_text(self, val: str) -> Text:
+        """Format a pass/fail/n/a GDDR status cell."""
+        display = val.title() if val != "n/a" else "N/A"
+        if val == "pass":
+            style = self.text_theme["text_green"]
+        elif val == "fail":
+            style = self.text_theme["attention"]
+        else:
+            style = self.text_theme["gray"]
+        return Text(display, style=style, justify="center")
+
+    def _gddr_value_text(self, val: str, alert: bool = False) -> Text:
+        """Format a numeric GDDR cell; gray N/A, red when alert is set."""
+        if val in (None, "N/A", "n/a"):
+            return Text("N/A", style=self.text_theme["gray"], justify="center")
+        style = self.text_theme["attention"] if alert else self.text_theme["text_green"]
+        return Text(str(val), style=style, justify="center")
+
+    def _gddr_separator_row(self) -> List[Text]:
+        """Gray dashed row used to separate device channel groups."""
+        ncols = len(constants.GDDR_TELEMETRY_TABLE_HEADER)
+        return [
+            Text("────", style=self.text_theme["gray"], justify="center")
+            for _ in range(ncols)
+        ]
+
+    def format_gddr_telemetry_rows(self) -> List[List[Text]]:
+        """Format GDDR telemetry rows (one row per channel)."""
+        all_rows = []
+        first_device = True
+        for board_num in self.backend.devices:
+            gddr = self.backend.device_gddr_telemetrys[board_num]
+            speed = gddr.get("speed") or "N/A"
+            channels = gddr.get("channels", [])
+            if not channels:
+                continue
+            if not first_device:
+                all_rows.append(self._gddr_separator_row())
+            first_device = False
+            for ch_idx, ch in enumerate(channels):
+                enabled = bool(ch.get("enabled"))
+                uncorr_rd = ch.get("uncorr_rd", "N/A")
+                uncorr_wr = ch.get("uncorr_wr", "N/A")
+                corr_rd = ch.get("corr_rd", "N/A")
+                corr_wr = ch.get("corr_wr", "N/A")
+                # DataTable has no rowspan; show device-level fields once per group.
+                device_cell = (
+                    Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
+                    if ch_idx == 0
+                    else Text("", justify="center")
+                )
+                speed_cell = (
+                    self._gddr_value_text(speed)
+                    if ch_idx == 0
+                    else Text("", justify="center")
+                )
+                row = [
+                    device_cell,
+                    Text(f"{ch.get('channel', 'N/A')}", style=self.text_theme["yellow_bold"], justify="center"),
+                    Text(
+                        "Y" if enabled else "N",
+                        style=self.text_theme["text_green"] if enabled else self.text_theme["gray"],
+                        justify="center",
+                    ),
+                    self._gddr_status_text(ch.get("training", "n/a")),
+                    self._gddr_status_text(ch.get("bist", "n/a")),
+                    speed_cell,
+                    self._gddr_value_text(ch.get("temp_top", "N/A")),
+                    self._gddr_value_text(ch.get("temp_bottom", "N/A")),
+                    self._gddr_value_text(
+                        corr_rd,
+                        alert=corr_rd not in (None, "N/A", "n/a", "0") and enabled,
+                    ),
+                    self._gddr_value_text(
+                        corr_wr,
+                        alert=corr_wr not in (None, "N/A", "n/a", "0") and enabled,
+                    ),
+                    self._gddr_value_text(
+                        uncorr_rd,
+                        alert=uncorr_rd not in (None, "N/A", "n/a", "0") and enabled,
+                    ),
+                    self._gddr_value_text(
+                        uncorr_wr,
+                        alert=uncorr_wr not in (None, "N/A", "n/a", "0") and enabled,
+                    ),
+                ]
+                all_rows.append(row)
+        if not all_rows:
+            ncols = len(constants.GDDR_TELEMETRY_TABLE_HEADER)
+            empty = [Text("", justify="center") for _ in range(ncols)]
+            empty[0] = Text("No GDDR telemetry", style=self.text_theme["gray"], justify="center")
+            all_rows.append(empty)
         return all_rows
 
     def get_heartbeat_spinner(self, input_secs: Union[int, str]) -> str:
@@ -733,12 +848,16 @@ class TTSMI(App):
         self.query_one(TabbedContent).active = "tab-2"
 
     def action_tab_three(self) -> None:
-        """Switch to read-only tab"""
+        """Switch to GDDR telemetry tab"""
         self.query_one(TabbedContent).active = "tab-3"
 
     def action_tab_four(self) -> None:
-        """Switch to processes tab"""
+        """Switch to firmware tab"""
         self.query_one(TabbedContent).active = "tab-4"
+
+    def action_tab_five(self) -> None:
+        """Switch to processes tab"""
+        self.query_one(TabbedContent).active = "tab-5"
 
     def action_help(self) -> None:
         """Pop up the help menu"""
@@ -785,9 +904,9 @@ class TTSMI(App):
         """This function runs every time a tab is activated"""
         tab_id = self.query_one(TabbedContent).active
 
-        if tab_id == "tab-2":
+        if tab_id == "tab-2" or tab_id == "tab-3":
             self.dispatch_telem_thread()
-        elif tab_id == "tab-4":
+        elif tab_id == "tab-5":
             self.dispatch_process_thread()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:

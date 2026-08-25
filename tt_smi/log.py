@@ -234,6 +234,28 @@ class Telemetry(ElasticModel):
 
 
 @optional
+class GddrChannelTelemetry(ElasticModel):
+    channel: int
+    enabled: bool
+    training: str
+    bist: str
+    temp_top: str
+    temp_bottom: str
+    corr_rd: str
+    corr_wr: str
+    uncorr_rd: str
+    uncorr_wr: str
+
+
+@optional
+class GddrTelemetry(ElasticModel):
+    speed: str
+    max_temp: str
+    enabled_mask: str
+    channels: List[GddrChannelTelemetry]
+
+
+@optional
 class Firmwares(ElasticModel):
     cm_fw: str
     cm_fw_date: str
@@ -262,6 +284,7 @@ class TTSMIDeviceLog(ElasticModel):
     smbus_telem: SmbusTelem
     board_info: BoardInfo
     telemetry: Telemetry
+    gddr_telemetry: GddrTelemetry
     firmwares: Firmwares
     limits: Limits
 
