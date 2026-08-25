@@ -286,9 +286,10 @@ def decode_wh_gddr_channel_training(dram_status: int, channel: int) -> str:
     return "n/a"
 
 
-def _gddr_channel_na(channel: int, enabled: bool = False) -> Dict[str, Any]:
+def _gddr_channel_na(channel: int, enabled: bool = False, harvested: bool = False) -> Dict[str, Any]:
     return {
         "channel": channel,
+        "harvested": harvested,
         "enabled": enabled,
         "training": "n/a",
         "bist": "n/a",
@@ -346,7 +347,13 @@ def build_gddr_telemetry(
 
         for channel in range(BH_GDDR_CHANNELS):
             enabled = bool(enabled_mask & (1 << channel))
-            ch = _gddr_channel_na(channel, enabled=enabled)
+            harvested = (not enabled) or (
+                dram_status is not None
+                and is_bh_gddr_channel_harvested(dram_status, channel, has_bist)
+            )
+            if harvested:
+                enabled = False
+            ch = _gddr_channel_na(channel, enabled=enabled, harvested=harvested)
             if dram_status is not None:
                 training, bist = decode_bh_gddr_channel_status(
                     dram_status, channel, has_bist
@@ -387,52 +394,50 @@ def build_gddr_telemetry(
     return gddr
 
 
-def p100_dram_training_passed(dram_status: int) -> bool:
-    """
-    Check if DRAM training passed for P100.
+def is_bh_gddr_channel_harvested(
+    dram_status: int, channel: int, has_bist: bool
+) -> bool:
+    """True when a BH GDDR channel never ran training/BIST (0b00 / 0b00)."""
+    if not has_bist:
+        return False
+    training, bist = decode_bh_gddr_channel_status(
+        dram_status, channel, has_bist=True
+    )
+    return training == "n/a" and bist == "n/a"
 
-    P100 may ship with one harvested GDDR channel (any of the 8). Pass when
-    exactly 7 channels report training+BIST success (0b01 in each 2-bit field),
-    and one channel reports all status bits clear (0b00 — absent/harvested slot).
+
+def bh_dram_training_passed(dram_status: int) -> bool:
+    """
+    Check if DRAM training passed for Blackhole.
+
+    Firmware may harvest up to one GDDR channel on any BH ASIC (PT-505).
+    Pass when all 8 channels report training+BIST success (0b01), or when
+    exactly 7 channels pass and one slot is all zeros (0b00 — harvested).
+    A training/BIST error on any channel, more than one harvested slot, or a
+    partial/incomplete state is a fail.
     """
     passing_channels = 0
     harvested_channels = 0
 
-    for channel in range(8):
-        # Per-channel DDR_STATUS layout (FW 19.7.3.0+):
-        #   bits [2i+1:2i]     - [training error | training complete]
-        #   bits [17+2i:16+2i] - [BIST failed    | BIST complete]
-        #
-        # 0b01 = success, 0b10 = failure, 0b00 = not run (harvested on P100)
-        training_complete = bool(dram_status & (1 << (2 * channel)))
-        training_error = bool(dram_status & (1 << (2 * channel + 1)))
-        bist_complete = bool(dram_status & (1 << (16 + 2 * channel)))
-        bist_failed = bool(dram_status & (1 << (17 + 2 * channel)))
-
-        if (
-            training_complete
-            and not training_error
-            and bist_complete
-            and not bist_failed
-        ):
-            # Active channel: trained and passed BIST (0b01 / 0b01).
+    for channel in range(BH_GDDR_CHANNELS):
+        training, bist = decode_bh_gddr_channel_status(
+            dram_status, channel, has_bist=True
+        )
+        if training == "pass" and bist == "pass":
             passing_channels += 1
-        elif (
-            not training_complete
-            and not training_error
-            and not bist_complete
-            and not bist_failed
-        ):
-            # Harvested channel: firmware never ran training/BIST (0b00 / 0b00).
+        elif training == "n/a" and bist == "n/a":
             harvested_channels += 1
             if harvested_channels > 1:
                 return False
         else:
-            # Real failure: error/fail bit set, or partial/incomplete state.
             return False
 
-    # P100 expects 7 active GDDR channels and 1 harvested slot.
-    return passing_channels == 7 and harvested_channels == 1
+    return passing_channels + harvested_channels == BH_GDDR_CHANNELS and harvested_channels <= 1
+
+
+def p100_dram_training_passed(dram_status: int) -> bool:
+    """Alias for bh_dram_training_passed; P100 uses the same harvest-tolerant check."""
+    return bh_dram_training_passed(dram_status)
 
 
 def get_board_type(board_id: str) -> str:

@@ -236,6 +236,7 @@ class Telemetry(ElasticModel):
 @optional
 class GddrChannelTelemetry(ElasticModel):
     channel: int
+    harvested: bool
     enabled: bool
     training: str
     bist: str

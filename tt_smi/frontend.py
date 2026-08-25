@@ -526,7 +526,7 @@ class TTSMI(App):
         if val == "pass":
             style = self.text_theme["text_green"]
         elif val == "fail":
-            style = self.text_theme["attention"]
+            style = self.text_theme["red_bold"]
         else:
             style = self.text_theme["gray"]
         return Text(display, style=style, justify="center")
@@ -537,6 +537,10 @@ class TTSMI(App):
             return Text("N/A", style=self.text_theme["gray"], justify="center")
         style = self.text_theme["attention"] if alert else self.text_theme["text_green"]
         return Text(str(val), style=style, justify="center")
+
+    def _gddr_harvested_dash(self) -> Text:
+        """Placeholder for fields that do not apply on a harvested channel."""
+        return Text("-", style=self.text_theme["attention"], justify="center")
 
     def _gddr_separator_row(self) -> List[Text]:
         """Gray dashed row used to separate device channel groups."""
@@ -561,24 +565,43 @@ class TTSMI(App):
             first_device = False
             for ch_idx, ch in enumerate(channels):
                 enabled = bool(ch.get("enabled"))
+                harvested = bool(ch.get("harvested"))
                 uncorr_rd = ch.get("uncorr_rd", "N/A")
                 uncorr_wr = ch.get("uncorr_wr", "N/A")
                 corr_rd = ch.get("corr_rd", "N/A")
                 corr_wr = ch.get("corr_wr", "N/A")
-                # DataTable has no rowspan; show device-level fields once per group.
+                # DataTable has no rowspan; show the device index once per group.
                 device_cell = (
                     Text(f"{board_num}", style=self.text_theme["yellow_bold"], justify="center")
                     if ch_idx == 0
                     else Text("", justify="center")
                 )
-                speed_cell = (
-                    self._gddr_value_text(speed)
-                    if ch_idx == 0
-                    else Text("", justify="center")
+                failed = ch.get("training") == "fail" or ch.get("bist") == "fail"
+                channel_cell = Text(
+                    f"{ch.get('channel', 'N/A')}",
+                    style=self.text_theme["red_bold"] if failed else self.text_theme["yellow_bold"],
+                    justify="center",
                 )
+                harvested_cell = Text(
+                    "Y" if harvested else "N",
+                    style=self.text_theme["attention"] if harvested else self.text_theme["gray"],
+                    justify="center",
+                )
+                if harvested:
+                    row = [
+                        device_cell,
+                        channel_cell,
+                        harvested_cell,
+                    ] + [
+                        self._gddr_harvested_dash()
+                        for _ in range(len(constants.GDDR_TELEMETRY_TABLE_HEADER) - 3)
+                    ]
+                    all_rows.append(row)
+                    continue
                 row = [
                     device_cell,
-                    Text(f"{ch.get('channel', 'N/A')}", style=self.text_theme["yellow_bold"], justify="center"),
+                    channel_cell,
+                    harvested_cell,
                     Text(
                         "Y" if enabled else "N",
                         style=self.text_theme["text_green"] if enabled else self.text_theme["gray"],
@@ -586,7 +609,11 @@ class TTSMI(App):
                     ),
                     self._gddr_status_text(ch.get("training", "n/a")),
                     self._gddr_status_text(ch.get("bist", "n/a")),
-                    speed_cell,
+                    self._gddr_value_text(
+                        speed
+                        if enabled and ch.get("training") == "pass"
+                        else "N/A"
+                    ),
                     self._gddr_value_text(ch.get("temp_top", "N/A")),
                     self._gddr_value_text(ch.get("temp_bottom", "N/A")),
                     self._gddr_value_text(

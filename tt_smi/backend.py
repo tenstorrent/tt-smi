@@ -35,7 +35,7 @@ from tt_smi.utils import (
     dict_from_public_attrs,
     get_host_software_versions,
     get_fw_bundle_version,
-    p100_dram_training_passed,
+    bh_dram_training_passed,
     build_gddr_telemetry,
     BH_GDDR_BIST_FW_VERSION,
 )
@@ -597,14 +597,8 @@ class TTSMIBackend:
                 # ...
                 # [30] - BIST complete GDDR 7
                 # [31] - BIST failed GDDR 7
-                if dram_status == 0x55555555:
-                    return True
-                # check if its p100 and if so, check if the training passed
-                match get_board_type(self.get_board_id(board_num)):
-                    case "p100a":
-                        return p100_dram_training_passed(dram_status)
-                    case _:
-                        return False
+                # All 8 trained, or 7 trained + 1 harvested (PT-505, any BH ASIC).
+                return bh_dram_training_passed(dram_status)
             else:
                 # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
                 #  [0] - Training complete GDDR 0

@@ -115,6 +115,7 @@ class TestSnapshot:
         """Test if fields are present in gddr_telemetry."""
         channel_fields = (
             "channel",
+            "harvested",
             "enabled",
             "training",
             "bist",

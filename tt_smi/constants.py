@@ -219,6 +219,7 @@ TELEMETRY_TABLE_HEADER = [
 GDDR_TELEMETRY_TABLE_HEADER = [
     "#",
     "Ch",
+    "Harvested",
     "Enabled",
     "Training",
     "BIST",
