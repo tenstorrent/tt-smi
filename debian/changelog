@@ -1,3 +1,14 @@
+tt-smi (6.3.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Add GDDR Telemetry tab and per-channel snapshot struct.
+  * Accept one harvested GDDR channel as DRAM trained on all Blackhole ASICs.
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.3.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 27 Aug 2026 15:33:59 +0000
+
 tt-smi (6.2.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
