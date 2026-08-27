@@ -35,7 +35,9 @@ from tt_smi.utils import (
     dict_from_public_attrs,
     get_host_software_versions,
     get_fw_bundle_version,
-    p100_dram_training_passed,
+    bh_dram_training_passed,
+    build_gddr_telemetry,
+    BH_GDDR_BIST_FW_VERSION,
 )
 from tt_umd import (
     TTDevice,
@@ -77,6 +79,7 @@ class TTSMIBackend:
                     smbus_telem=log.SmbusTelem(),
                     board_info=log.BoardInfo(),
                     telemetry=log.Telemetry(),
+                    gddr_telemetry=log.GddrTelemetry(),
                     firmwares=log.Firmwares(),
                     limits=log.Limits(),
                 )
@@ -87,6 +90,7 @@ class TTSMIBackend:
         self.firmware_infos = []
         self.device_infos = []
         self.device_telemetrys = []
+        self.device_gddr_telemetrys = []
         self.chip_limits = []
         self.pci_properties = []
         self.device_processes = []
@@ -104,6 +108,7 @@ class TTSMIBackend:
                 self.pci_properties.append(self.get_pci_properties(i))
                 self.device_infos.append(self.get_device_info(i))
                 self.device_telemetrys.append(self.get_chip_telemetry(i))
+                self.device_gddr_telemetrys.append(self.get_gddr_telemetry(i))
                 self.chip_limits.append(self.get_chip_limits(i))
     
     def is_blackhole(self, device_idx) -> bool:
@@ -181,6 +186,7 @@ class TTSMIBackend:
                 board_type = board_type + suffix
                 self.log.device_info[i].board_info["board_type"] = board_type
             self.log.device_info[i].telemetry = self.device_telemetrys[i]
+            self.log.device_info[i].gddr_telemetry = self.device_gddr_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
 
@@ -381,6 +387,7 @@ class TTSMIBackend:
         for i in self.devices:
             self.smbus_telem_info[i] = self.get_smbus_board_info(i)
             self.device_telemetrys[i] = self.get_chip_telemetry(i)
+            self.device_gddr_telemetrys[i] = self.get_gddr_telemetry(i)
 
     def get_device_processes(self):
         """Scan /proc/driver/tenstorrent/N/pids for processes using devices."""
@@ -590,14 +597,8 @@ class TTSMIBackend:
                 # ...
                 # [30] - BIST complete GDDR 7
                 # [31] - BIST failed GDDR 7
-                if dram_status == 0x55555555:
-                    return True
-                # check if its p100 and if so, check if the training passed
-                match get_board_type(self.get_board_id(board_num)):
-                    case "p100a":
-                        return p100_dram_training_passed(dram_status)
-                    case _:
-                        return False
+                # All 8 trained, or 7 trained + 1 harvested (PT-505, any BH ASIC).
+                return bh_dram_training_passed(dram_status)
             else:
                 # Pre-19.7.0.3 DDR Status in BH is a 16-bit field with the following layout:
                 #  [0] - Training complete GDDR 0
@@ -760,6 +761,26 @@ class TTSMIBackend:
                 CMD_LINE_COLOR.ENDC,
             )
             return {}
+
+    def get_gddr_telemetry(self, board_num) -> Dict:
+        """Return decoded per-channel GDDR telemetry for a board."""
+        dram_speed = self.get_dram_speed(board_num)
+        if dram_speed is None:
+            dram_speed = "N/A"
+
+        has_bist = False
+        if self.is_blackhole(board_num):
+            fw_bundle = get_fw_bundle_version(self.smbus_telem_info[board_num])
+            if fw_bundle is not None:
+                has_bist = int(fw_bundle, 16) >= BH_GDDR_BIST_FW_VERSION
+
+        return build_gddr_telemetry(
+            self.smbus_telem_info[board_num],
+            dram_speed=dram_speed,
+            is_blackhole=self.is_blackhole(board_num),
+            is_wormhole=self.is_wormhole(board_num),
+            has_bist=has_bist,
+        )
 
     def get_chip_limits(self, board_num: int) -> Dict[str, str]:
         if self.is_blackhole(board_num):

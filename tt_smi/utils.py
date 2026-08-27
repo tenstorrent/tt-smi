@@ -12,7 +12,7 @@ import fcntl
 import struct
 from enum import IntEnum
 from importlib.metadata import version
-from typing import Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 
@@ -176,52 +176,268 @@ def hex_to_semver_gddr_fw(raw: int) -> str:
     return f"{major}.{minor}"
 
 
-def p100_dram_training_passed(dram_status: int) -> bool:
-    """
-    Check if DRAM training passed for P100.
+BH_GDDR_CHANNELS = 8
+WH_GDDR_CHANNELS = 6
 
-    P100 may ship with one harvested GDDR channel (any of the 8). Pass when
-    exactly 7 channels report training+BIST success (0b01 in each 2-bit field),
-    and one channel reports all status bits clear (0b00 — absent/harvested slot).
+# Packed GDDR_x_y_TEMP / GDDR_x_y_CORR_ERRS tags, in channel-pair order.
+BH_GDDR_TEMP_TAGS = (
+    "GDDR_0_1_TEMP",
+    "GDDR_2_3_TEMP",
+    "GDDR_4_5_TEMP",
+    "GDDR_6_7_TEMP",
+)
+BH_GDDR_CORR_ERR_TAGS = (
+    "GDDR_0_1_CORR_ERRS",
+    "GDDR_2_3_CORR_ERRS",
+    "GDDR_4_5_CORR_ERRS",
+    "GDDR_6_7_CORR_ERRS",
+)
+
+# FW 19.7.0.0+ includes per-channel BIST bits in DDR_STATUS [31:16].
+BH_GDDR_BIST_FW_VERSION = 0x13070000
+
+
+def parse_telem_hex(smbus_telem: dict, key: str) -> Optional[int]:
+    """Parse a hex telemetry tag from smbus_telem, or None if missing."""
+    val = smbus_telem.get(key)
+    if val is None:
+        return None
+    return int(val, 16)
+
+
+def decode_gddr_pair_temps(packed: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    """Decode a GDDR_x_y_TEMP word into ((x_bottom, x_top), (y_bottom, y_top)).
+
+    Firmware packs each pair as:
+      [7:0]   x bottom die °C
+      [15:8]  x top die °C
+      [23:16] y bottom die °C
+      [31:24] y top die °C
+    """
+    x_bottom = packed & 0xFF
+    x_top = (packed >> 8) & 0xFF
+    y_bottom = (packed >> 16) & 0xFF
+    y_top = (packed >> 24) & 0xFF
+    return (x_bottom, x_top), (y_bottom, y_top)
+
+
+def decode_gddr_pair_corr_errs(packed: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    """Decode a GDDR_x_y_CORR_ERRS word into ((x_rd, x_wr), (y_rd, y_wr)).
+
+    Firmware packs each pair as:
+      [7:0]   x corrected read EDC (saturates at 255)
+      [15:8]  x corrected write EDC
+      [23:16] y corrected read EDC
+      [31:24] y corrected write EDC
+    """
+    x_rd = packed & 0xFF
+    x_wr = (packed >> 8) & 0xFF
+    y_rd = (packed >> 16) & 0xFF
+    y_wr = (packed >> 24) & 0xFF
+    return (x_rd, x_wr), (y_rd, y_wr)
+
+
+def decode_gddr_uncorr_errs(packed: int, channel: int) -> Tuple[int, int]:
+    """Return (uncorr_rd, uncorr_wr) flags for one channel from GDDR_UNCORR_ERRS."""
+    rd = (packed >> (channel * 2)) & 1
+    wr = (packed >> (channel * 2 + 1)) & 1
+    return rd, wr
+
+
+def decode_bh_gddr_channel_status(
+    dram_status: int, channel: int, has_bist: bool
+) -> Tuple[str, str]:
+    """Decode BH DDR_STATUS training/BIST for one GDDR channel.
+
+    Per channel (FW 19.7+):
+      bits [2i+1:2i]     training (01 complete, 10 error, 00 not run)
+      bits [17+2i:16+2i] BIST     (01 complete, 10 failed, 00 not run)
+    """
+    training_complete = bool(dram_status & (1 << (2 * channel)))
+    training_error = bool(dram_status & (1 << (2 * channel + 1)))
+    if training_error:
+        training = "fail"
+    elif training_complete:
+        training = "pass"
+    else:
+        training = "n/a"
+
+    if not has_bist:
+        return training, "n/a"
+
+    bist_complete = bool(dram_status & (1 << (16 + 2 * channel)))
+    bist_failed = bool(dram_status & (1 << (17 + 2 * channel)))
+    if bist_failed:
+        bist = "fail"
+    elif bist_complete:
+        bist = "pass"
+    else:
+        bist = "n/a"
+    return training, bist
+
+
+def decode_wh_gddr_channel_training(dram_status: int, channel: int) -> str:
+    """Decode Wormhole DDR_STATUS nibble for one DRAM channel (0x2 pass, 0x1 fail)."""
+    nibble = (dram_status >> (channel * 4)) & 0xF
+    if nibble == 0x2:
+        return "pass"
+    if nibble == 0x1:
+        return "fail"
+    return "n/a"
+
+
+def _gddr_channel_na(channel: int, enabled: bool = False, harvested: bool = False) -> Dict[str, Any]:
+    return {
+        "channel": channel,
+        "harvested": harvested,
+        "enabled": enabled,
+        "training": "n/a",
+        "bist": "n/a",
+        "temp_top": "N/A",
+        "temp_bottom": "N/A",
+        "corr_rd": "N/A",
+        "corr_wr": "N/A",
+        "uncorr_rd": "N/A",
+        "uncorr_wr": "N/A",
+    }
+
+
+def build_gddr_telemetry(
+    smbus_telem: dict,
+    dram_speed: str,
+    is_blackhole: bool,
+    is_wormhole: bool,
+    has_bist: bool,
+) -> Dict[str, Any]:
+    """Build the decoded GDDR telemetry struct used by the GUI and snapshot."""
+    gddr: Dict[str, Any] = {
+        "speed": dram_speed if dram_speed else "N/A",
+        "max_temp": "N/A",
+        "enabled_mask": "N/A",
+        "channels": [],
+    }
+
+    if is_blackhole:
+        enabled_mask = parse_telem_hex(smbus_telem, "ENABLED_GDDR")
+        if enabled_mask is not None:
+            gddr["enabled_mask"] = hex(enabled_mask)
+        else:
+            enabled_mask = (1 << BH_GDDR_CHANNELS) - 1
+
+        max_temp = parse_telem_hex(smbus_telem, "MAX_GDDR_TEMP")
+        if max_temp is not None:
+            gddr["max_temp"] = str(max_temp)
+
+        dram_status = parse_telem_hex(smbus_telem, "DDR_STATUS")
+        uncorr_packed = parse_telem_hex(smbus_telem, "GDDR_UNCORR_ERRS")
+
+        pair_temps: List[Optional[Tuple[Tuple[int, int], Tuple[int, int]]]] = []
+        pair_corrs: List[Optional[Tuple[Tuple[int, int], Tuple[int, int]]]] = []
+        for temp_tag, corr_tag in zip(BH_GDDR_TEMP_TAGS, BH_GDDR_CORR_ERR_TAGS):
+            temp_packed = parse_telem_hex(smbus_telem, temp_tag)
+            corr_packed = parse_telem_hex(smbus_telem, corr_tag)
+            pair_temps.append(
+                decode_gddr_pair_temps(temp_packed) if temp_packed is not None else None
+            )
+            pair_corrs.append(
+                decode_gddr_pair_corr_errs(corr_packed)
+                if corr_packed is not None
+                else None
+            )
+
+        for channel in range(BH_GDDR_CHANNELS):
+            enabled = bool(enabled_mask & (1 << channel))
+            harvested = (not enabled) or (
+                dram_status is not None
+                and is_bh_gddr_channel_harvested(dram_status, channel, has_bist)
+            )
+            if harvested:
+                enabled = False
+            ch = _gddr_channel_na(channel, enabled=enabled, harvested=harvested)
+            if dram_status is not None:
+                training, bist = decode_bh_gddr_channel_status(
+                    dram_status, channel, has_bist
+                )
+                ch["training"] = training
+                ch["bist"] = bist
+            if enabled:
+                pair_idx = channel // 2
+                lane = channel % 2
+                if pair_temps[pair_idx] is not None:
+                    bottom, top = pair_temps[pair_idx][lane]
+                    ch["temp_bottom"] = str(bottom)
+                    ch["temp_top"] = str(top)
+                if pair_corrs[pair_idx] is not None:
+                    corr_rd, corr_wr = pair_corrs[pair_idx][lane]
+                    ch["corr_rd"] = str(corr_rd)
+                    ch["corr_wr"] = str(corr_wr)
+                if uncorr_packed is not None:
+                    uncorr_rd, uncorr_wr = decode_gddr_uncorr_errs(
+                        uncorr_packed, channel
+                    )
+                    ch["uncorr_rd"] = str(uncorr_rd)
+                    ch["uncorr_wr"] = str(uncorr_wr)
+            gddr["channels"].append(ch)
+        return gddr
+
+    if is_wormhole:
+        dram_status = parse_telem_hex(smbus_telem, "DDR_STATUS")
+        if dram_status is not None:
+            dram_status &= 0xFFFFFF
+        for channel in range(WH_GDDR_CHANNELS):
+            ch = _gddr_channel_na(channel, enabled=True)
+            if dram_status is not None:
+                ch["training"] = decode_wh_gddr_channel_training(dram_status, channel)
+            gddr["channels"].append(ch)
+        return gddr
+
+    return gddr
+
+
+def is_bh_gddr_channel_harvested(
+    dram_status: int, channel: int, has_bist: bool
+) -> bool:
+    """True when a BH GDDR channel never ran training/BIST (0b00 / 0b00)."""
+    if not has_bist:
+        return False
+    training, bist = decode_bh_gddr_channel_status(
+        dram_status, channel, has_bist=True
+    )
+    return training == "n/a" and bist == "n/a"
+
+
+def bh_dram_training_passed(dram_status: int) -> bool:
+    """
+    Check if DRAM training passed for Blackhole.
+
+    Firmware may harvest up to one GDDR channel on any BH ASIC (PT-505).
+    Pass when all 8 channels report training+BIST success (0b01), or when
+    exactly 7 channels pass and one slot is all zeros (0b00 — harvested).
+    A training/BIST error on any channel, more than one harvested slot, or a
+    partial/incomplete state is a fail.
     """
     passing_channels = 0
     harvested_channels = 0
 
-    for channel in range(8):
-        # Per-channel DDR_STATUS layout (FW 19.7.3.0+):
-        #   bits [2i+1:2i]     - [training error | training complete]
-        #   bits [17+2i:16+2i] - [BIST failed    | BIST complete]
-        #
-        # 0b01 = success, 0b10 = failure, 0b00 = not run (harvested on P100)
-        training_complete = bool(dram_status & (1 << (2 * channel)))
-        training_error = bool(dram_status & (1 << (2 * channel + 1)))
-        bist_complete = bool(dram_status & (1 << (16 + 2 * channel)))
-        bist_failed = bool(dram_status & (1 << (17 + 2 * channel)))
-
-        if (
-            training_complete
-            and not training_error
-            and bist_complete
-            and not bist_failed
-        ):
-            # Active channel: trained and passed BIST (0b01 / 0b01).
+    for channel in range(BH_GDDR_CHANNELS):
+        training, bist = decode_bh_gddr_channel_status(
+            dram_status, channel, has_bist=True
+        )
+        if training == "pass" and bist == "pass":
             passing_channels += 1
-        elif (
-            not training_complete
-            and not training_error
-            and not bist_complete
-            and not bist_failed
-        ):
-            # Harvested channel: firmware never ran training/BIST (0b00 / 0b00).
+        elif training == "n/a" and bist == "n/a":
             harvested_channels += 1
             if harvested_channels > 1:
                 return False
         else:
-            # Real failure: error/fail bit set, or partial/incomplete state.
             return False
 
-    # P100 expects 7 active GDDR channels and 1 harvested slot.
-    return passing_channels == 7 and harvested_channels == 1
+    return passing_channels + harvested_channels == BH_GDDR_CHANNELS and harvested_channels <= 1
+
+
+def p100_dram_training_passed(dram_status: int) -> bool:
+    """Alias for bh_dram_training_passed; P100 uses the same harvest-tolerant check."""
+    return bh_dram_training_passed(dram_status)
 
 
 def get_board_type(board_id: str) -> str:

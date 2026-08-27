@@ -9,6 +9,13 @@ from tt_smi.utils import (
     hex_to_semver_gddr_fw,
     is_driver_version_at_least,
     p100_dram_training_passed,
+    bh_dram_training_passed,
+    decode_gddr_pair_temps,
+    decode_gddr_pair_corr_errs,
+    decode_gddr_uncorr_errs,
+    decode_bh_gddr_channel_status,
+    decode_wh_gddr_channel_training,
+    build_gddr_telemetry,
 )
 
 class TestDriverVersion:
@@ -114,6 +121,164 @@ class TestHexToSemverGddrFw:
         assert hex_to_semver_gddr_fw(raw) == expected
 
 
+class TestGddrTelemetryDecode:
+    """Packed BH GDDR telemetry tags (temps, EDC errors, DDR_STATUS)."""
+
+    def test_decode_gddr_pair_temps(self):
+        # hello.log device 0 GDDR_0_1_TEMP = 0x1e1e2c2e
+        (x_bottom, x_top), (y_bottom, y_top) = decode_gddr_pair_temps(0x1E1E2C2E)
+        assert (x_bottom, x_top) == (0x2E, 0x2C)
+        assert (y_bottom, y_top) == (0x1E, 0x1E)
+
+    def test_decode_gddr_pair_corr_errs(self):
+        packed = (7 << 24) | (6 << 16) | (5 << 8) | 4
+        (x_rd, x_wr), (y_rd, y_wr) = decode_gddr_pair_corr_errs(packed)
+        assert (x_rd, x_wr) == (4, 5)
+        assert (y_rd, y_wr) == (6, 7)
+
+    def test_decode_gddr_uncorr_errs(self):
+        # Channel 3 write + channel 0 read
+        packed = (1 << 0) | (1 << 7)
+        assert decode_gddr_uncorr_errs(packed, 0) == (1, 0)
+        assert decode_gddr_uncorr_errs(packed, 3) == (0, 1)
+        assert decode_gddr_uncorr_errs(packed, 1) == (0, 0)
+
+    def test_decode_bh_gddr_channel_status_all_pass(self):
+        training, bist = decode_bh_gddr_channel_status(0x55555555, 0, has_bist=True)
+        assert training == "pass"
+        assert bist == "pass"
+
+    def test_decode_bh_gddr_channel_status_fail(self):
+        # Channel 1 training error (bit 3) and BIST failed (bit 19)
+        status = (1 << 3) | (1 << 19)
+        training, bist = decode_bh_gddr_channel_status(status, 1, has_bist=True)
+        assert training == "fail"
+        assert bist == "fail"
+
+    def test_decode_bh_gddr_channel_status_no_bist(self):
+        training, bist = decode_bh_gddr_channel_status(0x5555, 0, has_bist=False)
+        assert training == "pass"
+        assert bist == "n/a"
+
+    def test_decode_wh_gddr_channel_training(self):
+        # 6 channels all pass: 0x222222
+        assert decode_wh_gddr_channel_training(0x222222, 0) == "pass"
+        assert decode_wh_gddr_channel_training(0x000001, 0) == "fail"
+        assert decode_wh_gddr_channel_training(0x0, 0) == "n/a"
+
+    def test_build_gddr_telemetry_blackhole(self):
+        smbus = {
+            "DDR_STATUS": "0x55555555",
+            "DDR_SPEED": "0x3e80",
+            "ENABLED_GDDR": "0xff",
+            "GDDR_0_1_TEMP": "0x1e1e2c2e",
+            "GDDR_2_3_TEMP": "0x2c2a2c2e",
+            "GDDR_4_5_TEMP": "0x2a2a2a2a",
+            "GDDR_6_7_TEMP": "0x2a2a1e1c",
+            "GDDR_0_1_CORR_ERRS": "0x0",
+            "GDDR_2_3_CORR_ERRS": "0x0",
+            "GDDR_4_5_CORR_ERRS": "0x0",
+            "GDDR_6_7_CORR_ERRS": "0x0",
+            "GDDR_UNCORR_ERRS": "0x0",
+            "MAX_GDDR_TEMP": "0x2e",
+        }
+        gddr = build_gddr_telemetry(
+            smbus,
+            dram_speed="16G",
+            is_blackhole=True,
+            is_wormhole=False,
+            has_bist=True,
+        )
+        assert gddr["speed"] == "16G"
+        assert gddr["max_temp"] == "46"
+        assert gddr["enabled_mask"] == "0xff"
+        assert len(gddr["channels"]) == 8
+        ch0 = gddr["channels"][0]
+        assert ch0["channel"] == 0
+        assert ch0["enabled"] is True
+        assert ch0["training"] == "pass"
+        assert ch0["bist"] == "pass"
+        assert ch0["temp_bottom"] == "46"
+        assert ch0["temp_top"] == "44"
+        assert ch0["corr_rd"] == "0"
+        assert ch0["uncorr_wr"] == "0"
+
+    def test_build_gddr_telemetry_harvested_channel(self):
+        smbus = {
+            "DDR_STATUS": "0x55555555",
+            "ENABLED_GDDR": "0xfe",  # channel 0 harvested
+            "GDDR_0_1_TEMP": "0x1e1e2c2e",
+            "GDDR_2_3_TEMP": "0x0",
+            "GDDR_4_5_TEMP": "0x0",
+            "GDDR_6_7_TEMP": "0x0",
+            "GDDR_0_1_CORR_ERRS": "0x0",
+            "GDDR_2_3_CORR_ERRS": "0x0",
+            "GDDR_4_5_CORR_ERRS": "0x0",
+            "GDDR_6_7_CORR_ERRS": "0x0",
+            "GDDR_UNCORR_ERRS": "0x0",
+            "MAX_GDDR_TEMP": "0x2e",
+        }
+        gddr = build_gddr_telemetry(
+            smbus,
+            dram_speed="16G",
+            is_blackhole=True,
+            is_wormhole=False,
+            has_bist=True,
+        )
+        ch0 = gddr["channels"][0]
+        assert ch0["harvested"] is True
+        assert ch0["enabled"] is False
+        assert ch0["temp_top"] == "N/A"
+        assert gddr["channels"][1]["enabled"] is True
+        assert gddr["channels"][1]["temp_top"] == "30"
+
+    def test_build_gddr_telemetry_harvested_via_ddr_status(self):
+        """Harvested slot is 0b00 in DDR_STATUS even when ENABLED_GDDR is 0xff."""
+        smbus = {
+            "DDR_STATUS": hex(_p100_dram_status(harvested=2)),
+            "ENABLED_GDDR": "0xff",
+            "GDDR_0_1_TEMP": "0x1e1e2c2e",
+            "GDDR_2_3_TEMP": "0x2c2a2c2e",
+            "GDDR_4_5_TEMP": "0x0",
+            "GDDR_6_7_TEMP": "0x0",
+            "GDDR_0_1_CORR_ERRS": "0x0",
+            "GDDR_2_3_CORR_ERRS": "0x0",
+            "GDDR_4_5_CORR_ERRS": "0x0",
+            "GDDR_6_7_CORR_ERRS": "0x0",
+            "GDDR_UNCORR_ERRS": "0x0",
+            "MAX_GDDR_TEMP": "0x2e",
+        }
+        gddr = build_gddr_telemetry(
+            smbus,
+            dram_speed="16G",
+            is_blackhole=True,
+            is_wormhole=False,
+            has_bist=True,
+        )
+        ch2 = gddr["channels"][2]
+        assert ch2["harvested"] is True
+        assert ch2["enabled"] is False
+        assert ch2["training"] == "n/a"
+        assert ch2["bist"] == "n/a"
+        assert ch2["temp_top"] == "N/A"
+        assert gddr["channels"][0]["enabled"] is True
+        assert gddr["channels"][0]["training"] == "pass"
+
+    def test_build_gddr_telemetry_wormhole(self):
+        smbus = {"DDR_STATUS": "0x02222222"}
+        gddr = build_gddr_telemetry(
+            smbus,
+            dram_speed="16G",
+            is_blackhole=False,
+            is_wormhole=True,
+            has_bist=False,
+        )
+        assert gddr["max_temp"] == "N/A"
+        assert len(gddr["channels"]) == 6
+        assert all(ch["training"] == "pass" for ch in gddr["channels"])
+        assert all(ch["temp_top"] == "N/A" for ch in gddr["channels"])
+
+
 def _p100_dram_status(*, harvested: int = None, fail_training: int = None, fail_bist: int = None) -> int:
     """Build DDR_STATUS for P100 tests: all channels pass except optional overrides."""
     status = 0x55555555
@@ -128,17 +293,17 @@ def _p100_dram_status(*, harvested: int = None, fail_training: int = None, fail_
     return status
 
 
-class TestP100DramTrainingPassed:
+class TestBhDramTrainingPassed:
     @pytest.mark.parametrize(
         "dram_status,expected",
         [
+            # All 8 channels trained + BIST
+            (0x55555555, True),
             # 7 active channels + GDDR 2 harvested (real P100 example)
             (0x55455545, True),
             # Harvested slot can be any of the 8 channels
             (_p100_dram_status(harvested=0), True),
             (_p100_dram_status(harvested=7), True),
-            # All 8 channels trained — valid for non-P100, not the P100 7+1 layout
-            (0x55555555, False),
             # Two harvested channels
             (0x54455545, False),
             (_p100_dram_status(harvested=0, fail_training=1), False),
@@ -152,5 +317,7 @@ class TestP100DramTrainingPassed:
             (0x55455540, False),
         ],
     )
-    def test_p100_dram_training_passed(self, dram_status, expected):
+    def test_bh_dram_training_passed(self, dram_status, expected):
+        assert bh_dram_training_passed(dram_status) is expected
+        # Back-compat alias used by older P100-only call sites.
         assert p100_dram_training_passed(dram_status) is expected

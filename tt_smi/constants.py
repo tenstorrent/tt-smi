@@ -216,6 +216,22 @@ TELEMETRY_TABLE_HEADER = [
     "Heartbeat",
 ]
 
+GDDR_TELEMETRY_TABLE_HEADER = [
+    "#",
+    "Ch",
+    "Harvested",
+    "Enabled",
+    "Training",
+    "BIST",
+    "Speed",
+    "Top (°C)",
+    "Bot (°C)",
+    "Corr RD",
+    "Corr WR",
+    "Uncorr RD",
+    "Uncorr WR",
+]
+
 FIRMWARES_TABLE_HEADER = [
     "#",
     "FW Bundle Version",
@@ -256,7 +272,8 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |             Help             |   h   |                   Opens up this help menu                   |
 |   Go to device(s) info tab  |        1        |          Switch to tab with device info         |
 |   Go to device(s) telemetry tab     |        2        |          Switch to tab with telemetry info that is updated every 100ms           |
-|   Go to device(s) firmware tab     |        3        |          Switch to tab with all the fw versions on the board(s)          |
-|   Go to process(es) tab    |        4        |          Switch to tab with process info that is updated every 100ms           |
+|   Go to GDDR telemetry tab    |        3        |          Switch to tab with per-channel GDDR telemetry that is updated every 100ms           |
+|   Go to device(s) firmware tab     |        4        |          Switch to tab with all the fw versions on the board(s)          |
+|   Go to process(es) tab    |        5        |          Switch to tab with process info that is updated every 100ms           |
 
 """

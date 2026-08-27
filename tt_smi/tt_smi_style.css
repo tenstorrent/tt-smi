@@ -121,7 +121,7 @@ LatestReleasesBox Static {
 #help_menu_box {
   padding: 1 2;
   width: 110;
-  height: 33;
+  height: 36;
   border: solid $green;
   background: $surface;
   color: white;
