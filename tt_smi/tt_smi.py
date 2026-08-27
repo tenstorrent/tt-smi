@@ -114,7 +114,7 @@ def parse_args():
         "--galaxy_6u_trays_reset",
         default=False,
         action="store_true",
-        help="Reset all the ASICs on the galaxy host",
+        help="Reset all the ASICs on the galaxy host; prefers no PCIe retimer reset (BMC v0.05.22+), falls back to legacy retimer reset",
         dest="glx_reset",
     )
     parser.add_argument(

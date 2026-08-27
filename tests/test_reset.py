@@ -4,6 +4,7 @@
 import pytest
 
 from typing import List, Tuple
+from unittest.mock import MagicMock, patch
 
 from pyluwen import pci_scan
 from tt_umd import PCIDevice
@@ -12,6 +13,9 @@ from tt_smi.utils import get_dev_id_from_bdf
 from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
+    run_galaxy_ipmi_reset,
+    GLX_IPMI_OP_MODE_NO_RETIMER,
+    GLX_IPMI_OP_MODE_WITH_RETIMER,
 )
 from tt_smi.device_input import (
     classify_single_input,
@@ -21,6 +25,72 @@ from tt_smi.device_input import (
 )
 
 NUM_RESETS_STRESS_TEST = 10
+
+BMC_C9_STDERR = (
+    "Unable to send RAW command (channel=0x0 netfn=0x30 lun=0x0 cmd=0x8b rsp=0xc9): "
+    "Parameter out of range"
+)
+
+
+class TestGalaxyIpmiReset:
+    """Unit tests for the no-retimer Galaxy IPMI reset (no hardware)."""
+
+    def test_issues_op_mode_no_retimer(self):
+        mock_result = MagicMock(returncode=0, stdout="", stderr="")
+        with patch("tt_smi.reset.subprocess.run", return_value=mock_result) as mock_run:
+            run_galaxy_ipmi_reset()
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == [
+            "sudo",
+            "ipmitool",
+            "raw",
+            "0x30",
+            "0x8B",
+            "0xF",
+            "0xFF",
+            GLX_IPMI_OP_MODE_NO_RETIMER,
+            "0xF",
+        ]
+
+    def test_c9_falls_back_to_legacy_retimer_reset(self):
+        fail_new = MagicMock(returncode=1, stdout="", stderr=BMC_C9_STDERR)
+        ok_old = MagicMock(returncode=0, stdout="", stderr="")
+        with patch(
+            "tt_smi.reset.subprocess.run", side_effect=[fail_new, ok_old]
+        ) as mock_run:
+            run_galaxy_ipmi_reset()
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[0][0][0][7] == GLX_IPMI_OP_MODE_NO_RETIMER
+        assert mock_run.call_args_list[1][0][0][7] == GLX_IPMI_OP_MODE_WITH_RETIMER
+
+    def test_other_ipmi_failure_falls_back_to_legacy_retimer_reset(self):
+        fail_new = MagicMock(returncode=1, stdout="", stderr="Could not open device")
+        ok_old = MagicMock(returncode=0, stdout="", stderr="")
+        with patch(
+            "tt_smi.reset.subprocess.run", side_effect=[fail_new, ok_old]
+        ) as mock_run:
+            run_galaxy_ipmi_reset()
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[1][0][0][7] == GLX_IPMI_OP_MODE_WITH_RETIMER
+
+    def test_fallback_failure_raises_runtime_error(self):
+        fail_new = MagicMock(returncode=1, stdout="", stderr=BMC_C9_STDERR)
+        fail_old = MagicMock(returncode=1, stdout="", stderr="Could not open device")
+        with patch("tt_smi.reset.subprocess.run", side_effect=[fail_new, fail_old]):
+            with pytest.raises(RuntimeError, match="IPMI command failed"):
+                run_galaxy_ipmi_reset()
+
+    def test_missing_ipmitool_raises_runtime_error(self):
+        with patch(
+            "tt_smi.reset.subprocess.run", side_effect=FileNotFoundError("sudo")
+        ):
+            with pytest.raises(RuntimeError, match="ipmitool"):
+                run_galaxy_ipmi_reset()
+
+    def test_rejects_legacy_retimer_op_mode(self):
+        with pytest.raises(SystemExit) as exc:
+            glx_6u_trays_reset(op_mode="0x0")
+        assert exc.value.code == 1
 
 
 class TestParseResetInput:
