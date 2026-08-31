@@ -167,7 +167,7 @@ def umd_pci_warm_reset(
     # check if any of the chips are galaxy
     is_galaxy = False
     for info in chips.values():
-        if info.subsystem_id in {0x35, 0x47}:
+        if info.subsystem_id in {0x35, 0x47, 0x202}:
             is_galaxy = True
             break
     if is_galaxy:
@@ -255,7 +255,7 @@ def luwen_pci_reset(
         finally:
             del chip
 
-    is_galaxy = board_types <= {0x35, 0x47}
+    is_galaxy = board_types <= {0x35, 0x47, 0x202}
     if is_galaxy:
         print(
             CMD_LINE_COLOR.YELLOW,

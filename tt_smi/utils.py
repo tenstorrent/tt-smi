@@ -496,7 +496,7 @@ def get_board_type(board_id: str) -> str:
         return "p300a"
     elif upi == 0x46:
         return "p300c"
-    elif upi == 0x47:
+    elif upi == 0x47 or upi == 0x202:
         return "tt-galaxy-bh"
     else:
         return "N/A"

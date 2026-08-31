@@ -54,6 +54,7 @@ class TestGetBoardType:
             (0x45, "p300a"),
             (0x46, "p300c"),
             (0x47, "tt-galaxy-bh"),
+            (0x202, "tt-galaxy-bh"),
         ],
     )
     def test_all_known_board_types(self, upi, expected):
