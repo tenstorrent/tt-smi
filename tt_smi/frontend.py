@@ -39,11 +39,12 @@ from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
 
 
 class LatestReleasesBox(Container):
-    """Sidebar box showing the latest published version of each tt-stack package.
+    """Sidebar box showing the golden-pinned version of each tt-stack package.
 
-    Renders a ProgressBar while fetches are in-flight, then swaps to a list of
-    versions. If every fetch fails (e.g. no internet), the list stays empty
-    and the box just shows its border + title.
+    Versions come from the tt-sw-manifest golden stack, not from each repo's
+    newest upstream release. Renders a ProgressBar while the fetch is
+    in-flight, then swaps to a list of versions. If the fetch fails (e.g. no
+    internet), the list stays empty and the box just shows its border + title.
     """
 
     def __init__(self, id: str, title: str) -> None:
@@ -284,7 +285,7 @@ class TTSMI(App):
             )
 
     def fetch_latest_releases(self) -> None:
-        """Worker: fetch latest GitHub release tags and push them to the box."""
+        """Worker: fetch the golden version pins and push them to the box."""
         try:
             box = self.query_one("#latest_releases", LatestReleasesBox)
         except NoMatches:
