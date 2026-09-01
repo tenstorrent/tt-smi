@@ -1,11 +1,12 @@
 # SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fetches the latest published GitHub release tag for tt-stack packages.
+"""Fetches the golden version pins for tt-stack packages.
 
-Each package has a tag pattern with a named "version" group; only releases
-whose tag matches the pattern are considered. This mirrors the renovate
-filter rules used by infra (allowedVersions / extractVersion).
+The source of truth is `golden.json` from the latest tt-sw-manifest release:
+a set of component versions that have been validated together as one stack.
+This is deliberately *not* each repo's newest upstream release, which may not
+yet be approved. Each package maps to one pin field in that manifest.
 """
 
 import json
@@ -14,7 +15,6 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -22,8 +22,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 @dataclass(frozen=True)
 class ReleaseSpec:
     name: str
-    repo: str
-    tag_pattern: "re.Pattern[str]"
+    pin: str
     # cli=None means there's no PATH-based check for this package (firmware,
     # metalium image, etc.). tt-kmd has no CLI but is checkable via sysfs, so
     # we leave cli=None and special-case it in get_installed_version.
@@ -31,13 +30,15 @@ class ReleaseSpec:
 
 
 RELEASE_SPECS: List[ReleaseSpec] = [
-    ReleaseSpec("tt-kmd",             "tenstorrent/tt-kmd",             re.compile(r"^ttkmd-?(?P<version>\d+\.\d+\.\d+)$")),
-    ReleaseSpec("tt-smi",             "tenstorrent/tt-smi",             re.compile(r"^v?(?P<version>\d+\.\d+\.\d+)$"),       cli="tt-smi"),
-    ReleaseSpec("tt-flash",           "tenstorrent/tt-flash",           re.compile(r"^v?(?P<version>\d+\.\d+\.\d+)$"),       cli="tt-flash"),
-    ReleaseSpec("tt-system-firmware", "tenstorrent/tt-system-firmware", re.compile(r"^v?(?P<version>19\.\d+\.\d+)$")),
-    ReleaseSpec("tt-metal",           "tenstorrent/tt-metal",           re.compile(r"^v?(?P<version>0\.\d+\.\d+)$")),
-    ReleaseSpec("tt-installer",       "tenstorrent/tt-installer",       re.compile(r"^v?(?P<version>\d+\.\d+\.\d+)$")),
+    ReleaseSpec("tt-kmd",             "kmd"),
+    ReleaseSpec("tt-smi",             "smi",            cli="tt-smi"),
+    ReleaseSpec("tt-flash",           "flash",          cli="tt-flash"),
+    ReleaseSpec("tt-system-firmware", "firmware"),
+    ReleaseSpec("tt-metal",           "metal-version"),
+    ReleaseSpec("tt-installer",       "installer"),
 ]
+
+GOLDEN_MANIFEST_URL = "https://github.com/tenstorrent/tt-sw-manifest/releases/latest/download/golden.json"
 
 
 def is_checkable(spec: ReleaseSpec) -> bool:
@@ -105,52 +106,36 @@ def version_tuple(v: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def _fetch_latest_matching(spec: ReleaseSpec, timeout: float) -> Optional[str]:
-    """Return the version string of the newest release matching spec, or None."""
-    url = f"https://api.github.com/repos/{spec.repo}/releases?per_page=100"
+def _fetch_golden(timeout: float) -> Optional[Dict[str, str]]:
+    """Return the golden manifest pins, or None if the fetch/parse failed."""
     req = urllib.request.Request(
-        url,
+        GOLDEN_MANIFEST_URL,
         headers={
-            "Accept": "application/vnd.github+json",
+            "Accept": "application/json",
             "User-Agent": "tt-smi",
         },
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            releases = json.loads(resp.read())
+            manifest = json.loads(resp.read())
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
         return None
+    return manifest if isinstance(manifest, dict) else None
 
-    for release in releases:
-        if release.get("draft") or release.get("prerelease"):
-            continue
-        m = spec.tag_pattern.match(release.get("tag_name", ""))
-        if m:
-            return m.group("version")
-    return None
+
+def _pinned_version(manifest: Dict[str, str], spec: ReleaseSpec) -> Optional[str]:
+    """Pull one spec's version out of the manifest, normalized to bare semver.
+
+    Pins are written as plain versions except metal-version, which carries the
+    upstream "v" tag prefix.
+    """
+    pinned = manifest.get(spec.pin)
+    if not isinstance(pinned, str):
+        return None
+    return pinned.removeprefix("v") or None
 
 
 DEFAULT_MAX_ATTEMPTS = 3
-
-
-def _fetch_batch(
-    specs: List[ReleaseSpec], timeout: float
-) -> Dict[str, Optional[str]]:
-    """Run one parallel pass over `specs`. Returns {name: version_or_None}."""
-    results: Dict[str, Optional[str]] = {}
-    if not specs:
-        return results
-    with ThreadPoolExecutor(max_workers=len(specs)) as pool:
-        futures = {
-            pool.submit(_fetch_latest_matching, spec, timeout): spec for spec in specs
-        }
-        for fut in as_completed(futures):
-            spec = futures[fut]
-            try:
-                results[spec.name] = fut.result()
-            except Exception:
-                results[spec.name] = None
-    return results
 
 
 def fetch_all(
@@ -159,16 +144,15 @@ def fetch_all(
     on_attempt: Optional[Callable[[int], None]] = None,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
 ) -> Dict[str, Optional[str]]:
-    """Fetch latest versions for every spec, retrying any that come back None.
+    """Fetch the golden pin for every spec, retrying the manifest on failure.
 
-    Each attempt runs the remaining failed specs in parallel. `on_done` fires
-    exactly once per spec, when its version is known (success) or has exhausted
-    all attempts (final None). `on_attempt(n)` fires at the start of attempts
-    where n > 1 so callers can surface a retry indicator; it is not called for
-    the first attempt.
+    All pins come from a single manifest, so one fetch resolves every spec.
+    `on_done` fires exactly once per spec, with its pinned version or None if
+    the manifest could not be fetched (or has no pin for it). `on_attempt(n)`
+    fires at the start of attempts where n > 1 so callers can surface a retry
+    indicator; it is not called for the first attempt.
     """
-    pending = list(RELEASE_SPECS)
-    final: Dict[str, Optional[str]] = {}
+    manifest = None
     for attempt in range(1, max_attempts + 1):
         if attempt > 1 and on_attempt is not None:
             try:
@@ -176,21 +160,17 @@ def fetch_all(
             except Exception:
                 pass
 
-        round_results = _fetch_batch(pending, timeout)
-
-        next_pending: List[ReleaseSpec] = []
-        for spec in pending:
-            version = round_results.get(spec.name)
-            if version is not None or attempt == max_attempts:
-                final[spec.name] = version
-                if on_done is not None:
-                    try:
-                        on_done(spec, version)
-                    except Exception:
-                        pass
-            else:
-                next_pending.append(spec)
-        pending = next_pending
-        if not pending:
+        manifest = _fetch_golden(timeout)
+        if manifest is not None:
             break
+
+    final: Dict[str, Optional[str]] = {}
+    for spec in RELEASE_SPECS:
+        version = _pinned_version(manifest, spec) if manifest is not None else None
+        final[spec.name] = version
+        if on_done is not None:
+            try:
+                on_done(spec, version)
+            except Exception:
+                pass
     return final
