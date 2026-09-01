@@ -98,30 +98,37 @@ class LatestReleasesBox(Container):
         self.refresh()
 
     def _row_status(
-        self, spec_name: str, latest: Optional[str]
+        self, spec_name: str, golden: Optional[str]
     ) -> Tuple[str, Optional[Style], str, Optional[Style]]:
         """Return (glyph, glyph_style, value_text, value_style) for one row.
 
-        The value column shows "installed → latest" for the outdated case so
-        users see exactly what bump is available; everything else just shows
-        the latest version (or "—" if it's unknown).
+        Once both versions are known there are three states. Behind golden
+        shows "installed → golden" so the available bump is explicit. Ahead of
+        golden shows the installed version: running past the validated stack is
+        expected on dev hosts, so it's flagged rather than treated as an error,
+        and the row must not print a pin the host isn't actually on. A match
+        shows the pin itself.
         """
         muted = Style(color="grey50")
         installed = self._installed.get(spec_name)
         if installed is None:
             # Not checkable on this host, or not installed: no status glyph.
-            if latest is None:
+            if golden is None:
                 return ("", None, "—", muted)
-            return ("", None, latest, None)
+            return ("", None, golden, None)
 
-        if latest is None:
-            # We have installed but couldn't fetch latest.
+        if golden is None:
+            # We have installed but couldn't fetch the golden manifest.
             return ("", None, "—", muted)
 
-        if version_tuple(installed) >= version_tuple(latest):
-            return ("✓", Style(color="green"), latest, None)
+        if version_tuple(installed) > version_tuple(golden):
+            ahead = Style(color="cyan")
+            return ("▲", ahead, installed, ahead)
 
-        return ("↑", Style(color="yellow"), f"{installed} → {latest}", Style(color="yellow"))
+        if version_tuple(installed) == version_tuple(golden):
+            return ("✓", Style(color="green"), golden, None)
+
+        return ("↑", Style(color="yellow"), f"{installed} → {golden}", Style(color="yellow"))
 
     def _render_versions(self) -> Text:
         text = Text()
