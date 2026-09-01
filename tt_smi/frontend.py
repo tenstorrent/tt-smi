@@ -147,7 +147,7 @@ class LatestReleasesBox(Container):
 
     def _render_error(self) -> Text:
         return Text(
-            "Failed to fetch latest releases.\nCheck your network connection.",
+            "Failed to fetch tested versions.\nCheck your network connection.",
             style=Style(color="red"),
         )
 
@@ -230,7 +230,7 @@ class TTSMI(App):
                 if not self.offline:
                     yield LatestReleasesBox(
                         id="latest_releases",
-                        title="Latest Releases",
+                        title="Tested Versions",
                     )
             with TabbedContent(
                 "Information (1)", "Telemetry (2)", "FW Version (3)", "Processes (4)", id="tab_container"

@@ -204,6 +204,35 @@ Host processes currently holding open Tenstorrent device handles. Updated about 
 | Device | Logical device index the process is using. |
 | Command | Process command line (or executable name) as reported by the host. |
 
+### Tested Versions
+
+The sidebar box lists the version of each component in the Tenstorrent software
+stack that we have validated. These are **not** each project's newest release.
+They come from [`golden.json`][golden] in the latest [tt-sw-manifest][manifest]
+release: the set of versions that CI installs and exercises together as one
+stack. Renovate opens a PR there as components publish new releases, and a pin
+only moves once the full validation suite passes on the combination, so the
+newest release of a component and its tested version can differ. This is the
+same set that [tt-installer][installer] installs by default.
+
+Where TT-SMI can determine what is installed on the host (tt-kmd through sysfs,
+tt-smi and tt-flash through their CLIs), the row is marked:
+
+| Marker | Meaning |
+|--------|---------|
+| `✓` | Matches the tested version. |
+| `↑` | Older than the tested version, shown as `installed → tested`. |
+| `▲` | Newer than the tested version. Not an error: the host is running ahead of the validated stack, so this particular combination has not been tested together. |
+
+Rows with no marker are informational, since TT-SMI has no way to tell what is
+installed for them.
+
+Run `tt-smi --offline` to skip the fetch and hide the box.
+
+[golden]: https://github.com/tenstorrent/tt-sw-manifest/blob/main/golden.json
+[installer]: https://github.com/tenstorrent/tt-installer
+[manifest]: https://github.com/tenstorrent/tt-sw-manifest
+
 ## Listing devices
 
 Use **`tt-smi -ls`** or **`tt-smi --list`** to print a table of Tenstorrent devices and exit (no GUI). This is the easiest way to see **UMD Chip ID**, **PCI BDF**, and **`/dev/tenstorrent/<n>`** (shown as **PCI Dev ID**) for each board—use these values with `tt-smi -r` as described in [Resets](#resets).

@@ -86,7 +86,7 @@ def parse_args():
         "--offline",
         default=False,
         action="store_true",
-        help="Do not access the network; hides the Latest Releases box",
+        help="Do not access the network; hides the Tested Versions box",
     )
     parser.add_argument(
         "-r",
