@@ -1,3 +1,21 @@
+tt-smi (6.4.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Prefer no-retimer Galaxy IPMI reset, fall back to legacy 0x0 on failure.
+
+  [ Alexander Lay ]
+  * Add support for Galaxy bin 6
+
+  [ Zakhary Kaplan ]
+  * Source Latest Releases from tt-sw-manifest golden pins
+  * Flag packages running ahead of the golden pin
+  * Rename the box to Tested Versions and document it
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.4.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 02 Sep 2026 21:02:56 +0000
+
 tt-smi (6.3.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
