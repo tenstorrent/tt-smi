@@ -97,7 +97,7 @@ def run_galaxy_ipmi_reset(
 
     BMC firmware v0.05.22 or later accepts 0x3. Older BMCs reject it with
     IPMI completion code 0xc9 (Parameter out of range) and do not reset.
-    On any 0x3 failure, print an error and fall back to legacy op_mode 0x0
+    On any 0x3 failure, print a warning and fall back to legacy op_mode 0x0
     so the tray reset still goes through.
     """
     result = _run_ipmitool(
@@ -113,20 +113,18 @@ def run_galaxy_ipmi_reset(
 
     if _ipmi_output_is_param_out_of_range(failure):
         print(
-            CMD_LINE_COLOR.RED,
-            "Galaxy reset without PCIe retimer (op_mode 0x3) is not supported by this BMC.\n"
-            "The BMC rejected the command with Parameter out of range (rsp=0xc9).\n"
-            f"Please upgrade BMC firmware to v{MINIMUM_BMC_VERSION_NO_RETIMER_RESET} or later.\n"
-            f"Falling back to legacy retimer reset (op_mode {GLX_IPMI_OP_MODE_WITH_RETIMER})...",
-            CMD_LINE_COLOR.ENDC,
+            f"{CMD_LINE_COLOR.YELLOW}WARNING! "
+            f"This Galaxy is on BMC < v{MINIMUM_BMC_VERSION_NO_RETIMER_RESET}, "
+            "so reset without PCIe retimer (op_mode 0x3) is not supported. "
+            f"Upgrade BMC firmware to v{MINIMUM_BMC_VERSION_NO_RETIMER_RESET} or later to enable it.{CMD_LINE_COLOR.ENDC}\n"
+            f"{CMD_LINE_COLOR.BLUE}Falling back to legacy retimer reset (op_mode {GLX_IPMI_OP_MODE_WITH_RETIMER})...{CMD_LINE_COLOR.ENDC}"
         )
     else:
         print(
-            CMD_LINE_COLOR.RED,
+            f"{CMD_LINE_COLOR.YELLOW}WARNING!{CMD_LINE_COLOR.ENDC} "
             f"Galaxy no-retimer IPMI reset (op_mode {GLX_IPMI_OP_MODE_NO_RETIMER}) failed:\n"
             f"{failure}\n"
-            f"Falling back to legacy retimer reset (op_mode {GLX_IPMI_OP_MODE_WITH_RETIMER})...",
-            CMD_LINE_COLOR.ENDC,
+            f"{CMD_LINE_COLOR.BLUE}Falling back to legacy retimer reset (op_mode {GLX_IPMI_OP_MODE_WITH_RETIMER})...{CMD_LINE_COLOR.ENDC}"
         )
 
     fallback = _run_ipmitool(
