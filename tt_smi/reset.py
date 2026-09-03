@@ -115,8 +115,8 @@ def run_galaxy_ipmi_reset(
         print(
             f"{CMD_LINE_COLOR.YELLOW}WARNING! "
             f"This Galaxy is on BMC < v{MINIMUM_BMC_VERSION_NO_RETIMER_RESET}, "
-            "so reset without PCIe retimer (op_mode 0x3) is not supported."
-            f"{CMD_LINE_COLOR.ENDC}\n"
+            "so reset without PCIe retimer (op_mode 0x3) is not supported. "
+            f"Upgrade BMC firmware to v{MINIMUM_BMC_VERSION_NO_RETIMER_RESET} or later to enable it.{CMD_LINE_COLOR.ENDC}\n"
             f"{CMD_LINE_COLOR.BLUE}Falling back to legacy retimer reset (op_mode {GLX_IPMI_OP_MODE_WITH_RETIMER})...{CMD_LINE_COLOR.ENDC}"
         )
     else:
