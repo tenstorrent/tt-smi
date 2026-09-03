@@ -1,3 +1,14 @@
+tt-smi (6.4.1) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Update the -glx_reset and -glx_reset_auto BMC update message to be softer
+  * Enhance warning for BMC version and retimer reset
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.4.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 03 Sep 2026 19:17:02 +0000
+
 tt-smi (6.4.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
