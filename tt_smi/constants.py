@@ -135,7 +135,7 @@ LIMITS = [
     "board_power_limit",
 ]
 
-# FW TAG_INPUT_POWER; missing from UMD TelemetryTag as of tt-umd 0.9.8
+# FW TAG_INPUT_POWER; missing from UMD TelemetryTag as of tt-umd 0.9.10
 TAG_INPUT_POWER = 54
 
 # leaving this intact for the snapshot version of the firmware list 
