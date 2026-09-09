@@ -1,3 +1,13 @@
+tt-smi (6.5.0) noble; urgency=medium
+
+  [ Bojan Rosko ]
+  * Bump tt-umd to 0.9.10
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.5.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 09 Sep 2026 18:55:17 +0000
+
 tt-smi (6.4.1) noble; urgency=medium
 
   [ Samridhi Bansal ]
