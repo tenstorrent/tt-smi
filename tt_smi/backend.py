@@ -127,13 +127,13 @@ class TTSMIBackend:
         if self.devices[device_idx].is_remote():
             return "N/A"
         return (self.devices[device_idx].get_pci_interface_id() if not self.use_umd
-                else self.devices[device_idx].get_pci_device().get_device_num())
+                else self.devices[device_idx].get_communication_device_id())
         
     def get_pci_bdf(self, device_idx) -> str:
         if self.devices[device_idx].is_remote():
             return "N/A"
         return (self.devices[device_idx].get_pci_bdf() if not self.use_umd
-                else self.devices[device_idx].get_pci_device().get_device_info().pci_bdf)
+                else self.umd_cluster_descriptor.get_chip_pci_bdfs()[device_idx])
     
     def get_device_name(self, device_idx):
         """Get device name from chip object"""
