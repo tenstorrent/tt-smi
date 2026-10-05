@@ -1,3 +1,13 @@
+tt-smi (6.7.0) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * chore: Bump UMD 9.11 -> 9.12 and luwen from 9.0 -> 0.10
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.7.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 05 Oct 2026 19:12:39 +0000
+
 tt-smi (6.6.0) noble; urgency=medium
 
   [ Joel Smith ]
