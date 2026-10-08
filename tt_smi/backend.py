@@ -192,7 +192,16 @@ class TTSMIBackend:
             self.log.device_info[i].gddr_telemetry = self.device_gddr_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
-            self.log.device_info[i].ethernet = self.get_ethernet_status(i)
+            try:
+                self.log.device_info[i].ethernet = self.get_ethernet_status(i)
+            except Exception as e:
+                self.log.device_info[i].ethernet = None
+                print(
+                    CMD_LINE_COLOR.YELLOW,
+                    f"WARNING: device {i}: ethernet status read failed, omitted from snapshot: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                    file=sys.stderr,
+                )
 
         self.update_processes()
         self.log.processes = [log.DeviceProcess(**p) for p in self.device_processes]
@@ -479,24 +488,33 @@ class TTSMIBackend:
         """Refresh the process list."""
         self.device_processes = self.get_device_processes()
 
+    def get_missing_eth_api(self, board_num) -> List[str]:
+        """TTDevice eth getters missing from the installed tt-umd"""
+        return [a for a in constants.ETH_UMD_API if not hasattr(self.devices[board_num], a)]
+
     def get_ethernet_status(self, board_num) -> Optional[List[Dict]]:
-        """Read per-link eth status. None if not supported (luwen, WH, remote chip)"""
+        """Read per-link eth status. None if not supported (luwen, WH, remote chip, old tt-umd)"""
         if (
             not self.use_umd
             or not self.is_blackhole(board_num)
             or self.devices[board_num].is_remote()
+            or self.get_missing_eth_api(board_num)
         ):
             return None
         tt_device = self.devices[board_num]
         soc_desc = tt_device.get_soc_descriptor()
         links = []
         for core in soc_desc.get_cores(CoreType.ETH, CoordSystem.NOC0):
-            status = tt_device.read_eth_core_training_status(core)
+            try:
+                status = getattr(tt_device.read_eth_core_training_status(core), "name", None)
+            except (ValueError, TypeError):
+                # Raw value outside the UMD enum
+                status = None
             links.append(
                 {
                     "channel": soc_desc.translate_coord_to(core, CoordSystem.LOGICAL).y,
                     "core": f"{core.x}-{core.y}",
-                    "link": constants.ETH_LINK_STATUS.get(status.name, "UNKNOWN"),
+                    "link": constants.ETH_LINK_STATUS.get(status, "UNKNOWN"),
                     "train_speed_gbps": tt_device.read_eth_core_train_speed(core),
                     "target_speed_gbps": tt_device.read_eth_core_target_speed(core),
                 }
@@ -509,20 +527,25 @@ class TTSMIBackend:
             return "not supported with --use_luwen"
         if self.is_wormhole(board_num):
             return "not supported on Wormhole"
-        return "not supported on remote chips"
+        if self.devices[board_num].is_remote():
+            return "not supported on remote chips"
+        missing = self.get_missing_eth_api(board_num)
+        if missing:
+            return f"requires a newer tt-umd (TTDevice lacks {', '.join(missing)})"
+        return "not supported"
 
     def print_ethernet_status(self, eth_input: SmiDeviceInput):
         """Print per-link eth status for the selected devices"""
-        selected = []
-        for i in self.devices:
-            if eth_input.type == SmiDeviceTargetKind.ALL:
-                selected.append(i)
-            elif eth_input.type == SmiDeviceTargetKind.UMD_LOGICAL_ID and i in eth_input.value:
-                selected.append(i)
-            elif eth_input.type == SmiDeviceTargetKind.PCI_BDF and self.get_pci_bdf(i) in eth_input.value:
-                selected.append(i)
-            elif eth_input.type == SmiDeviceTargetKind.DEV_TENSTORRENT_ID and self.get_pci_device_id(i) in eth_input.value:
-                selected.append(i)
+        if eth_input.type == SmiDeviceTargetKind.ALL:
+            selected = list(self.devices)
+        else:
+            key = {
+                SmiDeviceTargetKind.UMD_LOGICAL_ID: lambda i: i,
+                SmiDeviceTargetKind.PCI_BDF: self.get_pci_bdf,
+                SmiDeviceTargetKind.DEV_TENSTORRENT_ID: self.get_pci_device_id,
+            }[eth_input.type]
+            keys = {i: key(i) for i in self.devices}
+            selected = [i for i in self.devices if keys[i] in eth_input.value]
         if not selected:
             print(
                 CMD_LINE_COLOR.RED,
@@ -530,6 +553,15 @@ class TTSMIBackend:
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
+        if eth_input.type != SmiDeviceTargetKind.ALL:
+            for target in eth_input.value:
+                if target not in keys.values():
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        f"WARNING: no device matches {target}. Use -ls to list devices.",
+                        CMD_LINE_COLOR.ENDC,
+                        file=sys.stderr,
+                    )
         for i in selected:
             print(
                 f"Device {i}: {self.get_device_name(i)} {self.device_infos[i]['board_type']}  ({self.get_pci_bdf(i)})"

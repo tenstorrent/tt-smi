@@ -157,16 +157,24 @@ def parse_args():
         default=None,
         nargs="*",
         help=(
-            "Print per-link Ethernet status (Blackhole only): link state, raw train and target speed. "
+            "Print per-link Ethernet status (Blackhole only): link state, train and target speed (Gbps). "
             "Targets as for -r. Omit targets or use 'all' for all devices."
         ),
         dest="eth_status",
     )
     args = parser.parse_args()
     if args.eth_status is not None and (
-        args.snapshot or args.filename is not False or args.reset is not None or args.list
+        args.snapshot
+        or args.filename is not False
+        or args.reset is not None
+        or args.list
+        or args.glx_reset
+        or args.glx_reset_auto
+        or args.glx_list_tray_to_device
     ):
-        parser.error("--eth_status cannot be used with -s, -f, -r or -ls")
+        parser.error(
+            "--eth_status cannot be used with -s, -f, -r, -ls, -glx_reset, -glx_reset_auto or -glx_list_tray_to_device"
+        )
     return args
 
 

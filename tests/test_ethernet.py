@@ -8,8 +8,9 @@ from enum import Enum
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import tt_umd
 from tt_umd import ARCH
-from tt_smi import constants
+from tt_smi import constants, log
 from tt_smi.backend import TTSMIBackend
 from tt_smi.frontend import TTSMI
 from tt_smi.tt_smi import parse_args
@@ -46,6 +47,14 @@ def make_bh_device(links):
     return dev
 
 
+def make_old_umd_bh_device():
+    """BH TTDevice from a tt-umd without the eth getters"""
+    dev = MagicMock(spec=["get_arch", "is_remote", "get_soc_descriptor"])
+    dev.get_arch.return_value = ARCH.BLACKHOLE
+    dev.is_remote.return_value = False
+    return dev
+
+
 def make_wh_device(remote=False):
     dev = MagicMock()
     dev.get_arch.return_value = ARCH.WORMHOLE_B0
@@ -56,7 +65,7 @@ def make_wh_device(remote=False):
 BH_LINKS = [
     (0, (1, 25), FakeEthTrainingStatus.SUCCESS, 400, 400),
     (1, (2, 25), FakeEthTrainingStatus.FAIL, None, 400),
-    (2, (3, 25), FakeEthTrainingStatus.NOT_CONNECTED, None, None),
+    (2, (3, 25), FakeEthTrainingStatus.NOT_CONNECTED, None, 400),
     (3, (4, 25), FakeEthTrainingStatus.IN_PROGRESS, None, 0),
 ]
 
@@ -106,7 +115,17 @@ class TestEthStatusArgs:
 
     @pytest.mark.parametrize(
         "other",
-        [["-s"], ["-f"], ["-f", "out.json"], ["-r"], ["-r", "0"], ["-ls"]],
+        [
+            ["-s"],
+            ["-f"],
+            ["-f", "out.json"],
+            ["-r"],
+            ["-r", "0"],
+            ["-ls"],
+            ["-glx_reset"],
+            ["-glx_reset_auto"],
+            ["-glx_list_tray_to_device"],
+        ],
     )
     def test_conflicts(self, monkeypatch, other):
         with pytest.raises(SystemExit) as e:
@@ -129,12 +148,34 @@ class TestGetEthernetStatus:
         assert links == [
             {"channel": 0, "core": "1-25", "link": "UP", "train_speed_gbps": 400, "target_speed_gbps": 400},
             {"channel": 1, "core": "2-25", "link": "DOWN", "train_speed_gbps": None, "target_speed_gbps": 400},
-            {"channel": 2, "core": "3-25", "link": "UNUSED", "train_speed_gbps": None, "target_speed_gbps": None},
+            {"channel": 2, "core": "3-25", "link": "UNUSED", "train_speed_gbps": None, "target_speed_gbps": 400},
             {"channel": 3, "core": "4-25", "link": "UNKNOWN", "train_speed_gbps": None, "target_speed_gbps": 0},
         ]
 
     def test_link_map_covers_umd_enum(self):
         assert set(constants.ETH_LINK_STATUS) == {s.name for s in FakeEthTrainingStatus}
+
+    def test_link_map_covers_real_umd_enum(self):
+        if not hasattr(tt_umd, "EthTrainingStatus"):
+            pytest.skip("installed tt-umd lacks EthTrainingStatus")
+        names = set(tt_umd.EthTrainingStatus.__members__)
+        assert names <= set(constants.ETH_LINK_STATUS)
+
+    def test_unknown_status_value(self):
+        dev = make_bh_device(BH_LINKS[:1])
+        dev.read_eth_core_training_status.side_effect = ValueError("bad enum value")
+        links = make_backend({0: dev}).get_ethernet_status(0)
+        assert links[0]["link"] == "UNKNOWN"
+
+    def test_old_umd_none(self):
+        dev = make_old_umd_bh_device()
+        backend = make_backend({0: dev})
+        assert backend.get_ethernet_status(0) is None
+        dev.get_soc_descriptor.assert_not_called()
+        reason = backend.get_ethernet_not_supported_reason(0)
+        assert reason.startswith("requires a newer tt-umd")
+        for name in constants.ETH_UMD_API:
+            assert name in reason
 
     def test_luwen_none(self):
         dev = make_bh_device(BH_LINKS)
@@ -215,6 +256,21 @@ class TestPrintEthernetStatus:
         assert "Device 0" not in out
         assert "Device 1: Blackhole" in out
 
+    def test_partial_match_warns(self, capsys):
+        backend = make_backend({0: make_bh_device(BH_LINKS)})
+        backend.get_pci_bdf = lambda i: "0000:01:00.0"
+        backend.print_ethernet_status(parse_smi_device_input(["0", "99"]))
+        out, err = capsys.readouterr()
+        assert "Device 0: Blackhole" in out
+        assert "no device matches 99" in err
+        assert "no device matches 0" not in err
+
+    def test_old_umd_reason(self, capsys):
+        backend = make_backend({0: make_old_umd_bh_device()})
+        backend.get_pci_bdf = lambda i: "0000:01:00.0"
+        backend.print_ethernet_status(parse_smi_device_input([]))
+        assert "Ethernet link status requires a newer tt-umd" in capsys.readouterr().out
+
     def test_no_match_exits(self):
         backend = make_backend({0: make_bh_device(BH_LINKS)})
         with pytest.raises(SystemExit) as e:
@@ -239,8 +295,24 @@ class TestSnapshotEthernet:
         eth = snap["device_info"][0]["ethernet"]
         assert len(eth) == len(BH_LINKS)
         assert eth[0] == {"channel": 0, "core": "1-25", "link": "UP", "train_speed_gbps": 400, "target_speed_gbps": 400}
-        assert eth[2] == {"channel": 2, "core": "3-25", "link": "UNUSED", "train_speed_gbps": None, "target_speed_gbps": None}
+        assert eth[2] == {"channel": 2, "core": "3-25", "link": "UNUSED", "train_speed_gbps": None, "target_speed_gbps": 400}
         assert "ethernet" not in snap["device_info"][1]
+
+    def test_old_umd_omitted(self):
+        snap = self.snapshot({0: make_old_umd_bh_device()})
+        assert "ethernet" not in snap["device_info"][0]
+
+    def test_read_error_omitted(self, capsys):
+        dev = make_bh_device(BH_LINKS)
+        dev.get_soc_descriptor.side_effect = RuntimeError("eth read failed")
+        snap = self.snapshot({0: dev, 1: make_bh_device(BH_LINKS)})
+        assert "ethernet" not in snap["device_info"][0]
+        assert len(snap["device_info"][1]["ethernet"]) == len(BH_LINKS)
+        assert "device 0: ethernet status read failed" in capsys.readouterr().err
+
+    def test_speed_none_validates(self):
+        link = log.EthLink(channel=0, core="1-25", link="DOWN", train_speed_gbps=None, target_speed_gbps=None)
+        assert link.train_speed_gbps is None
 
 
 class TestEthernetTab:
@@ -260,9 +332,28 @@ class TestEthernetTab:
         assert all(len(r) == ncols for r in rows)
         assert len(rows) == len(BH_LINKS) + 1
         assert [t.plain for t in rows[0]] == ["0", "0", "1-25", "UP", "400", "400"]
-        assert [t.plain for t in rows[2]] == ["0", "2", "3-25", "UNUSED", "-", "-"]
+        assert [t.plain for t in rows[2]] == ["0", "2", "3-25", "UNUSED", "-", "400"]
         assert rows[-1][0].plain == "1"
         assert rows[-1][3].plain == "not supported on Wormhole"
+
+    def test_old_umd_reason_row(self):
+        backend = make_backend({0: make_old_umd_bh_device()})
+        rows = TTSMI.format_ethernet_rows(self.fake_app(backend))
+        assert len(rows) == 1
+        assert rows[0][3].plain.startswith("requires a newer tt-umd")
+
+    @pytest.mark.parametrize("on_tab", [True, False])
+    def test_filter_keys_only_on_tab(self, on_tab):
+        app = SimpleNamespace(
+            on_eth_tab=lambda: on_tab, eth_hide_unused=False, eth_hide_down=False, ethernet_links=None
+        )
+        assert TTSMI.check_action(app, "toggle_eth_unused", ()) is on_tab
+        assert TTSMI.check_action(app, "toggle_eth_down", ()) is on_tab
+        assert TTSMI.check_action(app, "tab_one", ()) is True
+        TTSMI.action_toggle_eth_unused(app)
+        TTSMI.action_toggle_eth_down(app)
+        assert app.eth_hide_unused is on_tab
+        assert app.eth_hide_down is on_tab
 
     def test_filters(self):
         backend = make_backend({0: make_bh_device(BH_LINKS)})

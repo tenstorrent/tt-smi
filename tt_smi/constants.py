@@ -257,6 +257,13 @@ ETHERNET_TABLE_HEADER = [
     "Target (Gbps)",
 ]
 
+# TTDevice eth getters; absent in older tt-umd
+ETH_UMD_API = (
+    "read_eth_core_training_status",
+    "read_eth_core_train_speed",
+    "read_eth_core_target_speed",
+)
+
 # UMD EthTrainingStatus name -> link state shown to the user
 ETH_LINK_STATUS = {
     "SUCCESS": "UP",
@@ -292,7 +299,7 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |   Go to GDDR telemetry tab    |        3        |          Switch to tab with per-channel GDDR telemetry that is updated every 100ms           |
 |   Go to device(s) firmware tab     |        4        |          Switch to tab with all the fw versions on the board(s)          |
 |   Go to process(es) tab    |        5        |          Switch to tab with process info that is updated every 100ms           |
-|   Go to ethernet tab    |        6        |          Switch to tab with per-link ethernet status, read once on open           |
+|   Go to ethernet tab    |        6        |          Switch to tab with per-link ethernet status, read on first open           |
 |   Hide/show unused links    |        u        |          Ethernet tab: toggle hiding UNUSED links           |
 |   Hide/show down links    |        x        |          Ethernet tab: toggle hiding DOWN links           |
 

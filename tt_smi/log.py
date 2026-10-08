@@ -10,7 +10,7 @@ import base64
 import inspect
 import datetime
 from pathlib import Path
-from typing import Any, Union, List, TypeVar, Generic
+from typing import Any, Union, List, Optional, TypeVar, Generic
 
 try:
     # Try the newer v2 pydantic and use that first
@@ -285,8 +285,8 @@ class EthLink(ElasticModel):
     channel: int
     core: str
     link: str
-    train_speed_gbps: int
-    target_speed_gbps: int
+    train_speed_gbps: Optional[int]
+    target_speed_gbps: Optional[int]
 
 
 @optional

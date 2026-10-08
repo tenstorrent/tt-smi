@@ -957,14 +957,31 @@ class TTSMI(App):
         """Switch to ethernet tab"""
         self.query_one(TabbedContent).active = "tab-6"
 
+    def on_eth_tab(self) -> bool:
+        """True if the ethernet tab is active"""
+        try:
+            return self.query_one(TabbedContent).active == "tab-6"
+        except NoMatches:
+            return False
+
+    def check_action(self, action: str, parameters) -> Optional[bool]:
+        """Enable and show eth link filters only on the ethernet tab"""
+        if action in ("toggle_eth_unused", "toggle_eth_down"):
+            return self.on_eth_tab()
+        return True
+
     def action_toggle_eth_unused(self) -> None:
         """Toggle hiding unused ethernet links"""
+        if not self.on_eth_tab():
+            return
         self.eth_hide_unused = not self.eth_hide_unused
         if self.ethernet_links is not None:
             self.update_ethernet_table()
 
     def action_toggle_eth_down(self) -> None:
         """Toggle hiding down ethernet links"""
+        if not self.on_eth_tab():
+            return
         self.eth_hide_down = not self.eth_hide_down
         if self.ethernet_links is not None:
             self.update_ethernet_table()
@@ -1020,6 +1037,8 @@ class TTSMI(App):
             self.dispatch_process_thread()
         elif tab_id == "tab-6":
             self.update_ethernet_table()
+        if hasattr(self, "refresh_bindings"):  # older textual lacks it
+            self.refresh_bindings()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """Handle worker state change. Here we just use it to catch worker errors."""
