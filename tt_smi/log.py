@@ -281,6 +281,15 @@ class Limits(ElasticModel):
 
 
 @optional
+class EthLink(ElasticModel):
+    channel: int
+    core: str
+    link: str
+    train_speed_gbps: int
+    target_speed_gbps: int
+
+
+@optional
 class TTSMIDeviceLog(ElasticModel):
     smbus_telem: SmbusTelem
     board_info: BoardInfo
@@ -288,6 +297,7 @@ class TTSMIDeviceLog(ElasticModel):
     gddr_telemetry: GddrTelemetry
     firmwares: Firmwares
     limits: Limits
+    ethernet: List[EthLink]
 
 
 @optional

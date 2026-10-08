@@ -167,6 +167,9 @@ class TTSMI(App):
         ("3", "tab_three", "GDDR telemetry tab"),
         ("4", "tab_four", "Firmware tab"),
         ("5", "tab_five", "Processes tab"),
+        ("6", "tab_six", "Ethernet tab"),
+        ("u, U", "toggle_eth_unused", "Hide/show unused links"),
+        ("x, X", "toggle_eth_down", "Hide/show down links"),
     ]
 
     try:
@@ -203,6 +206,9 @@ class TTSMI(App):
         self.text_theme = create_tt_tools_theme()
         self.telem_worker = None
         self.process_worker = None
+        self.ethernet_links = None
+        self.eth_hide_unused = False
+        self.eth_hide_down = False
 
         if key_bindings:
             self.BINDINGS += key_bindings
@@ -239,6 +245,7 @@ class TTSMI(App):
                 "GDDR Telemetry (3)",
                 "FW Version (4)",
                 "Processes (5)",
+                "Ethernet (6)",
                 id="tab_container",
             ):
                 yield TTDataTable(
@@ -269,6 +276,12 @@ class TTSMI(App):
                     title="Device Processes",
                     id="tt_smi_processes",
                     header=constants.PROCESSES_TABLE_HEADER,
+                    header_height=2,
+                )
+                yield TTDataTable(
+                    title="Ethernet Links",
+                    id="tt_smi_ethernet",
+                    header=constants.ETHERNET_TABLE_HEADER,
                     header_height=2,
                 )
         yield Footer()
@@ -371,6 +384,52 @@ class TTSMI(App):
             empty = [Text("", justify="center") for _ in range(ncols)]
             empty[0] = Text("No processes found", style=self.text_theme["gray"], justify="center")
             all_rows.append(empty)
+        return all_rows
+
+    def update_ethernet_table(self) -> None:
+        """Fill ethernet table. Reads eth L1 once, so not in the telemetry loop"""
+        if self.ethernet_links is None:
+            self.ethernet_links = {i: self.backend.get_ethernet_status(i) for i in self.backend.devices}
+        eth_table = self.get_widget_by_id(id="tt_smi_ethernet")
+        eth_table.dt.cursor_type = "none"
+        eth_table.dt.clear()
+        eth_table.dt.add_rows(self.format_ethernet_rows())
+        hidden = [name for name, on in (("unused", self.eth_hide_unused), ("down", self.eth_hide_down)) if on]
+        eth_table.dt.border_title = "Ethernet Links" + (f" (hiding {', '.join(hidden)})" if hidden else "")
+
+    def format_ethernet_rows(self) -> List[List[Text]]:
+        """Format ethernet rows"""
+        all_rows = []
+        ncols = len(constants.ETHERNET_TABLE_HEADER)
+        for i, links in self.ethernet_links.items():
+            if links is None:
+                row = [Text("", justify="center") for _ in range(ncols)]
+                row[0] = Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center")
+                row[3] = Text(
+                    self.backend.get_ethernet_not_supported_reason(i),
+                    style=self.text_theme["gray"],
+                    justify="center",
+                )
+                all_rows.append(row)
+                continue
+            for link in links:
+                if (self.eth_hide_unused and link["link"] == "UNUSED") or (
+                    self.eth_hide_down and link["link"] == "DOWN"
+                ):
+                    continue
+                train = link["train_speed_gbps"]
+                target = link["target_speed_gbps"]
+                link_style = self.text_theme["text_green"] if link["link"] == "UP" else self.text_theme["gray"]
+                all_rows.append(
+                    [
+                        Text(f"{i}", style=self.text_theme["yellow_bold"], justify="center"),
+                        Text(f"{link['channel']}", style=self.text_theme["text_green"], justify="center"),
+                        Text(f"{link['core']}", style=self.text_theme["text_green"], justify="center"),
+                        Text(f"{link['link']}", style=link_style, justify="center"),
+                        Text(f"{train if train is not None else '-'}", style=self.text_theme["text_green"], justify="center"),
+                        Text(f"{target if target is not None else '-'}", style=self.text_theme["text_green"], justify="center"),
+                    ]
+                )
         return all_rows
 
     def format_firmware_rows(self):
@@ -894,6 +953,22 @@ class TTSMI(App):
         """Switch to processes tab"""
         self.query_one(TabbedContent).active = "tab-5"
 
+    def action_tab_six(self) -> None:
+        """Switch to ethernet tab"""
+        self.query_one(TabbedContent).active = "tab-6"
+
+    def action_toggle_eth_unused(self) -> None:
+        """Toggle hiding unused ethernet links"""
+        self.eth_hide_unused = not self.eth_hide_unused
+        if self.ethernet_links is not None:
+            self.update_ethernet_table()
+
+    def action_toggle_eth_down(self) -> None:
+        """Toggle hiding down ethernet links"""
+        self.eth_hide_down = not self.eth_hide_down
+        if self.ethernet_links is not None:
+            self.update_ethernet_table()
+
     def action_help(self) -> None:
         """Pop up the help menu"""
         tt_confirm_box = TTHelperMenuBox(
@@ -943,6 +1018,8 @@ class TTSMI(App):
             self.dispatch_telem_thread()
         elif tab_id == "tab-5":
             self.dispatch_process_thread()
+        elif tab_id == "tab-6":
+            self.update_ethernet_table()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """Handle worker state change. Here we just use it to catch worker errors."""

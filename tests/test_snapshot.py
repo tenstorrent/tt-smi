@@ -168,6 +168,16 @@ class TestSnapshot:
             assert "bus_peak_limit" in limits
             assert "board_power_limit" in limits
 
+    def test_ethernet_fields(self, snapshot):
+        """Blackhole (UMD) devices have an ethernet list; Wormhole has none."""
+        for device_info in snapshot["device_info"]:
+            if "ethernet" not in device_info:
+                continue
+            for link in device_info["ethernet"]:
+                assert "channel" in link
+                assert "core" in link
+                assert "link" in link
+
     def test_snapshot_no_tty(self):
         """Test if the output from tt-smi -s --snapshot_no_tty can be parsed as json"""
         result = subprocess.run(

@@ -248,6 +248,23 @@ PROCESSES_TABLE_HEADER = [
     "Command",
 ]
 
+ETHERNET_TABLE_HEADER = [
+    "Device",
+    "Chan",
+    "Core (NOC0)",
+    "Link",
+    "Speed (Gbps)",
+    "Target (Gbps)",
+]
+
+# UMD EthTrainingStatus name -> link state shown to the user
+ETH_LINK_STATUS = {
+    "SUCCESS": "UP",
+    "FAIL": "DOWN",
+    "NOT_CONNECTED": "UNUSED",
+    "IN_PROGRESS": "UNKNOWN",
+}
+
 PCI_PROPERTIES = [
     "current_link_speed",
     "max_link_speed",
@@ -275,5 +292,8 @@ Use cursor or keyboard keys to navigate the app. The following table details the
 |   Go to GDDR telemetry tab    |        3        |          Switch to tab with per-channel GDDR telemetry that is updated every 100ms           |
 |   Go to device(s) firmware tab     |        4        |          Switch to tab with all the fw versions on the board(s)          |
 |   Go to process(es) tab    |        5        |          Switch to tab with process info that is updated every 100ms           |
+|   Go to ethernet tab    |        6        |          Switch to tab with per-link ethernet status, read once on open           |
+|   Hide/show unused links    |        u        |          Ethernet tab: toggle hiding UNUSED links           |
+|   Hide/show down links    |        x        |          Ethernet tab: toggle hiding DOWN links           |
 
 """
