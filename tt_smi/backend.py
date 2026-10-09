@@ -21,7 +21,7 @@ from rich import get_console
 from rich.syntax import Syntax
 from typing import Any, Dict, List, Optional, Union
 from rich.progress import track
-from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_smi.colors import CMD_LINE_COLOR
 from pyluwen import PciChip
 from tt_smi.utils import (
     LOG_FOLDER,
