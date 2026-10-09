@@ -46,11 +46,14 @@ from tt_umd import (
     ClusterDescriptor,
     SmBusArcTelemetryReader,
     ARCH,
+    CoreType,
+    CoordSystem,
 )
 from tt_tools_common.utils_common.system_utils import (
     get_host_info,
 )
 from tt_tools_common.utils_common.tools_utils import init_logging
+from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 
 class TTSMIBackend:
     """
@@ -189,6 +192,16 @@ class TTSMIBackend:
             self.log.device_info[i].gddr_telemetry = self.device_gddr_telemetrys[i]
             self.log.device_info[i].firmwares = self.firmware_infos[i]
             self.log.device_info[i].limits = self.chip_limits[i]
+            try:
+                self.log.device_info[i].ethernet = self.get_ethernet_status(i)
+            except Exception as e:
+                self.log.device_info[i].ethernet = None
+                print(
+                    CMD_LINE_COLOR.YELLOW,
+                    f"WARNING: device {i}: ethernet status read failed, omitted from snapshot: {e}",
+                    CMD_LINE_COLOR.ENDC,
+                    file=sys.stderr,
+                )
 
         self.update_processes()
         self.log.processes = [log.DeviceProcess(**p) for p in self.device_processes]
@@ -474,6 +487,96 @@ class TTSMIBackend:
     def update_processes(self):
         """Refresh the process list."""
         self.device_processes = self.get_device_processes()
+
+    def get_missing_eth_api(self, board_num) -> List[str]:
+        """TTDevice eth getters missing from the installed tt-umd"""
+        return [a for a in constants.ETH_UMD_API if not hasattr(self.devices[board_num], a)]
+
+    def get_ethernet_status(self, board_num) -> Optional[List[Dict]]:
+        """Read per-link eth status. None if not supported (luwen, WH, remote chip, old tt-umd)"""
+        if (
+            not self.use_umd
+            or not self.is_blackhole(board_num)
+            or self.devices[board_num].is_remote()
+            or self.get_missing_eth_api(board_num)
+        ):
+            return None
+        tt_device = self.devices[board_num]
+        soc_desc = tt_device.get_soc_descriptor()
+        links = []
+        for core in soc_desc.get_cores(CoreType.ETH, CoordSystem.NOC0):
+            try:
+                status = getattr(tt_device.read_eth_core_training_status(core), "name", None)
+            except (ValueError, TypeError):
+                # Raw value outside the UMD enum
+                status = None
+            links.append(
+                {
+                    "channel": soc_desc.translate_coord_to(core, CoordSystem.LOGICAL).y,
+                    "core": f"{core.x}-{core.y}",
+                    "link": constants.ETH_LINK_STATUS.get(status, "UNKNOWN"),
+                    "train_speed_gbps": tt_device.read_eth_core_train_speed(core),
+                    "target_speed_gbps": tt_device.read_eth_core_target_speed(core),
+                }
+            )
+        return links
+
+    def get_ethernet_not_supported_reason(self, board_num) -> str:
+        """Reason get_ethernet_status returns None for this device"""
+        if not self.use_umd:
+            return "not supported with --use_luwen"
+        if self.is_wormhole(board_num):
+            return "not supported on Wormhole"
+        if self.devices[board_num].is_remote():
+            return "not supported on remote chips"
+        missing = self.get_missing_eth_api(board_num)
+        if missing:
+            return f"requires a newer tt-umd (TTDevice lacks {', '.join(missing)})"
+        return "not supported"
+
+    def print_ethernet_status(self, eth_input: SmiDeviceInput):
+        """Print per-link eth status for the selected devices"""
+        if eth_input.type == SmiDeviceTargetKind.ALL:
+            selected = list(self.devices)
+        else:
+            key = {
+                SmiDeviceTargetKind.UMD_LOGICAL_ID: lambda i: i,
+                SmiDeviceTargetKind.PCI_BDF: self.get_pci_bdf,
+                SmiDeviceTargetKind.DEV_TENSTORRENT_ID: self.get_pci_device_id,
+            }[eth_input.type]
+            keys = {i: key(i) for i in self.devices}
+            selected = [i for i in self.devices if keys[i] in eth_input.value]
+        if not selected:
+            print(
+                CMD_LINE_COLOR.RED,
+                f"No devices match {eth_input.value}. Use -ls to list devices.",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
+        if eth_input.type != SmiDeviceTargetKind.ALL:
+            for target in eth_input.value:
+                if target not in keys.values():
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        f"WARNING: no device matches {target}. Use -ls to list devices.",
+                        CMD_LINE_COLOR.ENDC,
+                        file=sys.stderr,
+                    )
+        for i in selected:
+            print(
+                f"Device {i}: {self.get_device_name(i)} {self.device_infos[i]['board_type']}  ({self.get_pci_bdf(i)})"
+            )
+            links = self.get_ethernet_status(i)
+            if links is None:
+                print(f"    Ethernet link status {self.get_ethernet_not_supported_reason(i)}.")
+                continue
+            for link in links:
+                line = f"    Link {link['channel']:>2}: {link['link']:<7} core {link['core']:<6}"
+                train = link["train_speed_gbps"]
+                target = link["target_speed_gbps"]
+                line += f" speed {train if train is not None else '-':>4} Gbps"
+                line += f" target {target if target is not None else '-':>4} Gbps"
+                print(line)
 
     def get_board_id(self, board_num) -> str:
         """Read board id from CSM or SPI if FW is not loaded"""
