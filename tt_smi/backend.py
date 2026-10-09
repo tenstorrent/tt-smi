@@ -880,15 +880,14 @@ class TTSMIBackend:
                 elif "CM_FW_VERSION" in self.smbus_telem_info[board_num]:
                     val = self.smbus_telem_info[board_num]["CM_FW_VERSION"]
                 else:
-                    val = "N/A"
+                    val = None
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
 
             elif field == "cm_fw_date":
-                if "WH_FW_DATE" in self.smbus_telem_info[board_num]:
-                    val = self.smbus_telem_info[board_num]["WH_FW_DATE"]
+                val = self.smbus_telem_info[board_num].get("WH_FW_DATE")
                 if val is None:
                     fw_versions[field] = "N/A"
                 else:
@@ -929,8 +928,7 @@ class TTSMIBackend:
                 else:
                     fw_versions[field] = hex_to_semver_m3_fw(int(val, 16))
             elif field == "tt_flash_version":
-                if "TT_FLASH_VERSION" in self.smbus_telem_info[board_num]:
-                    val = self.smbus_telem_info[board_num]["TT_FLASH_VERSION"]
+                val = self.smbus_telem_info[board_num].get("TT_FLASH_VERSION")
                 if val is None:
                     fw_versions[field] = "N/A"
                 # See below- Galaxy systems manually get an N/A tt_flash_version
