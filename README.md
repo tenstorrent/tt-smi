@@ -105,7 +105,7 @@ Running tt-smi with the ```-h, --help``` flag displays the help text.
 
 ```
 $ tt-smi -h
-usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen]
+usage: tt-smi [-h] [-l] [-v] [-s] [-ls] [-f [snapshot filename]] [-c] [-r [TARGETS ...]] [--snapshot_no_tty] [-glx_reset] [-glx_reset_auto] [-glx_list_tray_to_device] [--no_reinit] [--use_luwen] [--eth_status [TARGETS ...]]
 
 Tenstorrent System Management Interface (TT-SMI) is a command line utility to interact with all Tenstorrent devices on host. The main objective of TT-SMI is to provide a simple and easy-to-use
 interface to display devices, device telemetry, and system information. TT-SMI is also used to issue board-level resets.
@@ -130,6 +130,8 @@ options:
                         List the mapping of devices to trays on the galaxy
   --no_reinit           Don't detect devices post reset
   --use_luwen           Use deprecated Luwen driver instead of UMD (default).
+  --eth_status [TARGETS ...]
+                        Print per-link Ethernet status (Blackhole only): link state, train and target speed (Gbps). Targets as for -r. Omit targets or use 'all' for all devices.
   ```
 
 These options will be discussed in more detail in the following sections.
@@ -223,6 +225,19 @@ Host processes currently holding open Tenstorrent device handles. Updated about 
 | User | Username that owns the process. |
 | Device | Logical device index the process is using. |
 | Command | Process command line (or executable name) as reported by the host. |
+
+#### Ethernet (6)
+
+Per-link Ethernet status for local Blackhole chips (UMD only). Read on first open of the tab. Press `u` / `x` on this tab to hide UNUSED / DOWN links. Needs a tt-umd that provides the TTDevice eth getters; otherwise the row shows the reason.
+
+| Field | Description |
+|-------|-------------|
+| Device | Logical device index. |
+| Chan | Ethernet channel (logical). |
+| Core (NOC0) | Ethernet core NOC0 coordinates (`x-y`). |
+| Link | `UP`, `DOWN`, `UNUSED` (not connected) or `UNKNOWN`. |
+| Speed (Gbps) | Trained link speed. `-` when not available. |
+| Target (Gbps) | Configured target speed. `-` when not available. |
 
 ### Tested Versions
 

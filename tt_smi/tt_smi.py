@@ -151,7 +151,30 @@ def parse_args():
         action="store_true",
         help="Skip waiting for Ethernet training post reset.",
     )
+    parser.add_argument(
+        "--eth_status",
+        metavar="TARGETS",
+        default=None,
+        nargs="*",
+        help=(
+            "Print per-link Ethernet status (Blackhole only): link state, train and target speed (Gbps). "
+            "Targets as for -r. Omit targets or use 'all' for all devices."
+        ),
+        dest="eth_status",
+    )
     args = parser.parse_args()
+    if args.eth_status is not None and (
+        args.snapshot
+        or args.filename is not False
+        or args.reset is not None
+        or args.list
+        or args.glx_reset
+        or args.glx_reset_auto
+        or args.glx_list_tray_to_device
+    ):
+        parser.error(
+            "--eth_status cannot be used with -s, -f, -r, -ls, -glx_reset, -glx_reset_auto or -glx_list_tray_to_device"
+        )
     return args
 
 
@@ -180,6 +203,9 @@ def tt_smi_main(backend: TTSMIBackend, args):
             )
             sys.exit(1)
         backend.print_tray_and_device_mapping()
+        sys.exit(0)
+    if args.eth_status is not None:
+        backend.print_ethernet_status(parse_smi_device_input(args.eth_status))
         sys.exit(0)
     if args.snapshot or args.filename == "-":  # If we pass '-s' or '-f -"
         backend.print_logs_to_stdout(pretty=backend.pretty_output)

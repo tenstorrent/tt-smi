@@ -168,6 +168,26 @@ class TestSnapshot:
             assert "bus_peak_limit" in limits
             assert "board_power_limit" in limits
 
+    def test_ethernet_fields(self, snapshot, backend):
+        """Local Blackhole (UMD, new tt-umd) devices have an ethernet list; others have none."""
+        for i, device_info in zip(backend.devices, snapshot["device_info"]):
+            supported = (
+                backend.use_umd
+                and backend.is_blackhole(i)
+                and not backend.devices[i].is_remote()
+                and not backend.get_missing_eth_api(i)
+            )
+            if not supported:
+                assert "ethernet" not in device_info
+                continue
+            assert device_info.get("ethernet"), "Blackhole should list eth links"
+            for link in device_info["ethernet"]:
+                assert "channel" in link
+                assert "core" in link
+                assert "link" in link
+                assert "train_speed_gbps" in link
+                assert "target_speed_gbps" in link
+
     def test_snapshot_no_tty(self):
         """Test if the output from tt-smi -s --snapshot_no_tty can be parsed as json"""
         result = subprocess.run(
