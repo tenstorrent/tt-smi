@@ -31,6 +31,18 @@ class TestDriverVersion:
 
 
 class TestGetBoardType:
+
+    @pytest.mark.parametrize("bad_id", ["N/A", "", None, "not-hex"])
+    def test_get_board_type_invalid_inputs(self, bad_id):
+        assert get_board_type(bad_id) == "N/A"
+
+    def test_get_board_id_missing_fallback_telemetry(self):
+        from tt_smi.backend import TTSMIBackend
+        backend = object.__new__(TTSMIBackend)
+        backend.smbus_telem_info = [{"BOARD_ID": None, "BOARD_ID_LOW": None, "BOARD_ID_HIGH": None}]
+        assert backend.get_board_id(0) == "N/A"
+        backend.smbus_telem_info = [{}]
+        assert backend.get_board_id(0) == "N/A"
     @pytest.mark.parametrize(
         "upi,expected",
         [
