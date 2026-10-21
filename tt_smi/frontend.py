@@ -708,7 +708,7 @@ class TTSMI(App):
                         )
                 elif info == "pcie_width":
                     max_link_width = self.backend.pci_properties[i]["max_link_width"]
-                    if device.is_remote():
+                    if device.is_remote() or val == "N/A" or max_link_width == "N/A":
                         rows.append(
                             Text(
                                 f"N/A",
@@ -717,7 +717,7 @@ class TTSMI(App):
                             )
                         )
                     else:
-                        if val < max_link_width:
+                        if int(val) < int(max_link_width):
                             rows.append(
                                 Text(
                                     f"x{val}",
@@ -863,7 +863,7 @@ class TTSMI(App):
         """An [action](/guide/actions) to quit the app as soon as possible."""
         exit_message = Text(f"Exiting TT-SMI.", style="yellow")
         if self.snapshot:
-            log_name = self.backend.save_logs(self.result_filename)
+            log_name = self.backend.save_logs_to_file(self.result_filename)
             exit_message = exit_message + Text(
                 f"\nSaved tt-smi log to: {log_name}", style="purple"
             )
