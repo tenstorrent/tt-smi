@@ -239,7 +239,7 @@ def main():
         # Galaxy reset, without auto retries
         try:
             # reinit has to be enabled to detect devices post reset
-            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen)
+            glx_6u_trays_reset(reinit=not(args.no_reinit), print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
@@ -265,7 +265,7 @@ def main():
             try:
                 # Try to reset galaxy 6u trays
                 # reinit has to be enabled to detect devices post reset
-                glx_6u_trays_reset(reinit=True, print_status=is_tty, use_umd=not args.use_luwen)
+                glx_6u_trays_reset(reinit=True, print_status=is_tty, use_umd=not args.use_luwen, eth_train_skip=args.eth_train_skip)
                 break  # If reset was successful, break the loop
             except Exception as e:
                 reset_try_number += 1
