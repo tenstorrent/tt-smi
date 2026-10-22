@@ -8,7 +8,9 @@ from importlib.resources import files
 from importlib.metadata import version
 from typing import Dict, List, Optional, Tuple, Union
 
+from rich.console import Group
 from rich.style import Style
+from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.css.query import NoMatches
@@ -33,30 +35,43 @@ from .latest_releases import (
     ReleaseSpec,
     fetch_all,
     get_installed_all,
+    oldest_version,
     version_tuple,
 )
-from .utils import hex_to_semver_eth, hex_to_semver_m3_fw
+from .utils import hex_to_semver_eth, hex_to_semver_m3_fw, trim_semver
 
 
 class LatestReleasesBox(Container):
-    """Sidebar box showing the golden-pinned version of each tt-stack package.
+    """Sidebar box comparing each tt-stack package against its golden pin.
 
-    Versions come from the tt-sw-manifest golden stack, not from each repo's
+    Pins come from the tt-sw-manifest golden stack, not from each repo's
     newest upstream release. Renders a ProgressBar while the fetch is
-    in-flight, then swaps to a list of versions. If the fetch fails (e.g. no
-    internet), the list stays empty and the box just shows its border + title.
+    in-flight, then swaps to a table of current and tested versions. If the
+    fetch fails (e.g. no internet), the tested column is empty and an error
+    line follows the table.
     """
+
+    # Column widths.
+    #
+    # The sidebar is 40 columns wide, leaving 36 inside the border and
+    # padding. Every column has a fixed width and never wraps, so a version
+    # too long for its column is cut with an ellipsis instead of spilling
+    # onto the next line.
+    MARK_WIDTH = 1
+    LABEL_WIDTH = 9
+    VERSION_WIDTH = 11
 
     def __init__(self, id: str, title: str) -> None:
         super().__init__(id=id)
         self._base_title = title
         self.border_title = title
         self._versions: Dict[str, Optional[str]] = {}
-        # Specs in this dict are "checkable" (we know how to ask the host);
-        # a None value means "not installed". A status glyph only renders
-        # when an installed version is known.
+        # Specs in this dict are "checkable" (we know how to ask the host or
+        # the boards); a None value means "not installed". A status glyph only
+        # renders when a current version is known.
         self._installed: Dict[str, Optional[str]] = {}
-        self._key_width = max(len(s.name) for s in RELEASE_SPECS) + 1
+        # Whether boards run different firmware bundles.
+        self._mixed = False
 
     def compose(self) -> ComposeResult:
         yield ProgressBar(
@@ -72,9 +87,14 @@ class LatestReleasesBox(Container):
         self._versions[spec.name] = version
         self.query_one("#latest_releases_progress", ProgressBar).advance(1)
 
-    def set_installed(self, installed: Dict[str, Optional[str]]) -> None:
-        """Record installed-version lookups for the checkable specs."""
+    def set_installed(self, installed: Dict[str, Optional[str]], mixed: bool) -> None:
+        """Record current-version lookups for the checkable specs.
+
+        `mixed` marks that boards run different firmware bundles, in which
+        case the firmware entry holds the oldest.
+        """
         self._installed = installed
+        self._mixed = mixed
 
     def set_attempt(self, attempt: int, max_attempts: int) -> None:
         """Surface a retry indicator in the border title (e.g. 'attempt 2/3')."""
@@ -85,65 +105,68 @@ class LatestReleasesBox(Container):
         self.refresh()
 
     def finalize(self) -> None:
-        """All fetches done. Swap the progress bar out for the version list."""
+        """All fetches done. Swap the progress bar out for the version table."""
         self.border_title = self._base_title
         self.styles.border_title_color = None
         self.query_one("#latest_releases_progress", ProgressBar).display = False
         list_widget = self.query_one("#latest_releases_list", Static)
-        if any(v is not None for v in self._versions.values()):
-            list_widget.update(self._render_versions())
-        else:
-            list_widget.update(self._render_error())
+        list_widget.update(self._render_versions())
         list_widget.display = True
         self.refresh()
 
-    def _row_status(
-        self, spec_name: str, golden: Optional[str]
-    ) -> Tuple[str, Optional[Style], str, Optional[Style]]:
-        """Return (glyph, glyph_style, value_text, value_style) for one row.
+    def _row_cells(self, spec_name: str, golden: Optional[str]) -> Tuple[Text, Text, Text]:
+        """Return the (glyph, current, tested) cells for one row.
 
         Once both versions are known there are three states. Behind golden
-        shows "installed → golden" so the available bump is explicit. Ahead of
-        golden shows the installed version: running past the validated stack is
-        expected on dev hosts, so it's flagged rather than treated as an error,
-        and the row must not print a pin the host isn't actually on. A match
-        shows the pin itself.
+        shows the current version in yellow, so the available bump stands out.
+        Ahead of golden is expected on dev hosts, so it's flagged rather than
+        treated as an error. A match is marked as such. A version that can't
+        be determined shows a dash.
         """
         muted = Style(color="grey50")
+        tested = Text(golden) if golden is not None else Text("—", style=muted)
         installed = self._installed.get(spec_name)
         if installed is None:
-            # Not checkable on this host, or not installed: no status glyph.
-            if golden is None:
-                return ("", None, "—", muted)
-            return ("", None, golden, None)
+            # Not checkable, or not installed: no status glyph.
+            return (Text(""), Text("—", style=muted), tested)
+
+        current = installed
+        if spec_name == "tt-system-firmware" and self._mixed:
+            current += "*"
 
         if golden is None:
-            # We have installed but couldn't fetch the golden manifest.
-            return ("", None, "—", muted)
+            # We have the current version but couldn't fetch the golden manifest.
+            return (Text(""), Text(current), tested)
 
         if version_tuple(installed) > version_tuple(golden):
             ahead = Style(color="cyan")
-            return ("▲", ahead, installed, ahead)
+            return (Text("▲", style=ahead), Text(current, style=ahead), tested)
 
         if version_tuple(installed) == version_tuple(golden):
-            return ("✓", Style(color="green"), golden, None)
+            return (Text("✓", style=Style(color="green")), Text(current), tested)
 
-        return ("↑", Style(color="yellow"), f"{installed} → {golden}", Style(color="yellow"))
+        behind = Style(color="yellow")
+        return (Text("↑", style=behind), Text(current, style=behind), tested)
 
-    def _render_versions(self) -> Text:
-        text = Text()
+    def _render_versions(self) -> Group:
+        table = Table(box=None, padding=(0, 1, 0, 0), pad_edge=False)
+        table.add_column(width=self.MARK_WIDTH, no_wrap=True)
+        table.add_column(width=self.LABEL_WIDTH, no_wrap=True)
+        table.add_column("current", width=self.VERSION_WIDTH, no_wrap=True)
+        table.add_column("tested", width=self.VERSION_WIDTH, no_wrap=True)
         for spec in RELEASE_SPECS:
-            ver = self._versions.get(spec.name)
-            glyph, glyph_style, val_text, val_style = self._row_status(spec.name, ver)
-            leader = Text(f"{glyph} " if glyph else "  ", style=glyph_style)
-            key = Text(
-                f"{spec.name.ljust(self._key_width)}: ",
-                style=Style(color="#ffd10a", bold=True),
+            glyph, current, tested = self._row_cells(
+                spec.name, self._versions.get(spec.name)
             )
-            val = Text(f"{val_text}\n", style=val_style)
-            text.append_text(leader).append_text(key).append_text(val)
-        text.rstrip()
-        return text
+            label = Text(spec.label, style=Style(color="#ffd10a", bold=True))
+            table.add_row(glyph, label, current, tested)
+
+        parts = [table]
+        if self._mixed:
+            parts += [Text(""), Text("* boards differ: oldest shown")]
+        if all(v is None for v in self._versions.values()):
+            parts += [Text(""), self._render_error()]
+        return Group(*parts)
 
     def _render_error(self) -> Text:
         return Text(
@@ -231,7 +254,7 @@ class TTSMI(App):
                 if not self.offline:
                     yield LatestReleasesBox(
                         id="latest_releases",
-                        title="Tested Versions",
+                        title="Versions",
                     )
             with TabbedContent(
                 "Information (1)",
@@ -322,8 +345,18 @@ class TTSMI(App):
 
         fetch_all(timeout=5.0, on_done=on_done, on_attempt=on_attempt)
         installed = get_installed_all()
-        self.call_from_thread(box.set_installed, installed)
+        bundles = self.firmware_bundles()
+        installed["tt-system-firmware"] = oldest_version(bundles)
+        self.call_from_thread(box.set_installed, installed, len(set(bundles)) > 1)
         self.call_from_thread(box.finalize)
+
+    def firmware_bundles(self) -> List[str]:
+        """The firmware bundle version of each board that reports one."""
+        return [
+            trim_semver(info["fw_bundle_version"])
+            for info in self.backend.firmware_infos
+            if info["fw_bundle_version"] not in ("N/A", hex_to_semver_m3_fw(0))
+        ]
 
     def update_telem_table(self) -> None:
         """Update telemetry tables"""
@@ -385,6 +418,10 @@ class TTSMI(App):
                         Text(f"{val}", style=self.text_theme["gray"], justify="center")
                     )
                 else:
+                    if fw == "fw_bundle_version":
+                        # Match the Versions sidebar, which shows the bundle
+                        # in the golden pins' three-part form.
+                        val = trim_semver(val)
                     rows.append(
                         Text(f"{val}", style=self.text_theme["text_green"], justify="center")
                     )

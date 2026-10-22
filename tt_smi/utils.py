@@ -163,6 +163,18 @@ def hex_to_semver_m3_fw(hexsemver: int):
     return f"{major}.{minor}.{patch}.{ver}"
 
 
+def trim_semver(semver: str) -> str:
+    """Drops a zero fourth component, so 19.15.0.0 reads as 19.15.0.
+
+    Firmware bundles carry four components while the golden pins carry three.
+    Trimming makes the two read the same and compare equal.
+    """
+    parts = semver.split(".")
+    if len(parts) == 4 and parts[3] == "0":
+        return ".".join(parts[:3])
+    return semver
+
+
 def hex_to_semver_gddr_fw(raw: int) -> str:
     """
     Blackhole GDDR/MRISC FW telemetry (TAG_GDDR_FW_VERSION; UMD key GDDR_FW_VERSION): upper 16 bits = major,
