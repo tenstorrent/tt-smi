@@ -7,6 +7,7 @@ from tt_smi.utils import (
     get_board_type,
     convert_signed_16_16_to_float,
     hex_to_semver_gddr_fw,
+    trim_semver,
     is_driver_version_at_least,
     p100_dram_training_passed,
     bh_dram_training_passed,
@@ -120,6 +121,22 @@ class TestHexToSemverGddrFw:
     )
     def test_hex_to_semver_gddr_fw(self, raw, expected):
         assert hex_to_semver_gddr_fw(raw) == expected
+
+
+class TestTrimSemver:
+    """FW bundle versions read like the three-part golden pins."""
+
+    @pytest.mark.parametrize(
+        "semver,expected",
+        [
+            ("19.15.0.0", "19.15.0"),
+            ("19.15.0.1", "19.15.0.1"),  # Nonzero fourth part is kept
+            ("2.11.0", "2.11.0"),
+            ("N/A", "N/A"),
+        ],
+    )
+    def test_trim_semver(self, semver, expected):
+        assert trim_semver(semver) == expected
 
 
 class TestGddrTelemetryDecode:
