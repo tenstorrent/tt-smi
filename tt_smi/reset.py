@@ -415,6 +415,7 @@ def glx_6u_trays_reset(
     reset_time: str = "0xF",
     print_status: bool = True,
     use_umd: bool = False,
+    eth_train_skip: bool = False,
 ):
     """
     Reset the ASICs on the galaxy systems with the following steps:
@@ -532,15 +533,38 @@ def glx_6u_trays_reset(
         if use_umd:
             options = get_default_discovery_options()
             options.discover_remote_devices = False
-            options.wait_on_ethernet_link_training = False
-            _, devices = TopologyDiscovery.discover(options=options)
+            options.wait_on_ethernet_link_training = not eth_train_skip
+            cluster_descriptor, devices = TopologyDiscovery.discover(options=options)
             chip_count = len(devices)
+            if not eth_train_skip and cluster_descriptor is not None:
+                eth_conns = (
+                    cluster_descriptor.get_ethernet_connections()
+                    if hasattr(cluster_descriptor, "get_ethernet_connections")
+                    else {}
+                )
+                devices_missing_links = [
+                    dev_id
+                    for dev_id in devices
+                    if not eth_conns.get(dev_id)
+                ]
+                if eth_conns and devices_missing_links:
+                    print(
+                        CMD_LINE_COLOR.YELLOW,
+                        f"WARNING: Galaxy reset completed with missing Ethernet links on device(s): {devices_missing_links}. "
+                        "Re-run tt-smi -glx_reset_auto or cold boot if topology errors persist.",
+                        CMD_LINE_COLOR.ENDC,
+                    )
+                    raise RuntimeError(
+                        f"Missing Ethernet links after Galaxy reset on devices: {devices_missing_links}"
+                    )
         else:
             os.environ["RUST_BACKTRACE"] = "full"
             chips = detect_chips_with_callback(
-                local_only=True, ignore_ethernet=True, print_status=print_status
+                local_only=True, ignore_ethernet=eth_train_skip, print_status=print_status
             )
             chip_count = len(chips)
+            if not eth_train_skip and all( getattr(c, "as_wh", lambda: None)() for c in chips ):
+                check_wh_galaxy_eth_link_status(chips)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
