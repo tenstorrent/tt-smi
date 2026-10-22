@@ -466,9 +466,12 @@ def get_board_type(board_id: str) -> str:
                    |     +--------------- BBBBB = Unique Part Identifier (UPI)
                    +--------------------- AA
     """
-    if board_id == "N/A":
+    if not board_id or board_id == "N/A":
         return "N/A"
-    serial_num = int(f"0x{board_id}", base=16)
+    try:
+        serial_num = int(f"0x{board_id}", base=16)
+    except (TypeError, ValueError):
+        return "N/A"
     upi = (serial_num >> 36) & 0xFFFFF
 
     # Grayskull cards
