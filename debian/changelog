@@ -1,3 +1,16 @@
+tt-smi (6.8.0) noble; urgency=medium
+
+  [ Aleksa Jovanovic ]
+  * Stop using TTDevice get_pci_device in the UMD backend
+
+  [ Zakhary Kaplan ]
+  * feat(ui): redesign versions box
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.8.0
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 22 Oct 2026 18:54:12 +0000
+
 tt-smi (6.7.0) noble; urgency=medium
 
   [ Samridhi Bansal ]
