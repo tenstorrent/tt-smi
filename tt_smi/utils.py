@@ -15,6 +15,7 @@ from importlib.metadata import version
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
+from tt_umd import TopologyDiscovery, TTDevice
 
 from tt_smi import constants
 
@@ -614,3 +615,20 @@ def get_dev_id_from_bdf(bdf: str) -> int:
         sys.exit(1)
 
     return n
+
+
+def discover(options=None):
+    """
+    Discover devices with UMD and request the idle power state on each.
+
+    Discovery opens devices power-aware, which never lowers power on its own,
+    so a device left busy by boot or reset would stay busy. The driver
+    combines requests across every open handle, so a running workload keeps
+    its power state.
+    """
+    if options is None:
+        options = constants.get_default_discovery_options()
+    cluster_descriptor, devices = TopologyDiscovery.discover(options=options)
+    for device in devices.values():
+        device.set_power_state(TTDevice.PowerState.IDLE)
+    return cluster_descriptor, devices
