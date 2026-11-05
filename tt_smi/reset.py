@@ -19,6 +19,7 @@ from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_smi.utils import (
+    discover,
     get_dev_id_from_bdf,
     get_driver_version,
     is_driver_version_at_least,
@@ -35,7 +36,6 @@ from pyluwen import (
 from tt_umd import (
     WarmReset,
     PCIDevice,
-    TopologyDiscovery,
 )
 from tt_tools_common.utils_common.tools_utils import (
     detect_chips_with_callback,
@@ -394,7 +394,7 @@ def pci_board_reset(
                 if eth_train_skip:
                     options.discover_remote_devices = False
                     options.wait_on_ethernet_link_training = False
-                TopologyDiscovery.discover(options=options)
+                discover(options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status, ignore_ethernet=eth_train_skip)
@@ -533,7 +533,7 @@ def glx_6u_trays_reset(
             options = get_default_discovery_options()
             options.discover_remote_devices = False
             options.wait_on_ethernet_link_training = False
-            _, devices = TopologyDiscovery.discover(options=options)
+            _, devices = discover(options)
             chip_count = len(devices)
         else:
             os.environ["RUST_BACKTRACE"] = "full"
