@@ -1,3 +1,13 @@
+tt-smi (6.8.1) resolute; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * feat(umd): enable low power discovery
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 6.8.1
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 06 Nov 2026 17:03:43 +0000
+
 tt-smi (6.8.0) noble; urgency=medium
 
   [ Aleksa Jovanovic ]
