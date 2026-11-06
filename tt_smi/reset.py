@@ -20,6 +20,7 @@ from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_smi.utils import (
+    discover,
     get_dev_id_from_bdf,
     get_driver_version,
     is_driver_version_at_least,
@@ -36,7 +37,6 @@ from pyluwen import (
 from tt_umd import (
     WarmReset,
     PCIDevice,
-    TopologyDiscovery,
     ARCH,
     SmBusArcTelemetryReader,
     TelemetryTag,
@@ -384,7 +384,7 @@ def pci_board_reset(
                 if eth_train_skip:
                     options.discover_remote_devices = False
                     options.wait_on_ethernet_link_training = False
-                TopologyDiscovery.discover(options=options)
+                discover(options)
             else:
                 os.environ["RUST_BACKTRACE"] = "full"
                 detect_chips_with_callback(print_status=print_status, ignore_ethernet=eth_train_skip)
@@ -667,7 +667,7 @@ def _reinit_and_check_heartbeat(use_umd: bool, print_status: bool) -> set:
             options = get_default_discovery_options()
             options.discover_remote_devices = False
             options.wait_on_ethernet_link_training = False
-            cluster_descriptor, devices = TopologyDiscovery.discover(options=options)
+            cluster_descriptor, devices = discover(options)
             bdfs = cluster_descriptor.get_chip_pci_bdfs()
             chips_by_bdf = {_full_bdf(bdfs[i]): chip for i, chip in devices.items()}
         else:

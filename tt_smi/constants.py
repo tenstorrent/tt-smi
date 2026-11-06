@@ -14,6 +14,7 @@ def get_default_discovery_options():
     options.eth_fw_heartbeat_failure = TopologyDiscoveryOptions.Action.IGNORE
     options.cmfw_mismatch_action = TopologyDiscoveryOptions.Action.IGNORE
     options.unexpected_routing_firmware_config = TopologyDiscoveryOptions.Action.IGNORE
+    options.low_power = True
     return options
 
 SMBUS_TELEMETRY_LIST = [
