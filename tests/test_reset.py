@@ -15,7 +15,6 @@ from tt_smi.reset import (
     glx_6u_trays_reset,
     run_galaxy_ipmi_reset,
     GLX_IPMI_OP_MODE_NO_RETIMER,
-    GLX_IPMI_OP_MODE_WITH_RETIMER,
 )
 from tt_smi.device_input import (
     classify_single_input,
@@ -52,33 +51,19 @@ class TestGalaxyIpmiReset:
             "0xF",
         ]
 
-    def test_c9_falls_back_to_legacy_retimer_reset(self):
+    def test_c9_raises_without_legacy_fallback(self):
         fail_new = MagicMock(returncode=1, stdout="", stderr=BMC_C9_STDERR)
-        ok_old = MagicMock(returncode=0, stdout="", stderr="")
-        with patch(
-            "tt_smi.reset.subprocess.run", side_effect=[fail_new, ok_old]
-        ) as mock_run:
-            run_galaxy_ipmi_reset()
-        assert mock_run.call_count == 2
-        assert mock_run.call_args_list[0][0][0][7] == GLX_IPMI_OP_MODE_NO_RETIMER
-        assert mock_run.call_args_list[1][0][0][7] == GLX_IPMI_OP_MODE_WITH_RETIMER
-
-    def test_other_ipmi_failure_falls_back_to_legacy_retimer_reset(self):
-        fail_new = MagicMock(returncode=1, stdout="", stderr="Could not open device")
-        ok_old = MagicMock(returncode=0, stdout="", stderr="")
-        with patch(
-            "tt_smi.reset.subprocess.run", side_effect=[fail_new, ok_old]
-        ) as mock_run:
-            run_galaxy_ipmi_reset()
-        assert mock_run.call_count == 2
-        assert mock_run.call_args_list[1][0][0][7] == GLX_IPMI_OP_MODE_WITH_RETIMER
-
-    def test_fallback_failure_raises_runtime_error(self):
-        fail_new = MagicMock(returncode=1, stdout="", stderr=BMC_C9_STDERR)
-        fail_old = MagicMock(returncode=1, stdout="", stderr="Could not open device")
-        with patch("tt_smi.reset.subprocess.run", side_effect=[fail_new, fail_old]):
-            with pytest.raises(RuntimeError, match="IPMI command failed"):
+        with patch("tt_smi.reset.subprocess.run", side_effect=[fail_new]) as mock_run:
+            with pytest.raises(RuntimeError, match="upgrade BMC firmware"):
                 run_galaxy_ipmi_reset()
+        assert mock_run.call_count == 1
+
+    def test_other_ipmi_failure_raises_without_legacy_fallback(self):
+        fail_new = MagicMock(returncode=1, stdout="", stderr="Could not open device")
+        with patch("tt_smi.reset.subprocess.run", side_effect=[fail_new]) as mock_run:
+            with pytest.raises(RuntimeError, match="Could not open device"):
+                run_galaxy_ipmi_reset()
+        assert mock_run.call_count == 1
 
     def test_missing_ipmitool_raises_runtime_error(self):
         with patch(
@@ -274,7 +259,8 @@ class TestPciDriverReset:
         assert len(post_reset_devices) == len(pci_indices)
 
     def test_pci_reset_dev_id(
-        self, reset_test_config_with_backend: Tuple[Tuple[List[int], bool], TTSMIBackend]
+        self,
+        reset_test_config_with_backend: Tuple[Tuple[List[int], bool], TTSMIBackend],
     ):
         """
         Reset the first enumerated device by /dev/tenstorrent/<N> (tt-smi -r /dev/tenstorrent/N).
@@ -297,7 +283,8 @@ class TestPciDriverReset:
         assert len(post_reset_devices) == len(pci_indices)
 
     def test_pci_reset_pci_bdf(
-        self, reset_test_config_with_backend: Tuple[Tuple[List[int], bool], TTSMIBackend]
+        self,
+        reset_test_config_with_backend: Tuple[Tuple[List[int], bool], TTSMIBackend],
     ):
         """
         Reset the first enumerated device by /dev/tenstorrent/<N> (tt-smi -r /dev/tenstorrent/N).

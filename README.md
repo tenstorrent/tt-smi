@@ -123,7 +123,7 @@ options:
                         Reset targets: UMD logical IDs, PCI BDFs (e.g. 0000:0a:00.0), or /dev/tenstorrent/<id>. Use -ls to list devices. Omit targets or use "all" to reset all devices. Do not mix types in one command.
   --snapshot_no_tty     Force no-tty behavior in the snapshot to stdout
   -glx_reset, --galaxy_6u_trays_reset
-                        Reset all the ASICs on the galaxy host; prefers no PCIe retimer reset (BMC v0.05.22+), falls back to legacy retimer reset
+                        Reset all the ASICs on the galaxy host; uses the no-PCIe-retimer reset (BMC v0.05.22+ required)
   -glx_reset_auto, --galaxy_6u_trays_reset_auto
                         Reset all ASICs on the galaxy host, but do auto retries up to 3 times if reset fails
   -glx_list_tray_to_device, --galaxy_6u_list_tray_to_device
@@ -363,7 +363,7 @@ By default, the reset command will re-initialize the boards after reset. Use the
 
 There are several options available for resetting Galaxy 6U trays.
   - Use the `-r/--reset` argument and treat it like any other pcie card. Warning - Needs CPLD FW v1.16 or higher. 
-  - glx_reset: resets the galaxy without resetting PCIe retimers when BMC v0.05.22+ is present; falls back to the legacy retimer reset on older BMCs
+  - glx_reset: resets the galaxy without resetting PCIe retimers when BMC v0.05.22+ is present; needs BMC v0.05.22+ (no legacy retimer fallback)
   - glx_reset_auto: same as -glx_reset, but resets up to 3 times if an Ethernet failure has been detected
 
 ### Full galaxy reset
@@ -377,7 +377,7 @@ Driver loaded
  Detected Chips: 32
  Re-initialized 32 boards after reset. Exiting...
 ```
-This prefers `ipmitool raw 0x30 0x8B 0xF 0xFF 0x3 0xF` (no PCIe retimer reset). If that command fails — including older BMCs that reject it with `rsp=0xc9` (Parameter out of range) — tt-smi prints an error and falls back to the legacy `0x0` retimer reset so the trays still reset. BMC firmware v0.05.22 or later is required for the no-retimer path.
+This uses `ipmitool raw 0x30 0x8B 0xF 0xFF 0x3 0xF` (no PCIe retimer reset) only. If it fails, including on older BMCs that reject it with `rsp=0xc9` (Parameter out of range), tt-smi prints an error and does not reset; there is no fallback to the legacy `0x0` retimer reset, which also resets the NVMe retimers. BMC firmware v0.05.22 or later is required.
 To identify the correct tray number for resetting specific devices, users can run `tt-smi -glx_list_tray_to_device / --galaxy_6u_list_tray_to_device`. This command displays a mapping table that shows the relationship between tray numbers, tray bus IDs, and the corresponding PCI device IDs, making it easier to target the appropriate devices for reset operations. Note that this command should not be run in a virtual machine (VM) environment as it requires direct hardware access to the Galaxy system.
 
 ```
