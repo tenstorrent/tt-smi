@@ -389,10 +389,11 @@ class TTSMIBackend:
             self.device_telemetrys[i] = self.get_chip_telemetry(i)
             self.device_gddr_telemetrys[i] = self.get_gddr_telemetry(i)
 
-    def get_device_processes(self):
+    def get_device_processes(self, include_self: bool = False):
         """Scan /proc/driver/tenstorrent/N/pids for processes using devices."""
         procfs_base = "/proc/driver/tenstorrent"
         seen = {}
+        own_pid = os.getpid()
 
         try:
             devices = os.listdir(procfs_base)
@@ -413,6 +414,8 @@ class TTSMIBackend:
                         try:
                             pid = int(parts[0])
                         except ValueError:
+                            continue
+                        if not include_self and pid == own_pid:
                             continue
                         key = (pid, device)
                         if key not in seen:

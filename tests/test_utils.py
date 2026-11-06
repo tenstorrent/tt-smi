@@ -1,3 +1,4 @@
+import os
 # SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -339,3 +340,33 @@ class TestBhDramTrainingPassed:
         assert bh_dram_training_passed(dram_status) is expected
         # Back-compat alias used by older P100-only call sites.
         assert p100_dram_training_passed(dram_status) is expected
+
+
+class TestGetDeviceProcesses:
+    def test_excludes_own_pid_by_default(self, monkeypatch, tmp_path):
+        from tt_smi.backend import TTSMIBackend
+
+        dev0 = tmp_path / "0"
+        dev0.mkdir()
+        own_pid = os.getpid()
+        other_pid = own_pid + 10000
+        (dev0 / "pids").write_text(f"{own_pid}\n{other_pid}\n")
+
+        backend = object.__new__(TTSMIBackend)
+        monkeypatch.setattr("os.listdir", lambda path: ["0"])
+        real_open = open
+
+        def fake_open(path, *args, **kwargs):
+            if str(path) == "/proc/driver/tenstorrent/0/pids":
+                return real_open(dev0 / "pids", *args, **kwargs)
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", fake_open)
+        monkeypatch.setattr(backend, "_get_username", lambda pid: "testuser")
+        monkeypatch.setattr(backend, "_get_cmdline", lambda pid: f"cmd-{pid}")
+
+        procs_default = backend.get_device_processes()
+        assert [p["pid"] for p in procs_default] == [other_pid]
+
+        procs_with_self = backend.get_device_processes(include_self=True)
+        assert [p["pid"] for p in procs_with_self] == [own_pid, other_pid]
