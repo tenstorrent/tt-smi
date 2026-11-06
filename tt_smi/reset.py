@@ -449,7 +449,7 @@ def glx_6u_trays_reset(
         sys.exit(1)
     print(
         CMD_LINE_COLOR.PURPLE,
-        "Resetting WH Galaxy trays with reset command...",
+        "Resetting Galaxy trays with reset command...",
         CMD_LINE_COLOR.ENDC,
     )
 
