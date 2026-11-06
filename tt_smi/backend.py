@@ -481,11 +481,12 @@ class TTSMIBackend:
             board_id = int(self.smbus_telem_info[board_num]["BOARD_ID"], base=16)
             return f"{board_id:016x}"
         else:
-            board_info_0 = int(self.smbus_telem_info[board_num]["BOARD_ID_LOW"], base=16)
-            board_info_1 = int(self.smbus_telem_info[board_num]["BOARD_ID_HIGH"], base=16)
-
-            if board_info_0 is None or board_info_1 is None:
+            raw_low = self.smbus_telem_info[board_num].get("BOARD_ID_LOW")
+            raw_high = self.smbus_telem_info[board_num].get("BOARD_ID_HIGH")
+            if raw_low is None or raw_high is None:
                 return "N/A"
+            board_info_0 = int(raw_low, base=16)
+            board_info_1 = int(raw_high, base=16)
             return f"{board_info_1:08x}{board_info_0:08x}"
 
     def get_dram_speed(self, board_num) -> int:
