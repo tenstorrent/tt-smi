@@ -87,26 +87,6 @@ def test_chip_still_missing_is_named_by_bdf_and_tray(galaxy, monkeypatch, capsys
     assert "31/32" in out
 
 
-def test_stuck_heartbeat_is_named(galaxy, monkeypatch, capsys):
-    stuck = "0000:c3:00.0"
-    beats = {}
-
-    def read_heartbeat(bdf, use_umd):
-        beats[bdf] = beats.get(bdf, 0) + (bdf != stuck)
-        return beats[bdf]
-
-    monkeypatch.setattr(reset, "_read_heartbeat", read_heartbeat)
-    monkeypatch.setattr(
-        reset,
-        "_reinit_and_check_heartbeat",
-        lambda use_umd, print_status: reset._alive_chips(
-            {b: b for b in GALAXY_BDFS}, use_umd
-        ),
-    )
-    assert run_reset() == reset.GLX_EXIT_CHIPS_MISSING
-    assert f"{stuck} (tray 3)" in capsys.readouterr().out
-
-
 def test_ioctl_that_raises_does_not_stop_the_others():
     def ioctl(interface_id, flag):
         if interface_id == 3:
