@@ -349,7 +349,7 @@ class TTSMIBackend:
                 telem_reader = SmBusArcTelemetryReader(self.devices[board_num])
                 tag_collection = wormhole.TelemetryTag
             elif arch == ARCH.BLACKHOLE:
-                telem_reader = self.devices[board_num].get_arc_telemetry_reader()
+                telem_reader = self.devices[board_num].get_firmware_telemetry_reader()
                 tag_collection = TelemetryTag
             else:
                 raise ValueError(f"Unknown arch for device {board_num}")
