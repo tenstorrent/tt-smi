@@ -25,6 +25,14 @@ on:
 jobs:
   build-deb:
     name: Build ${{ matrix.os }} Package
+    # Only a run started on main gets the Debian signing key: the OSPO Vault
+    # role binds ref main and this environment (OSPO-825).
+    environment: deb-signing
+    # About 3 minutes per matrix job today; the Vault step stops after 10.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -64,11 +72,54 @@ jobs:
             python3-all \
             python3-pip \
             python3-tomli
+      # The Debian signing key comes from the OSPO Vault (OSPO-825). It goes to
+      # the import step through `with:` only: not into `run:` text, the job
+      # environment, a log or an artifact.
+      - name: Get the Debian signing key
+        id: vault
+        timeout-minutes: 10
+        uses: tenstorrent/.github/actions/vault-secrets@a697f1bb22ad8b488b0ac63f9a261e462179fe13 # vault-secrets-v1.0.0
+        with:
+          role: tenstorrent--tt-smi--deb-signing
+          secrets: |
+            kv/data/tenstorrent/all.debian_signing_key private | DEB_SIGNING_KEY ;
+            kv/data/tenstorrent/all.debian_signing_key public | DEB_SIGNING_PUBLIC_KEY
       - name: Import GPG key
         id: gpg_key_import
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
+          gpg_private_key: ${{ fromJSON(steps.vault.outputs.secrets).DEB_SIGNING_KEY }}
+      # The imported secret key must be the key whose public part is in Vault.
+      # Prints fingerprints only.
+      - name: Check the imported key against the public key
+        shell: bash
+        env:
+          DEB_SIGNING_PUBLIC_KEY: ${{ fromJSON(steps.vault.outputs.secrets).DEB_SIGNING_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          primary_fprs() { awk -F: '($1 == "pub" || $1 == "sec") { want = 1; next } $1 == "fpr" && want { print $10; want = 0 }'; }
+          tmp="$(mktemp -d)"
+          trap 'gpgconf --homedir "$tmp" --kill all >/dev/null 2>&1 || true; rm -rf "$tmp"' EXIT
+          printf '%s\n' "$DEB_SIGNING_PUBLIC_KEY" | gpg --homedir "$tmp" --batch --quiet --import
+          vault_fpr="$(gpg --homedir "$tmp" --batch --with-colons --list-keys | primary_fprs)"
+          imported_fpr="$(gpg --batch --with-colons --list-secret-keys | primary_fprs)"
+          echo "Imported secret key: ${imported_fpr:-none}"
+          echo "Public key from Vault: ${vault_fpr:-none}"
+          if [ -z "$vault_fpr" ] || [ "$(printf '%s\n' "$vault_fpr" | wc -l)" -ne 1 ] || [ "$imported_fpr" != "$vault_fpr" ]; then
+            echo "::error::The imported signing key does not match the public key from Vault."
+            exit 1
+          fi
+      # The shared Vault action does not leave the tailnet. The build steps
+      # below do not need it.
+      - name: Leave tailnet
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo tailscale logout || { echo "::warning::tailscale logout failed; taking the interface down"; sudo tailscale down || true; }
+          else
+            echo "not on the tailnet"
+          fi
       - run: gpg --list-keys
       - run: gpg --list-secret-keys
       - uses: actions/checkout@v4
