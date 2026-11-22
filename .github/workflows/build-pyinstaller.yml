@@ -66,14 +66,6 @@ jobs:
             binutils \
             libc6-dev
 
-      - name: Import GPG key
-        id: gpg_key_import
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
-      - run: gpg --list-keys
-      - run: gpg --list-secret-keys
-
       - name: Download wheel built by build-pypi
         uses: actions/download-artifact@v4
         with:
