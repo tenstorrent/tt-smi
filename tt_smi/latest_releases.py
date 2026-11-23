@@ -23,6 +23,9 @@ from typing import Callable, Dict, List, Optional, Tuple
 class ReleaseSpec:
     name: str
     pin: str
+    # Short row name for the sidebar, which is too narrow for the full package
+    # names.
+    label: str
     # cli=None means there's no PATH-based check for this package (firmware,
     # metalium image, etc.). tt-kmd has no CLI but is checkable via sysfs, so
     # we leave cli=None and special-case it in get_installed_version.
@@ -30,12 +33,12 @@ class ReleaseSpec:
 
 
 RELEASE_SPECS: List[ReleaseSpec] = [
-    ReleaseSpec("tt-kmd",             "kmd"),
-    ReleaseSpec("tt-smi",             "smi",            cli="tt-smi"),
-    ReleaseSpec("tt-flash",           "flash",          cli="tt-flash"),
-    ReleaseSpec("tt-system-firmware", "firmware"),
-    ReleaseSpec("tt-metal",           "metal-version"),
-    ReleaseSpec("tt-installer",       "installer"),
+    ReleaseSpec("tt-kmd",             "kmd",           "kmd"),
+    ReleaseSpec("tt-smi",             "smi",           "smi",       cli="tt-smi"),
+    ReleaseSpec("tt-flash",           "flash",         "flash",     cli="tt-flash"),
+    ReleaseSpec("tt-system-firmware", "firmware",      "fw bundle"),
+    ReleaseSpec("tt-metal",           "metal-version", "metal"),
+    ReleaseSpec("tt-installer",       "installer",     "installer"),
 ]
 
 GOLDEN_MANIFEST_URL = "https://github.com/tenstorrent/tt-sw-manifest/releases/latest/download/golden.json"
@@ -86,7 +89,9 @@ def get_installed_all() -> Dict[str, Optional[str]]:
 
     Returns {package_name: version_or_None}, only for specs where we have a
     way to check. Specs not in the returned dict are "not checkable" (e.g.
-    tt-system-firmware, tt-metal) and should render without a status glyph.
+    tt-metal) and should render without a status glyph. tt-system-firmware
+    runs on the boards rather than the host, so the caller fills it in from
+    device telemetry.
     """
     return {
         spec.name: get_installed_version(spec)
@@ -104,6 +109,15 @@ def version_tuple(v: str) -> Tuple[int, ...]:
         except ValueError:
             break
     return tuple(parts)
+
+
+def oldest_version(versions: List[str]) -> Optional[str]:
+    """The oldest of the given versions, or None if there are none.
+
+    Boards in one host can run different firmware bundles. The oldest is the
+    one that needs updating, so it's the one compared against the pin.
+    """
+    return min(versions, key=version_tuple, default=None)
 
 
 def _fetch_golden(timeout: float) -> Optional[Dict[str, str]]:

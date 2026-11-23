@@ -224,28 +224,39 @@ Host processes currently holding open Tenstorrent device handles. Updated about 
 | Device | Logical device index the process is using. |
 | Command | Process command line (or executable name) as reported by the host. |
 
-### Tested Versions
+### Versions
 
-The sidebar box lists the version of each component in the Tenstorrent software
-stack that we have validated. These are **not** each project's newest release.
-They come from [`golden.json`][golden] in the latest [tt-sw-manifest][manifest]
-release: the set of versions that CI installs and exercises together as one
-stack. Renovate opens a PR there as components publish new releases, and a pin
-only moves once the full validation suite passes on the combination, so the
-newest release of a component and its tested version can differ. This is the
-same set that [tt-installer][installer] installs by default.
+The sidebar box compares each component of the Tenstorrent software stack
+against the version we have validated.
 
-Where TT-SMI can determine what is installed on the host (tt-kmd through sysfs,
-tt-smi and tt-flash through their CLIs), the row is marked:
+The **tested** column holds the validated versions. These are **not** each
+project's newest release. They come from [`golden.json`][golden] in the latest
+[tt-sw-manifest][manifest] release: the set of versions that CI installs and
+exercises together as one stack. Renovate opens a PR there as components
+publish new releases, and a pin only moves once the full validation suite
+passes on the combination, so the newest release of a component and its tested
+version can differ. This is the same set that [tt-installer][installer]
+installs by default.
+
+The **current** column holds what this system is running, where TT-SMI can
+determine it:
+
+| Row | Current version |
+|-----|-----------------|
+| kmd | The driver loaded in the kernel, from sysfs. After installing a new driver, this stays on the old version until the module is reloaded or the host reboots. |
+| smi, flash | The `tt-smi` and `tt-flash` found on `PATH`. |
+| fw bundle | The FW Bundle Version from the [FW Version tab](#fw-version-4). When boards run different bundles, the oldest is shown, marked with `*`. |
+
+Rows with a current version are marked:
 
 | Marker | Meaning |
 |--------|---------|
 | `✓` | Matches the tested version. |
-| `↑` | Older than the tested version, shown as `installed → tested`. |
-| `▲` | Newer than the tested version. Not an error: the host is running ahead of the validated stack, so this particular combination has not been tested together. |
+| `↑` | Older than the tested version. |
+| `▲` | Newer than the tested version. Not an error: the system is running ahead of the validated stack, so this particular combination has not been tested together. |
 
-Rows with no marker are informational, since TT-SMI has no way to tell what is
-installed for them.
+A `—` marks a version TT-SMI could not determine. The metal and installer rows
+are informational, since TT-SMI has no way to tell what is installed for them.
 
 Run `tt-smi --offline` to skip the fetch and hide the box.
 

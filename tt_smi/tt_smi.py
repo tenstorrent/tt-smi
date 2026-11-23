@@ -15,14 +15,12 @@ import sys
 import argparse
 from importlib.metadata import version
 
-from tt_umd import TopologyDiscovery
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import detect_chips_with_callback
 from tt_smi.utils import get_driver_version
 
-from tt_smi import constants
 from tt_smi.backend import TTSMIBackend
-from tt_smi.utils import check_is_galaxy, is_vm
+from tt_smi.utils import check_is_galaxy, discover, is_vm
 from tt_smi.reset import (
     pci_board_reset,
     glx_6u_trays_reset,
@@ -86,7 +84,7 @@ def parse_args():
         "--offline",
         default=False,
         action="store_true",
-        help="Do not access the network; hides the Tested Versions box",
+        help="Do not access the network; hides the Versions box",
     )
     parser.add_argument(
         "-r",
@@ -288,7 +286,7 @@ def main():
 
     try:
         if not args.use_luwen:
-            cluster_descriptor, devices = TopologyDiscovery.discover(options=constants.get_default_discovery_options())
+            cluster_descriptor, devices = discover()
         else:
             cluster_descriptor = None
             devices = dict(enumerate(detect_chips_with_callback(
