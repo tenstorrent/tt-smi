@@ -557,6 +557,13 @@ def check_is_galaxy(backend, user_arg: str):
         sys.exit(1)
 
 
+def galaxy_tray(bus_id: int, ubb_bus_ids: Dict[int, int]) -> int:
+    """Galaxy tray number of a PCI bus number (0 if it is on no tray)."""
+    return next(
+        (tray for tray, base in ubb_bus_ids.items() if base == bus_id & 0xF0), 0
+    )
+
+
 def is_vm() -> bool:
     """Return True if running inside a VM (e.g. hypervisor present in /proc/cpuinfo)."""
     try:

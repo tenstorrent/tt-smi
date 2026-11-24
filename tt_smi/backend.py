@@ -31,6 +31,7 @@ from tt_smi.utils import (
     hex_to_semver_gddr_fw,
     hex_to_semver_eth_wh,
     get_board_type,
+    galaxy_tray,
     convert_signed_16_16_to_float,
     dict_from_public_attrs,
     get_host_software_versions,
@@ -312,16 +313,12 @@ class TTSMIBackend:
         )
 
         def _get_mapping_tray_to_device():
-            bus_id_to_tray = {
-                bus_id: tray_num for tray_num, bus_id in ubb_bus_ids.items()
-            }
             tray_to_devices = {}
             for i, device_info in enumerate(self.device_infos):
                 # Extract bus id from "domain:bus:device.function" format
                 bus_id = int(device_info["bus_id"].split(":")[1], 16)
-                tray_bus_id = bus_id & 0xF0
-                if tray_bus_id in bus_id_to_tray:
-                    tray_num = bus_id_to_tray[tray_bus_id]
+                tray_num = galaxy_tray(bus_id, ubb_bus_ids)
+                if tray_num:
                     tray_to_devices.setdefault(tray_num, []).append(i)
             return tray_to_devices
 

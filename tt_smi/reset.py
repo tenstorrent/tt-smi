@@ -8,6 +8,7 @@ Device-selection parsing for ``-r`` / ``--reset`` lives in
 :mod:`tt_smi.device_input`; this module focuses on the reset mechanism itself.
 """
 
+import glob
 import os
 import subprocess
 import sys
@@ -21,17 +22,18 @@ from tt_tools_common.reset_common.bh_reset import BHChipReset
 from tt_smi.utils import (
     discover,
     get_dev_id_from_bdf,
+    galaxy_tray,
     get_driver_version,
     is_driver_version_at_least,
     IoctlResetFlags,
     reset_device_ioctl,
 )
+from tt_smi import constants
 from tt_smi.constants import get_default_discovery_options
 from tt_smi.device_input import SmiDeviceInput, SmiDeviceTargetKind
 from pyluwen import (
     PciChip,
     pci_scan,
-    run_ubb_wait_for_driver_load,
 )
 from tt_umd import (
     WarmReset,
@@ -47,6 +49,10 @@ MINIMUM_DRIVER_VERSION_GALAXY_SECONDARY_BUS_RESET = "2.7.0"
 MINIMUM_BMC_VERSION_NO_RETIMER_RESET = "0.05.22"
 GLX_IPMI_OP_MODE_WITH_RETIMER = "0x0"
 GLX_IPMI_OP_MODE_NO_RETIMER = "0x3"
+GLX_EXPECTED_CHIPS = 32
+GLX_EXIT_CHIPS_MISSING = 4
+GLX_RECOUNT_TIMEOUT_S = 120
+SYSFS_PCI = "/sys/bus/pci"
 
 
 def _ipmi_output_is_param_out_of_range(output: str) -> bool:
@@ -164,7 +170,12 @@ def parallel_reset_device_ioctl(device_ids: List[int], flag: int) -> List[int]:
         return []
 
     def ioctl_one(interface_id: int) -> tuple[int, bool]:
-        return interface_id, reset_device_ioctl(interface_id, flag)
+        # A chip that cannot be opened counts as failed; the others go on.
+        try:
+            return interface_id, reset_device_ioctl(interface_id, flag)
+        except OSError as e:
+            print(f"/dev/tenstorrent/{interface_id}: {e}")
+            return interface_id, False
 
     failed: List[int] = []
     with ThreadPoolExecutor(max_workers=len(device_ids)) as pool:
@@ -222,33 +233,6 @@ def check_wh_galaxy_eth_link_status(devices):
                 CMD_LINE_COLOR.ENDC,
             )
         raise Exception("WH Galaxy Ethernet link errors detected!")
-
-def umd_ubb_wait_for_driver_load():
-    """
-    Wait for the driver to reload for UMD, try 100 times.
-    Similar to luwen's ubb_wait_for_driver_load but uses PCIDevice.enumerate_devices.
-    """
-    attempts = 0
-    expected_chip_count = 32
-
-    while attempts < 100:
-        device_count = 0
-        try:
-            devices = PCIDevice.enumerate_devices()
-            device_count = len(devices)
-            if device_count == expected_chip_count:
-                print(f"Driver loaded with {device_count} devices")
-                return
-        except Exception:
-            pass
-
-        print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
-        time.sleep(1)
-        attempts += 1
-
-    raise Exception(
-        f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up"
-    )
 
 def umd_pci_warm_reset(
     reset_input: SmiDeviceInput,
@@ -407,6 +391,73 @@ def pci_board_reset(
             sys.exit(1)
 
 
+def _bmc_problem() -> str:
+    """Return "" if the BMC answers in-band Get Device ID, else what went wrong."""
+    try:
+        result = subprocess.run(
+            ["sudo", "ipmitool", "mc", "info"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except FileNotFoundError:
+        return "ipmitool not found"
+    except subprocess.TimeoutExpired:
+        return "no answer within 15 s"
+    return _ipmi_failure_detail(result)
+
+
+def _glx_chips() -> tuple:
+    """Tenstorrent chips in sysfs: (BDF -> PCI device id of every chip listed,
+    set of BDFs that answer config reads (not all ones) with the driver bound)."""
+    known, present = {}, set()
+    for path in glob.glob(os.path.join(SYSFS_PCI, "devices", "*")):
+        bdf = os.path.basename(path)
+        try:
+            with open(os.path.join(path, "vendor")) as f:
+                if f.read().strip() != "0x1e52":
+                    continue
+            with open(os.path.join(path, "device")) as f:
+                known[bdf] = f.read().strip()
+            with open(os.path.join(path, "config"), "rb") as f:
+                if f.read(2) != b"\x52\x1e":
+                    continue
+            driver = os.readlink(os.path.join(path, "driver"))
+            if os.path.basename(driver) == "tenstorrent":
+                present.add(bdf)
+        except OSError:
+            continue
+    return known, present
+
+
+def _pci_rescan():
+    result = subprocess.run(
+        ["sudo", "tee", os.path.join(SYSFS_PCI, "rescan")],
+        input="1",
+        capture_output=True,
+        text=True,
+    )
+    error = _ipmi_failure_detail(result)
+    if error:
+        print(
+            f"{CMD_LINE_COLOR.YELLOW}Warning: PCI rescan failed: {error}"
+            f"{CMD_LINE_COLOR.ENDC}"
+        )
+
+
+def _wait_for_glx_chips() -> tuple:
+    """Rescan and recount until GLX_EXPECTED_CHIPS are present, or
+    GLX_RECOUNT_TIMEOUT_S passes."""
+    deadline = time.monotonic() + GLX_RECOUNT_TIMEOUT_S
+    while True:
+        known, present = _glx_chips()
+        print(f"Recount after reset: {len(present)}/{GLX_EXPECTED_CHIPS} chips present")
+        if len(present) >= GLX_EXPECTED_CHIPS or time.monotonic() > deadline:
+            return known, present
+        _pci_rescan()
+        time.sleep(10)
+
+
 def glx_6u_trays_reset(
     reinit: bool = True,
     ubb_num: str = "0xF",
@@ -418,11 +469,13 @@ def glx_6u_trays_reset(
 ):
     """
     Reset the ASICs on the galaxy systems with the following steps:
-    1. Perform USER_RESET ioctl on all chips
-    2. Reset the trays with IPMI (op_mode 0x3, no PCIe retimer)
-    3. Wait for 30s
-    4. Perform POST_RESET ioctl on all chips
-    5. Reinit all chips
+    1. Check that the BMC answers; if not, reset nothing
+    2. Perform USER_RESET ioctl on all chips
+    3. Reset the trays with IPMI (op_mode 0x3, no PCIe retimer)
+    4. Wait for 30s, then rescan and recount until all 32 chips are back
+    5. Perform POST_RESET ioctl on all chips
+    6. Reinit all chips
+    Exits GLX_EXIT_CHIPS_MISSING (4) naming each chip not back, by BDF and tray.
 
     Args:
         reinit: Whether to reinitialize the chips after reset.
@@ -447,6 +500,16 @@ def glx_6u_trays_reset(
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
+    bmc_problem = _bmc_problem()
+    if bmc_problem:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Error: BMC does not answer in-band (ipmitool mc info): {bmc_problem}\n"
+            "No chip was reset.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(1)
+    known_before, _ = _glx_chips()
     print(
         CMD_LINE_COLOR.PURPLE,
         "Resetting WH Galaxy trays with reset command...",
@@ -491,8 +554,7 @@ def glx_6u_trays_reset(
     # op_mode 0x0 — that asserts RST_RETIMER_PERST_N and can drop NVMe.
     run_galaxy_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
     timed_wait(30)
-    # This function waits for all 32 chips to reappear on the bus.
-    run_ubb_wait_for_driver_load()
+    known, present = _wait_for_glx_chips()
 
     # Issue POST_RESET ioctl on all devices after they reappear
     if use_umd:
@@ -513,6 +575,28 @@ def glx_6u_trays_reset(
             f"Error: POST_RESET failed for device /dev/tenstorrent/{interface_id}.",
             CMD_LINE_COLOR.ENDC,
         )
+
+    known.update(known_before)
+    ubb_bus_ids = (
+        constants.WH_UBB_BUS_IDS
+        if "0x401e" in known.values()
+        else constants.BH_UBB_BUS_IDS
+    )
+    missing = sorted(set(known) - present)
+    for bdf in missing:
+        tray = galaxy_tray(int(bdf.split(":")[1], 16), ubb_bus_ids)
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Error: chip {bdf} (tray {tray}) did not come back after reset.",
+            CMD_LINE_COLOR.ENDC,
+        )
+    if missing or len(present) < GLX_EXPECTED_CHIPS:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Only {len(present)}/{GLX_EXPECTED_CHIPS} chips back.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(GLX_EXIT_CHIPS_MISSING)
     if post_reset_failed:
         sys.exit(1)
 
