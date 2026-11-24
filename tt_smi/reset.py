@@ -234,33 +234,6 @@ def check_wh_galaxy_eth_link_status(devices):
             )
         raise Exception("WH Galaxy Ethernet link errors detected!")
 
-def umd_ubb_wait_for_driver_load():
-    """
-    Wait for the driver to reload for UMD, try 100 times.
-    Similar to luwen's ubb_wait_for_driver_load but uses PCIDevice.enumerate_devices.
-    """
-    attempts = 0
-    expected_chip_count = 32
-
-    while attempts < 100:
-        device_count = 0
-        try:
-            devices = PCIDevice.enumerate_devices()
-            device_count = len(devices)
-            if device_count == expected_chip_count:
-                print(f"Driver loaded with {device_count} devices")
-                return
-        except Exception:
-            pass
-
-        print(f"Waiting for driver load ... {attempts} seconds (found {device_count} devices)")
-        time.sleep(1)
-        attempts += 1
-
-    raise Exception(
-        f"Driver not loaded with {expected_chip_count} devices after 100 seconds... giving up"
-    )
-
 def umd_pci_warm_reset(
     reset_input: SmiDeviceInput,
 ):
@@ -458,18 +431,13 @@ def _glx_chips() -> tuple:
 
 
 def _pci_rescan():
-    path = os.path.join(SYSFS_PCI, "rescan")
-    try:
-        with open(path, "w") as f:
-            f.write("1")
-        return
-    except PermissionError:
-        result = subprocess.run(
-            ["sudo", "tee", path], input="1", capture_output=True, text=True
-        )
-        error = _ipmi_failure_detail(result)
-    except OSError as e:
-        error = str(e)
+    result = subprocess.run(
+        ["sudo", "tee", os.path.join(SYSFS_PCI, "rescan")],
+        input="1",
+        capture_output=True,
+        text=True,
+    )
+    error = _ipmi_failure_detail(result)
     if error:
         print(
             f"{CMD_LINE_COLOR.YELLOW}Warning: PCI rescan failed: {error}"
@@ -477,15 +445,14 @@ def _pci_rescan():
         )
 
 
-def _wait_for_glx_chips(expected: set) -> tuple:
-    """Rescan and recount until every chip seen before the reset is back and
-    there are at least GLX_EXPECTED_CHIPS, or GLX_RECOUNT_TIMEOUT_S passes."""
+def _wait_for_glx_chips() -> tuple:
+    """Rescan and recount until GLX_EXPECTED_CHIPS are present, or
+    GLX_RECOUNT_TIMEOUT_S passes."""
     deadline = time.monotonic() + GLX_RECOUNT_TIMEOUT_S
     while True:
         known, present = _glx_chips()
         print(f"Recount after reset: {len(present)}/{GLX_EXPECTED_CHIPS} chips present")
-        done = not (expected - present) and len(present) >= GLX_EXPECTED_CHIPS
-        if done or time.monotonic() > deadline:
+        if len(present) >= GLX_EXPECTED_CHIPS or time.monotonic() > deadline:
             return known, present
         _pci_rescan()
         time.sleep(10)
@@ -587,7 +554,7 @@ def glx_6u_trays_reset(
     # op_mode 0x0 — that asserts RST_RETIMER_PERST_N and can drop NVMe.
     run_galaxy_ipmi_reset(ubb_num, dev_num, op_mode, reset_time)
     timed_wait(30)
-    known, present = _wait_for_glx_chips(set(known_before))
+    known, present = _wait_for_glx_chips()
 
     # Issue POST_RESET ioctl on all devices after they reappear
     if use_umd:

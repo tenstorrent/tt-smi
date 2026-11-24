@@ -95,3 +95,18 @@ def test_ioctl_that_raises_does_not_stop_the_others():
 
     with patch("tt_smi.reset.reset_device_ioctl", side_effect=ioctl):
         assert reset.parallel_reset_device_ioctl([0, 1, 2, 3, 4], 0) == [3]
+
+
+def test_rescan_always_writes_through_sudo_tee(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append((cmd, kwargs["input"]))
+        return subprocess.CompletedProcess(cmd, 1, "", "sudo: a password is required")
+
+    monkeypatch.setattr(reset, "SYSFS_PCI", str(tmp_path))
+    monkeypatch.setattr(reset.subprocess, "run", run)
+    reset._pci_rescan()
+    assert calls == [(["sudo", "tee", str(tmp_path / "rescan")], "1")]
+    assert not (tmp_path / "rescan").exists()
+    assert "PCI rescan failed: sudo: a password is required" in capsys.readouterr().out
